@@ -1,0 +1,13 @@
+:root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+body { margin: 2rem; background: #0f1115; color: #eef2f7; }
+header h1 { margin: 0 0 .25rem; }
+header p#meta { margin: .25rem 0 1rem; color: #9fb0c0; }
+.actions a, .actions button {
+  background: #1a2230; color: #e3eaf2; border: 1px solid #29354a;
+  padding: .5rem .75rem; margin-right: .5rem; border-radius: 8px; cursor: pointer;
+  text-decoration: none;
+}
+table { width: 100%; border-collapse: collapse; margin-top: .5rem; }
+th, td { border-bottom: 1px solid #29354a; padding: .6rem .5rem; text-align: left; }
+tbody tr:hover { background: #151c27; }
+strong { color: #55d38a; }
