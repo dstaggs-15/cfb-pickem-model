@@ -21,16 +21,19 @@ INPUT_GAMES_TXT = os.path.join("docs", "input", "games.txt")
 INPUT_ALIASES_JSON = os.path.join("docs", "input", "aliases.json")  # optional
 PRED_OUT_JSON = os.path.join("docs", "data", "predictions.json")
 
-# Features for the stat-diff model
+# Use LAST_N recent games (pre-game rolling means)
+LAST_N = 5
+
+# Box-score stats we use (long -> numeric -> averaged)
 STAT_FEATURES = [
     "totalYards","netPassingYards","rushingYards",
     "firstDowns","turnovers","sacks","tacklesForLoss",
     "thirdDownEff","fourthDownEff","kickingPoints"
 ]
 
-# Ensemble weights (tune these)
-ELO_WEIGHT  = 0.60    # weight for Elo probability
-STAT_WEIGHT = 0.40    # weight for logistic-regression probability
+# Ensemble weights
+ELO_WEIGHT  = 0.60    # Elo probability weight
+STAT_WEIGHT = 0.40    # Logistic (last-N diff) probability weight
 
 # Elo params
 ELO_START = 1500.0
@@ -38,12 +41,13 @@ ELO_K = 20.0
 ELO_HFA = 55.0          # home field advantage in Elo points
 ELO_MOV_SCALING = True  # margin-of-victory scaling
 
+
 # =========================
-# Team aliases (built-in) — augmented by docs/input/aliases.json if present
-# Map common short names -> dataset names (as they appear in cfb_schedule.csv)
+# Team aliases (common names -> dataset names)
+# Augmented by docs/input/aliases.json if present.
 # =========================
 BUILTIN_ALIASES = {
-    # Your recent games / screenshot teams
+    # Common teams / ones you’ve used
     "ohio state": "Ohio State Buckeyes",
     "texas": "Texas Longhorns",
     "northwestern": "Northwestern Wildcats",
@@ -100,7 +104,7 @@ BUILTIN_ALIASES = {
     "wake forest": "Wake Forest Demon Deacons", "virginia tech": "Virginia Tech Hokies",
     "boston college": "Boston College Eagles", "syracuse": "Syracuse Orange",
     "louisville": "Louisville Cardinals", "georgia tech": "Georgia Tech Yellow Jackets",
-    "pittsburgh": "Pittsburgh Panthers", "pitt": "Pittsburgh Panthers",
+    "pitt": "Pittsburgh Panthers", "pittsburgh": "Pittsburgh Panthers",
 
     "boise state": "Boise State Broncos", "san diego state": "San Diego State Aztecs",
     "san jose state": "San Jose State Spartans", "air force": "Air Force Falcons",
@@ -122,8 +126,6 @@ BUILTIN_ALIASES = {
     "troy": "Troy Trojans", "louisiana": "Louisiana Ragin' Cajuns",
     "ulm": "Louisiana-Monroe Warhawks", "texas state": "Texas State Bobcats",
     "arkansas state": "Arkansas State Red Wolves",
-
-    "tulane green wave": "Tulane Green Wave", # in case raw names already match
 }
 
 # =========================
@@ -205,28 +207,63 @@ def long_stats_to_wide(df_stats: pd.DataFrame) -> pd.DataFrame:
             wide[c] = np.nan
     return wide
 
-def build_examples(schedule: pd.DataFrame, wide_stats: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
-    merged = schedule[["game_id","home_team","away_team","home_points","away_points","season","week"]].copy()
-    home = wide_stats[wide_stats["homeAway"]=="home"].rename(columns={c:f"home_{c}" for c in STAT_FEATURES})
-    away = wide_stats[wide_stats["homeAway"]=="away"].rename(columns={c:f"away_{c}" for c in STAT_FEATURES})
+def to_numeric(x, default=0):
+    try:
+        return int(float(x))
+    except Exception:
+        return default
 
-    merged = merged.merge(home[["game_id","team"]+[f"home_{c}" for c in STAT_FEATURES]],
-                          left_on=["game_id","home_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
-    merged = merged.merge(away[["game_id","team"]+[f"away_{c}" for c in STAT_FEATURES]],
+# ---- Build rolling (pre-game) last-N means for each team & game
+def team_rolling_means(wide_stats: pd.DataFrame, schedule: pd.DataFrame, n: int) -> pd.DataFrame:
+    season_week = schedule[["game_id","season","week"]].copy()
+    season_week["season"] = season_week["season"].apply(lambda v: to_numeric(v, 0))
+    season_week["week"] = season_week["week"].apply(lambda v: to_numeric(v, 0))
+    w = wide_stats.merge(season_week, on="game_id", how="left")
+    w["season"] = w["season"].apply(lambda v: to_numeric(v, 0))
+    w["week"] = w["week"].apply(lambda v: to_numeric(v, 0))
+
+    w = w.sort_values(["team","season","week","game_id"]).reset_index(drop=True)
+
+    roll_cols = [f"R{n}_{c}" for c in STAT_FEATURES]
+    for c in STAT_FEATURES:
+        # rolling window per team, shifted so it's pre-game (no leakage)
+        w[f"R{n}_{c}"] = w.groupby("team")[c].transform(
+            lambda s: s.rolling(window=n, min_periods=1).mean().shift(1)
+        )
+
+    keep_cols = ["game_id","team","homeAway"] + roll_cols
+    return w[keep_cols]
+
+def build_examples_lastN(schedule: pd.DataFrame, wide_stats: pd.DataFrame, n: int):
+    roll = team_rolling_means(wide_stats, schedule, n)
+
+    # Join pre-game rolling means for home and away teams for each game
+    home = roll[roll["homeAway"]=="home"].copy()
+    away = roll[roll["homeAway"]=="away"].copy()
+
+    home = home.rename(columns={f"R{n}_{c}": f"home_R{n}_{c}" for c in STAT_FEATURES})
+    away = away.rename(columns={f"R{n}_{c}": f"away_R{n}_{c}" for c in STAT_FEATURES})
+
+    base = schedule[["game_id","home_team","away_team","home_points","away_points","season","week"]].copy()
+    merged = base.merge(home[["game_id","team"] + [f"home_R{n}_{c}" for c in STAT_FEATURES]],
+                        left_on=["game_id","home_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
+    merged = merged.merge(away[["game_id","team"] + [f"away_R{n}_{c}" for c in STAT_FEATURES]],
                           left_on=["game_id","away_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
 
+    # diffs (home - away)
+    diff_cols = []
     for c in STAT_FEATURES:
-        merged[f"diff_{c}"] = merged[f"home_{c}"] - merged[f"away_{c}"]
+        hc, ac = f"home_R{n}_{c}", f"away_R{n}_{c}"
+        dc = f"diff_R{n}_{c}"
+        merged[dc] = merged[hc].fillna(0.0) - merged[ac].fillna(0.0)
+        diff_cols.append(dc)
 
     merged["home_win"] = (merged["home_points"] > merged["away_points"]).astype(int)
     merged = merged.dropna(subset=["home_win"])
-
-    feature_cols = [f"diff_{c}" for c in STAT_FEATURES]
-    merged[feature_cols] = merged[feature_cols].fillna(0.0)
-    return merged, feature_cols
+    return merged, diff_cols
 
 # =========================
-# Elo rating
+# Elo rating (chronological)
 # =========================
 def elo_expect(a: float, b: float) -> float:
     return 1.0 / (1.0 + 10 ** (-(a - b) / 400.0))
@@ -235,13 +272,12 @@ def mov_multiplier(point_diff: float, rating_diff: float) -> float:
     diff = abs(point_diff)
     if diff <= 0:
         return 1.0
-    # Common chess/football Elo MoV scaling
     return math.log(diff + 1.0) * (2.2 / ((rating_diff * 0.001) + 2.2))
 
 def train_elo(schedule: pd.DataFrame) -> Dict[str, float]:
-    # Sort by season, then week to ensure temporal order
     sched = schedule[["season","week","home_team","away_team","home_points","away_points"]].dropna().copy()
-    sched["week"] = pd.to_numeric(sched["week"], errors="coerce").fillna(0).astype(int)
+    sched["season"] = sched["season"].apply(lambda v: to_numeric(v, 0))
+    sched["week"] = sched["week"].apply(lambda v: to_numeric(v, 0))
     sched = sched.sort_values(["season","week"]).reset_index(drop=True)
 
     R: Dict[str, float] = {}
@@ -251,10 +287,9 @@ def train_elo(schedule: pd.DataFrame) -> Dict[str, float]:
         h, a = row["home_team"], row["away_team"]
         hp, ap = float(row["home_points"]), float(row["away_points"])
         ra, rb = get(h), get(a)
-        # expected with home field advantage
         exp_h = elo_expect(ra + ELO_HFA, rb)
         exp_a = 1.0 - exp_h
-        # actual scores
+
         if hp == ap:
             score_h, score_a = 0.5, 0.5
             mov = 0.0
@@ -278,91 +313,58 @@ def prob_from_elo(elo: Dict[str,float], home: str, away: str) -> float:
     return elo_expect(rh + ELO_HFA, ra)
 
 # =========================
-# Team feature vectors for predictions
+# Train stats model on last-N diffs; predict with last-N team means
 # =========================
-def team_recent_averages(wide_stats: pd.DataFrame, schedule: pd.DataFrame, years_back: int = 5) -> pd.DataFrame:
-    # join season onto wide_stats to compute season-wise means
-    season_map = schedule[["game_id","season"]]
-    w = wide_stats.merge(season_map, on="game_id", how="left")
-    # limit to recent seasons if available
-    if "season" in w.columns and w["season"].notna().any():
-        max_season = int(pd.to_numeric(w["season"], errors="coerce").max())
-        min_keep = max_season - years_back + 1
-        w = w[pd.to_numeric(w["season"], errors="coerce").fillna(0).astype(int) >= (min_keep if not math.isnan(min_keep) else 0)]
-    # team-season means, then weighted by recency
-    w["season_num"] = pd.to_numeric(w["season"], errors="ignore")
-    grp = w.groupby(["team","season"])[STAT_FEATURES].mean().reset_index()
-
-    # recency weights: newer season = higher weight (1..years_back)
-    if "season" in grp.columns and grp["season"].notna().any():
-        base = pd.to_numeric(grp["season"], errors="coerce")
-        if base.notna().any():
-            min_s = int(base.min())
-            grp["weight"] = 1 + (pd.to_numeric(grp["season"], errors="coerce") - min_s)
-        else:
-            grp["weight"] = 1.0
-    else:
-        grp["weight"] = 1.0
-
-    for c in STAT_FEATURES:
-        grp[c] = grp[c].fillna(0.0)
-
-    # weighted average per team
-    weighted = (grp
-                .assign(w=grp["weight"])
-                .groupby("team")
-                .apply(lambda d: pd.Series({c: np.average(d[c].values, weights=d["w"].values)
-                                            for c in STAT_FEATURES}))
-                .reset_index())
-    return weighted.set_index("team")
-
-# =========================
-# Training (stats model) + Prediction
-# =========================
-def train_stats_model(schedule: pd.DataFrame, wide_stats: pd.DataFrame):
-    examples, feature_cols = build_examples(schedule, wide_stats)
+def train_stats_model_lastN(schedule: pd.DataFrame, wide_stats: pd.DataFrame, n: int):
+    examples, diff_cols = build_examples_lastN(schedule, wide_stats, n)
     train, test = train_test_split(examples, test_size=0.2, random_state=42, shuffle=True)
-    X_train = train[feature_cols].values; y_train = train["home_win"].values
-    X_test  = test[feature_cols].values;  y_test  = test["home_win"].values
-    model = LogisticRegression(max_iter=300)
+    X_train = train[diff_cols].values; y_train = train["home_win"].values
+    X_test  = test[diff_cols].values;  y_test  = test["home_win"].values
+    model = LogisticRegression(max_iter=400)
     model.fit(X_train, y_train)
     acc = accuracy_score(y_test, model.predict(X_test))
-    return model, acc, feature_cols
+    return model, acc, diff_cols
+
+def latest_team_lastN_vectors(wide_stats: pd.DataFrame, schedule: pd.DataFrame, n: int) -> pd.DataFrame:
+    # Build per-team pregame rolling means, then keep the latest available per team
+    roll = team_rolling_means(wide_stats, schedule, n)
+    # take last non-null row for each team
+    roll = roll.sort_values(["team","game_id"])
+    rcols = [f"R{n}_{c}" for c in STAT_FEATURES]
+    latest = roll.groupby("team").tail(1).set_index("team")[rcols].copy()
+    # fill any remaining NaNs with 0
+    latest = latest.fillna(0.0)
+    return latest
 
 def predict_games(elo: Dict[str,float],
                   stats_model: LogisticRegression,
-                  feature_cols: List[str],
-                  team_feature_df: pd.DataFrame,
-                  games: List[Dict[str,str]]) -> Tuple[List[Dict], List[str]]:
+                  diff_cols: List[str],
+                  team_lastN: pd.DataFrame,
+                  games: List[Dict[str,str]],
+                  n: int) -> Tuple[List[Dict], List[str]]:
     unknown = set()
     rows = []
 
+    def team_vec(team: str):
+        if team in team_lastN.index:
+            return team_lastN.loc[team, [f"R{n}_{c}" for c in STAT_FEATURES]].values.astype(float)
+        unknown.add(team)
+        return np.zeros(len(STAT_FEATURES), dtype=float)
+
     for g in games:
         home, away = g["home"], g["away"]
-
-        def vec(team):
-            if team in team_feature_df.index:
-                return team_feature_df.loc[team, STAT_FEATURES].values.astype(float)
-            unknown.add(team)
-            return np.zeros(len(STAT_FEATURES), dtype=float)
-
-        v_home = vec(home)
-        v_away = vec(away)
-        diff = v_home - v_away
-
-        X = np.array([[diff[i] for i,_ in enumerate(STAT_FEATURES)]])
+        vh = team_vec(home)
+        va = team_vec(away)
+        diff = vh - va
+        X = np.array([diff])  # same order as trained: diff_R{n}_*
         p_stat = float(stats_model.predict_proba(X)[0,1])
-
-        p_elo = prob_from_elo(elo, home, away)
-
+        p_elo  = prob_from_elo(elo, home, away)
         p_home = float(ELO_WEIGHT * p_elo + STAT_WEIGHT * p_stat)
-        pick = home if p_home >= 0.5 else away
-
         rows.append({
             "home": home, "away": away,
             "home_prob": round(p_home, 4),
             "away_prob": round(1.0 - p_home, 4),
-            "pick": pick
+            "pick": home if p_home >= 0.5 else away
         })
 
     return rows, sorted(unknown)
@@ -376,43 +378,40 @@ def main():
     schedule = download_csv(SCHEDULE_URL).rename(columns=str.strip)
     stats    = download_csv(TEAM_STATS_URL).rename(columns=str.strip)
 
-    # Normalize team names inside schedule to be consistent keys
-    # (Some datasets already use the long names used above.)
-    # We'll treat whatever appears in schedule['home_team']/['away_team'] as canonical.
+    # Canonical team list from schedule file (what the aliases must map into)
     teams_in_dataset = set(pd.concat([schedule["home_team"], schedule["away_team"]]).dropna().unique())
 
-    # Prepare wide stats
+    # Prepare wide stats (game/team rows with numeric columns)
     wide = long_stats_to_wide(stats)
 
-    # Train stat model
-    stat_model, stat_acc, feature_cols = train_stats_model(schedule, wide)
-    print(f"[STAT] Test accuracy: {stat_acc:.4f}")
+    # Train last-N stats model
+    stat_model, stat_acc, diff_cols = train_stats_model_lastN(schedule, wide, LAST_N)
+    print(f"[STAT last{LAST_N}] Test accuracy: {stat_acc:.4f}")
 
-    # Train Elo on chronological games
+    # Train Elo
     elo_ratings = train_elo(schedule)
     print(f"[ELO] Trained ratings for {len(elo_ratings)} teams.")
 
-    # Aggregate recent team features for prediction
-    team_feats = team_recent_averages(wide, schedule, years_back=5)
+    # Latest per-team last-N vectors for prediction time
+    team_lastN = latest_team_lastN_vectors(wide, schedule, LAST_N)
 
-    # Parse games.txt with alias mapping -> dataset names
+    # Parse games with alias mapping
     alias_map = load_alias_map()
 
-    # Safety: if alias points to a name not in dataset, try pass-through
     def safe_name(n):
         mapped = normalize_name(n, alias_map)
         return mapped if mapped in teams_in_dataset else n
 
     raw_games = parse_games_txt(INPUT_GAMES_TXT, alias_map)
-    safe_games = [{"home": safe_name(g["home"]), "away": safe_name(g["away"])} for g in raw_games]
+    games = [{"home": safe_name(g["home"]), "away": safe_name(g["away"])} for g in raw_games]
 
-    # Predict
-    rows, unknown = predict_games(elo_ratings, stat_model, feature_cols, team_feats, safe_games)
+    # Predict (ensemble Elo + last-N stats)
+    rows, unknown = predict_games(elo_ratings, stat_model, diff_cols, team_lastN, games, LAST_N)
 
     out = {
         "generated_at": dt.datetime.utcnow().replace(microsecond=0).isoformat()+"Z",
         "season": 0, "week": 0,
-        "model": "ensemble_v1 (elo {:.0%} / stats {:.0%})".format(ELO_WEIGHT, STAT_WEIGHT),
+        "model": f"ensemble_v2 (Elo {ELO_WEIGHT:.0%} + last{LAST_N} stats {STAT_WEIGHT:.0%})",
         "metric": {"test_accuracy": round(float(stat_acc), 4)},
         "unknown_teams": unknown,
         "games": rows,
