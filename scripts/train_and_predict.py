@@ -164,11 +164,10 @@ def to_dt(x):
     try: return pd.to_datetime(x, utc=True)
     except Exception: return pd.NaT
 
-# ---------- Schedule normalization (FIXES your KeyError: 'date') ----------
+# ---------- Schedule normalization ----------
 def ensure_schedule_columns(schedule: pd.DataFrame) -> pd.DataFrame:
     """Make sure required columns exist and 'date' is available or synthesized."""
     df = schedule.rename(columns=lambda c: c.strip())
-    # Standard columns we use; create if missing
     for col, default in [
         ("season_type", "regular"),
         ("neutral_site", False),
@@ -178,11 +177,9 @@ def ensure_schedule_columns(schedule: pd.DataFrame) -> pd.DataFrame:
     ]:
         if col not in df.columns:
             df[col] = default
-    # Ensure season/week ints
     df["season"] = df["season"].apply(to_int) if "season" in df.columns else 0
     df["week"] = df["week"].apply(to_int) if "week" in df.columns else 0
 
-    # Find a date-like column or synthesize one
     date_col = None
     for cand in ["date", "startDate", "start_date", "game_date", "startTime", "start_time"]:
         if cand in df.columns:
@@ -191,7 +188,6 @@ def ensure_schedule_columns(schedule: pd.DataFrame) -> pd.DataFrame:
     if date_col is not None:
         dt_series = df[date_col].apply(to_dt)
     else:
-        # Synthesize: August 1st + 7*(week-1) days as an approximate ordering anchor
         def synth(row):
             try:
                 base = dt.datetime(int(row["season"]), 8, 1, tzinfo=dt.timezone.utc)
@@ -201,10 +197,11 @@ def ensure_schedule_columns(schedule: pd.DataFrame) -> pd.DataFrame:
         dt_series = df.apply(synth, axis=1)
 
     df["date"] = dt_series
-    # Ensure game_id
     if "game_id" not in df.columns:
-        # create a stable id
-        df["game_id"] = pd.util.hash_pandas_object(df[["season","week","home_team","away_team"]].fillna(""), index=False).astype(np.int64)
+        df["game_id"] = pd.util.hash_pandas_object(
+            df[["season","week","home_team","away_team"]].fillna(""),
+            index=False
+        ).astype(np.int64)
     return df
 
 # -------------------------
@@ -213,11 +210,9 @@ def ensure_schedule_columns(schedule: pd.DataFrame) -> pd.DataFrame:
 def team_rolling_home_away(wide: pd.DataFrame, schedule: pd.DataFrame, n: int) -> Tuple[pd.DataFrame, pd.DataFrame]:
     sw = schedule[["game_id","season","week","neutral_site","date"]].copy()
     w = wide.merge(sw, on="game_id", how="left")
-    # Sort by actual date if available, else by (season, week, game_id)
     sort_keys = ["team","date","game_id"] if "date" in w.columns else ["team","season","week","game_id"]
     w = w.sort_values(sort_keys).reset_index(drop=True)
 
-    # Separate rolling streams by homeAway and shift(1) to avoid leakage
     for c in STAT_FEATURES:
         w[f"R{n}H_{c}"] = w.groupby(["team","homeAway"])[c].transform(
             lambda s: s.rolling(window=n, min_periods=1).mean().shift(1)
@@ -248,7 +243,6 @@ def haversine_km(lat1, lon1, lat2, lon2):
 
 def rest_and_travel(schedule: pd.DataFrame, teams_df: pd.DataFrame, venues_df: pd.DataFrame) -> pd.DataFrame:
     df = schedule[["game_id","season","week","date","home_team","away_team","neutral_site","venue_id","season_type"]].copy()
-    # last game date per team
     all_games = []
     for side in ["home","away"]:
         temp = df[["game_id","date",f"{side}_team"]].rename(columns={f"{side}_team": "team"})
@@ -269,7 +263,6 @@ def rest_and_travel(schedule: pd.DataFrame, teams_df: pd.DataFrame, venues_df: p
     m["home_bye"] = (m["home_rest_days"] >= 13).astype(int)
     m["away_bye"] = (m["away_rest_days"] >= 13).astype(int)
 
-    # Travel distance
     def latlon_team(school: str):
         if teams_df.empty: return (None, None)
         row = teams_df[teams_df["school"]==school]
@@ -314,7 +307,6 @@ def median_lines(lines: pd.DataFrame) -> pd.DataFrame:
     if lines is None or lines.empty:
         return pd.DataFrame(columns=["game_id","spread_home","over_under"])
     lines = lines.copy()
-    # Normalize possible alternative column names
     for old, new in [("spread","spread"), ("overUnder","over_under"), ("overunder","over_under")]:
         if old in lines.columns and new not in lines.columns:
             lines[new] = lines[old]
@@ -338,26 +330,39 @@ def build_training_examples(schedule: pd.DataFrame,
     # rolling form
     home_roll, away_roll = team_rolling_home_away(wide, schedule, n)
 
+    # Base schedule columns
     base_cols = ["game_id","home_team","away_team","home_points","away_points","season","week","season_type","date","neutral_site"]
     for bc in base_cols:
         if bc not in schedule.columns:
-            # Ensure missing columns exist with neutral defaults
             schedule[bc] = np.nan if bc not in ["season","week","neutral_site","season_type"] else (0 if bc in ["season","week"] else (False if bc=="neutral_site" else "regular"))
     base = schedule[base_cols].copy()
 
-    X = base.merge(home_roll, left_on=["game_id","home_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
-    X = X.merge(away_roll, left_on=["game_id","away_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
+    # Keep ONLY feature columns from rolling frames to avoid overlap explosions
+    hr_needed = ["game_id","team"] + [f"home_R{n}_{c}" for c in STAT_FEATURES]
+    ar_needed = ["game_id","team"] + [f"away_R{n}_{c}" for c in STAT_FEATURES]
+    home_roll_feat = home_roll[[c for c in hr_needed if c in home_roll.columns]].copy()
+    away_roll_feat = away_roll[[c for c in ar_needed if c in away_roll.columns]].copy()
+
+    # Merge rolling features
+    X = base.merge(home_roll_feat, left_on=["game_id","home_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
+    X = X.merge(away_roll_feat, left_on=["game_id","away_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
 
     # diffs
     diff_cols = []
     for c in STAT_FEATURES:
         hc, ac = f"home_R{n}_{c}", f"away_R{n}_{c}"
         dc = f"diff_R{n}_{c}"
+        if hc not in X.columns: X[hc] = 0.0
+        if ac not in X.columns: X[ac] = 0.0
         X[dc] = X[hc].fillna(0.0) - X[ac].fillna(0.0)
         diff_cols.append(dc)
 
     # engineered features
     eng = rest_and_travel(schedule, teams_df, venues_df)
+    # Drop any columns that already exist in X to avoid suffix collisions
+    overlap = [c for c in eng.columns if c in X.columns and c != "game_id"]
+    if overlap:
+        eng = eng.drop(columns=overlap)
     X = X.merge(eng, on="game_id", how="left")
 
     # lines
@@ -372,7 +377,8 @@ def build_training_examples(schedule: pd.DataFrame,
     # feature columns
     feature_cols = diff_cols + ["rest_diff","shortweek_diff","bye_diff","travel_diff_km","spread_home","over_under","neutral_site","is_postseason"]
     for col in feature_cols:
-        if col not in X.columns: X[col] = 0.0
+        if col not in X.columns:
+            X[col] = 0.0
     X[feature_cols] = X[feature_cols].fillna(0.0)
 
     # Optionally limit to recent years
@@ -380,7 +386,7 @@ def build_training_examples(schedule: pd.DataFrame,
         max_season = int(pd.to_numeric(X["season"], errors="coerce").max())
         X = X[pd.to_numeric(X["season"], errors="coerce") >= max_season - RECENT_YEARS_ONLY + 1]
 
-    # Only completed games for training (have points)
+    # Only completed games for training
     X = X.dropna(subset=["home_points","away_points"])
     return X, feature_cols
 
@@ -472,7 +478,6 @@ def train_elo(schedule: pd.DataFrame, talent_df: pd.DataFrame) -> Dict[str, floa
     sched["week"] = pd.to_numeric(sched["week"], errors="coerce").fillna(0).astype(int)
     sched = sched.sort_values(["season","week"]).reset_index(drop=True)
 
-    # Preseason priors from talent (optional)
     talent = pd.DataFrame()
     if isinstance(talent_df, pd.DataFrame) and not talent_df.empty:
         t = talent_df.copy()
@@ -487,7 +492,7 @@ def train_elo(schedule: pd.DataFrame, talent_df: pd.DataFrame) -> Dict[str, floa
 
     def preseason_seed(team: str, year: int) -> float:
         base = R.get(team, ELO_START)
-        base = ELO_START + (base - ELO_START) * (1.0 - MEAN_REVERT)  # mean reversion
+        base = ELO_START + (base - ELO_START) * (1.0 - MEAN_REVERT)
         if not talent.empty:
             z = talent[(talent["year"]==year) & (talent["school"]==team)]
             if len(z):
@@ -608,7 +613,6 @@ def predict_games(cal_model: CalibratedClassifierCV,
 # Main
 # -------------------------
 def main():
-    # Load schedule/stats (prefer local CFBD, fallback to snapshot)
     print("Loading schedule & team stats ...")
     schedule_raw = load_csv_local_or_url(LOCAL_SCHEDULE, FALLBACK_SCHEDULE_URL)
     stats    = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL).rename(columns=str.strip)
@@ -651,7 +655,6 @@ def main():
         d = d.set_index(["team","role"])
         cols = [f"{role}_R{LAST_N}_{c}" for c in STAT_FEATURES]
         d = d[cols]
-        # rename to common "R{N}_X" so we can look up uniformly
         return d.rename(columns={f"{role}_R{LAST_N}_{c}": f"R{LAST_N}_{c}" for c in STAT_FEATURES})
 
     latest_home = latest(home_roll, "home")
