@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-09-01T01:11:54Z",
+  "generated_at": "2025-09-01T01:19:58Z",
   "season": 0,
   "week": 0,
   "model": "logreg_v1",
@@ -7,14 +7,26 @@
     "test_accuracy": 0.6056
   },
   "unknown_teams": [
+    "Arizona",
+    "California",
     "Clemson",
     "Fresno State",
     "Georgia Southern",
+    "Hawai'i",
     "LSU",
+    "Miami",
+    "Northwestern",
+    "Notre Dame",
     "Ohio State",
+    "Oregon",
+    "South Carolina",
     "Texas",
+    "Tulane",
+    "UCLA",
     "UTEP",
-    "Utah State"
+    "Utah",
+    "Utah State",
+    "Virginia"
   ],
   "games": [
     {
@@ -23,6 +35,13 @@
       "home_prob": 0.5989,
       "away_prob": 0.4011,
       "pick": "Texas"
+    },
+    {
+      "home": "Northwestern",
+      "away": "Tulane",
+      "home_prob": 0.5989,
+      "away_prob": 0.4011,
+      "pick": "Northwestern"
     },
     {
       "home": "LSU",
@@ -44,6 +63,41 @@
       "home_prob": 0.5989,
       "away_prob": 0.4011,
       "pick": "Fresno State"
+    },
+    {
+      "home": "Arizona",
+      "away": "Hawai'i",
+      "home_prob": 0.5989,
+      "away_prob": 0.4011,
+      "pick": "Arizona"
+    },
+    {
+      "home": "California",
+      "away": "Oregon",
+      "home_prob": 0.5989,
+      "away_prob": 0.4011,
+      "pick": "California"
+    },
+    {
+      "home": "Utah",
+      "away": "UCLA",
+      "home_prob": 0.5989,
+      "away_prob": 0.4011,
+      "pick": "Utah"
+    },
+    {
+      "home": "South Carolina",
+      "away": "Virginia",
+      "home_prob": 0.5989,
+      "away_prob": 0.4011,
+      "pick": "South Carolina"
+    },
+    {
+      "home": "Notre Dame",
+      "away": "Miami",
+      "home_prob": 0.5989,
+      "away_prob": 0.4011,
+      "pick": "Notre Dame"
     }
   ]
 }
