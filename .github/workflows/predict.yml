@@ -2,12 +2,25 @@ name: predict
 
 on:
   workflow_dispatch:
+  schedule:
+    # Hourly (UTC). GitHub Actions uses UTC; 0 * * * * ≈ hourly in Chicago too.
+    - cron: "0 * * * *"
   push:
     branches: [ "main" ]
+    # Only re-run on code/input/workflow changes (not on data outputs)
     paths:
       - "scripts/**"
       - "docs/input/**"
       - ".github/workflows/predict.yml"
+
+# Needed so the workflow can push updated JSON artifacts back to the repo
+permissions:
+  contents: write
+
+# Avoid overlapping runs that could race on committing artifacts
+concurrency:
+  group: predict
+  cancel-in-progress: true
 
 jobs:
   run:
@@ -15,6 +28,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # safer rebase/push
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -25,6 +40,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r scripts/requirements.txt
+
+      # Optional but recommended: fetch/refresh CFBD CSVs used by training & color builder
+      - name: Fetch CFBD data
+        run: |
+          if [ -f scripts/fetch_cfbd.py ]; then
+            python scripts/fetch_cfbd.py || echo "[WARN] fetch_cfbd failed; training may fall back to snapshot URLs."
+          else
+            echo "[INFO] scripts/fetch_cfbd.py not found; using snapshot URLs in train script."
+          fi
 
       - name: Train & predict
         run: |
@@ -38,6 +62,10 @@ jobs:
         run: |
           python scripts/make_team_cards.py
 
+      - name: Build team colors
+        run: |
+          python scripts/build_team_colors.py
+
       - name: Commit artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -46,10 +74,18 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Rebase to avoid conflicts
+          # Rebase to avoid non-fast-forward errors if main moved
           git pull --rebase origin main || true
 
-          git add docs/data/predictions.json docs/data/spreads.json docs/data/team_summaries.json || true
-          git commit -m "Update predictions, spreads & team cards [skip ci]" || echo "No changes to commit"
+          git add docs/data/predictions.json || true
+          git add docs/data/spreads.json || true
+          git add docs/data/team_summaries.json || true
+          git add docs/data/team_colors.json || true
 
-          git push origin HEAD:main
+          # Commit only if there are staged changes
+          if ! git diff --cached --quiet; then
+            git commit -m "Update predictions, spreads, team cards & colors [skip ci]"
+            git push origin HEAD:main
+          else
+            echo "No changes to commit."
+          fi
