@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   build:
@@ -39,15 +38,55 @@ jobs:
         run: |
           python scripts/train_and_predict.py
 
-      # Instead of pushing to main (which causes conflicts), we create a PR
-      - name: Create/update PR with predictions
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Update predictions [skip ci]"
-          title: "Update predictions"
-          body: "Automated update of docs/data/predictions.json"
-          branch: "bot/predictions"
-          add-paths: |
-            docs/data/predictions.json
-          delete-branch: true
+      - name: Commit predictions to main (conflict-safe)
+        run: |
+          set -e
+
+          # Bot identity
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Ensure we're on main and up to date
+          git fetch origin main
+          git checkout main
+
+          # Stage output
+          git add docs/data/predictions.json
+
+          # If nothing changed, exit early
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          # Commit locally
+          git commit -m "Update predictions [skip ci]"
+
+          # Rebase on top of the latest main
+          set +e
+          git -c rebase.autoStash=true pull --rebase origin main
+          REBASE_STATUS=$?
+          set -e
+
+          if [ $REBASE_STATUS -ne 0 ]; then
+            echo "Rebase reported conflicts. Attempting auto-resolve for predictions.json ..."
+            # Keep OUR version of predictions.json (the one just generated)
+            git checkout --ours -- docs/data/predictions.json
+            git add docs/data/predictions.json
+            git rebase --continue || {
+              echo "Rebase continue failed. Aborting rebase and falling back to merge."
+              git rebase --abort
+              # Fallback: fetch latest and do a merge that prefers ours for predictions.json
+              git fetch origin main
+              git merge -X ours origin/main || true
+              git add docs/data/predictions.json
+              git commit -m "Resolve predictions.json conflict [skip ci]" || true
+            }
+          fi
+
+          # Push (with a one-time rebase retry if someone pushes between now and push)
+          if ! git push origin HEAD:main; then
+            echo "Non-fast-forward on push. Rebasing once more and retrying..."
+            git -c rebase.autoStash=true pull --rebase origin main || true
+            git push origin HEAD:main
+          fi
