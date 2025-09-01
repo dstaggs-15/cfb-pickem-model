@@ -2,84 +2,84 @@
   "season": 2019,
   "games": [
     {
-      "home": "Texas Longhorns",
-      "away": "Ohio State Buckeyes",
-      "spread_home": null,
-      "over_under": null,
+      "home": "Iowa",
+      "away": "Iowa State",
+      "spread_home": 0.0,
+      "over_under": 0.0,
       "favorite": null,
-      "market_line": null
+      "market_line": "Pick\u2019em"
     },
     {
-      "home": "Northwestern Wildcats",
-      "away": "Tulane Green Wave",
-      "spread_home": null,
-      "over_under": null,
+      "home": "Uconn",
+      "away": "Syracuse",
+      "spread_home": 0.0,
+      "over_under": 0.0,
       "favorite": null,
-      "market_line": null
+      "market_line": "Pick\u2019em"
     },
     {
-      "home": "LSU Tigers",
-      "away": "Clemson Tigers",
-      "spread_home": null,
-      "over_under": null,
+      "home": "Illinois",
+      "away": "Duke",
+      "spread_home": 0.0,
+      "over_under": 0.0,
       "favorite": null,
-      "market_line": null
+      "market_line": "Pick\u2019em"
     },
     {
-      "home": "UTEP Miners",
-      "away": "Utah State Aggies",
-      "spread_home": null,
-      "over_under": null,
+      "home": "Baylor",
+      "away": "SMU",
+      "spread_home": 0.0,
+      "over_under": 0.0,
       "favorite": null,
-      "market_line": null
+      "market_line": "Pick\u2019em"
     },
     {
-      "home": "Fresno State Bulldogs",
-      "away": "Georgia Southern Eagles",
-      "spread_home": null,
-      "over_under": null,
+      "home": "Virginia Cavaliers",
+      "away": "NC State",
+      "spread_home": 0.0,
+      "over_under": 0.0,
       "favorite": null,
-      "market_line": null
+      "market_line": "Pick\u2019em"
     },
     {
-      "home": "Arizona Wildcats",
-      "away": "Hawai'i Rainbow Warriors",
-      "spread_home": null,
-      "over_under": null,
+      "home": "Kansas",
+      "away": "Missouri",
+      "spread_home": 0.0,
+      "over_under": 0.0,
       "favorite": null,
-      "market_line": null
+      "market_line": "Pick\u2019em"
     },
     {
-      "home": "California Golden Bears",
-      "away": "Oregon Ducks",
-      "spread_home": null,
-      "over_under": null,
+      "home": "West Virginia",
+      "away": "Ohio",
+      "spread_home": 0.0,
+      "over_under": 0.0,
       "favorite": null,
-      "market_line": null
+      "market_line": "Pick\u2019em"
     },
     {
-      "home": "Utah Utes",
-      "away": "UCLA Bruins",
-      "spread_home": null,
-      "over_under": null,
+      "home": "Michigan",
+      "away": "Oklahoma",
+      "spread_home": 0.0,
+      "over_under": 0.0,
       "favorite": null,
-      "market_line": null
+      "market_line": "Pick\u2019em"
     },
     {
-      "home": "South Carolina Gamecocks",
-      "away": "Virginia Cavaliers",
-      "spread_home": null,
-      "over_under": null,
+      "home": "Arizona State",
+      "away": "Mississippi State",
+      "spread_home": 0.0,
+      "over_under": 0.0,
       "favorite": null,
-      "market_line": null
+      "market_line": "Pick\u2019em"
     },
     {
-      "home": "Notre Dame Fighting Irish",
-      "away": "Miami (FL) Hurricanes",
-      "spread_home": null,
-      "over_under": null,
+      "home": "Vanderbilt",
+      "away": "Virginia Tech",
+      "spread_home": 0.0,
+      "over_under": 0.0,
       "favorite": null,
-      "market_line": null
+      "market_line": "Pick\u2019em"
     }
   ]
 }

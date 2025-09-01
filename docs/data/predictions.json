@@ -1,103 +1,102 @@
 {
-  "generated_at": "2025-09-01T05:05:17Z",
+  "generated": "2025-09-01T05:21:21Z",
   "model": "ensemble_last5 (Elo 55% + Calibrated stats 45%)",
   "metric": {
     "season_ahead_acc": 0.6265,
     "season_ahead_auc": 0.5946,
     "season_ahead_brier": 0.2223
   },
-  "unknown_teams": [
-    "Arizona Wildcats",
-    "California Golden Bears",
-    "Clemson Tigers",
-    "Fresno State Bulldogs",
-    "Georgia Southern Eagles",
-    "Hawai'i Rainbow Warriors",
-    "LSU Tigers",
-    "Miami (FL) Hurricanes",
-    "Northwestern Wildcats",
-    "Notre Dame Fighting Irish",
-    "Ohio State Buckeyes",
-    "Oregon Ducks",
-    "South Carolina Gamecocks",
-    "Texas Longhorns",
-    "Tulane Green Wave",
-    "UCLA Bruins",
-    "UTEP Miners",
-    "Utah State Aggies",
-    "Utah Utes",
-    "Virginia Cavaliers"
-  ],
   "games": [
     {
-      "home": "Texas Longhorns",
-      "away": "Ohio State Buckeyes",
-      "home_prob": 0.589,
-      "away_prob": 0.411,
-      "pick": "Texas Longhorns"
+      "home": "Iowa",
+      "away": "Iowa State",
+      "home_prob": 0.6046,
+      "away_prob": 0.3954,
+      "pick": "Iowa",
+      "spread_home": 0.0,
+      "over_under": 0.0
     },
     {
-      "home": "Northwestern Wildcats",
-      "away": "Tulane Green Wave",
-      "home_prob": 0.589,
-      "away_prob": 0.411,
-      "pick": "Northwestern Wildcats"
+      "home": "Uconn",
+      "away": "Syracuse",
+      "home_prob": 0.5727,
+      "away_prob": 0.4273,
+      "pick": "Uconn",
+      "spread_home": 0.0,
+      "over_under": 0.0
     },
     {
-      "home": "LSU Tigers",
-      "away": "Clemson Tigers",
-      "home_prob": 0.589,
-      "away_prob": 0.411,
-      "pick": "LSU Tigers"
+      "home": "Illinois",
+      "away": "Duke",
+      "home_prob": 0.5166,
+      "away_prob": 0.4834,
+      "pick": "Illinois",
+      "spread_home": 0.0,
+      "over_under": 0.0
     },
     {
-      "home": "UTEP Miners",
-      "away": "Utah State Aggies",
-      "home_prob": 0.589,
-      "away_prob": 0.411,
-      "pick": "UTEP Miners"
+      "home": "Baylor",
+      "away": "SMU",
+      "home_prob": 0.613,
+      "away_prob": 0.387,
+      "pick": "Baylor",
+      "spread_home": 0.0,
+      "over_under": 0.0
     },
     {
-      "home": "Fresno State Bulldogs",
-      "away": "Georgia Southern Eagles",
-      "home_prob": 0.589,
-      "away_prob": 0.411,
-      "pick": "Fresno State Bulldogs"
+      "home": "Virginia Cavaliers",
+      "away": "NC State",
+      "home_prob": 0.5479,
+      "away_prob": 0.4521,
+      "pick": "Virginia Cavaliers",
+      "spread_home": 0.0,
+      "over_under": 0.0
     },
     {
-      "home": "Arizona Wildcats",
-      "away": "Hawai'i Rainbow Warriors",
-      "home_prob": 0.589,
-      "away_prob": 0.411,
-      "pick": "Arizona Wildcats"
+      "home": "Kansas",
+      "away": "Missouri",
+      "home_prob": 0.4315,
+      "away_prob": 0.5685,
+      "pick": "Missouri",
+      "spread_home": 0.0,
+      "over_under": 0.0
     },
     {
-      "home": "California Golden Bears",
-      "away": "Oregon Ducks",
-      "home_prob": 0.589,
-      "away_prob": 0.411,
-      "pick": "California Golden Bears"
+      "home": "West Virginia",
+      "away": "Ohio",
+      "home_prob": 0.6128,
+      "away_prob": 0.3872,
+      "pick": "West Virginia",
+      "spread_home": 0.0,
+      "over_under": 0.0
     },
     {
-      "home": "Utah Utes",
-      "away": "UCLA Bruins",
-      "home_prob": 0.589,
-      "away_prob": 0.411,
-      "pick": "Utah Utes"
+      "home": "Michigan",
+      "away": "Oklahoma",
+      "home_prob": 0.5479,
+      "away_prob": 0.4521,
+      "pick": "Michigan",
+      "spread_home": 0.0,
+      "over_under": 0.0
     },
     {
-      "home": "South Carolina Gamecocks",
-      "away": "Virginia Cavaliers",
-      "home_prob": 0.589,
-      "away_prob": 0.411,
-      "pick": "South Carolina Gamecocks"
+      "home": "Arizona State",
+      "away": "Mississippi State",
+      "home_prob": 0.5453,
+      "away_prob": 0.4547,
+      "pick": "Arizona State",
+      "spread_home": 0.0,
+      "over_under": 0.0
     },
     {
-      "home": "Notre Dame Fighting Irish",
-      "away": "Miami (FL) Hurricanes",
-      "home_prob": 0.589,
-      "away_prob": 0.411,
-      "pick": "Notre Dame Fighting Irish"
+      "home": "Vanderbilt",
+      "away": "Virginia Tech",
+      "home_prob": 0.4395,
+      "away_prob": 0.5605,
+      "pick": "Virginia Tech",
+      "spread_home": 0.0,
+      "over_under": 0.0
     }
-  ]
+  ],
+  "unknown_teams": []
 }
