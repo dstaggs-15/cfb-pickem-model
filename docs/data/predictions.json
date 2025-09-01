@@ -1,5 +1,5 @@
 {
-  "generated": "2025-09-01T14:23:51Z",
+  "generated": "2025-09-01T15:24:30Z",
   "model": "ensemble_last5 (Elo 55% + Calibrated stats 45%)",
   "metric": {
     "season_ahead_acc": 0.6265,
