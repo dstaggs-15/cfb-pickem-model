@@ -2,8 +2,6 @@
 
 Predict weekly winners for ESPN College Pick’em using a transparent, reproducible pipeline: **multi-season data**, **last-5 form**, **market lines**, **rest/travel**, **calibrated logistic regression**, and **a smarter Elo** — all glued together by GitHub Actions and rendered on GitHub Pages.
 
-> Educational project. Not betting advice. Use responsibly.
-
 ---
 
 ## 0) TL;DR (How to use)
