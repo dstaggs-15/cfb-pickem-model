@@ -1,8 +1,8 @@
 {
-  "generated_at": "2025-09-01T01:58:07Z",
+  "generated_at": "2025-09-01T01:58:47Z",
   "season": 0,
   "week": 0,
-  "model": "ensemble_v1 (elo 60% / stats 40%)",
+  "model": "ensemble_v2 (Elo 60% + last5 stats 40%)",
   "metric": {
     "test_accuracy": 0.6056
   },
