@@ -2,36 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>CFB Pick'em Predictions</title>
+  <title>CFB Pick'em — Model Predictions</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link href="styles.css" rel="stylesheet" />
 </head>
 <body>
-  <header>
+  <header class="page-header">
     <h1>College Pick'em — Model Predictions</h1>
     <p id="meta"></p>
     <div class="actions">
-      <a href="input/games.txt" target="_blank">games.txt</a>
-      <a href="data/predictions.json" target="_blank">predictions.json</a>
-      <button id="refresh">Refresh</button>
+      <a href="input/games.txt" target="_blank" rel="noopener">games.txt</a>
+      <a href="data/predictions.json" target="_blank" rel="noopener">predictions.json</a>
+      <button id="refresh" type="button">Refresh</button>
     </div>
   </header>
 
   <main>
-    <table id="predTable">
-      <thead>
-        <tr>
-          <th>Home</th>
-          <th>Away</th>
-          <th>Home Prob</th>
-          <th>Away Prob</th>
-          <th>Pick</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <section id="cards" class="cards-grid" aria-live="polite"></section>
   </main>
 
+  <!-- Optional: if you later add docs/assets/team_colors.json it will be auto-loaded -->
   <script src="app.js"></script>
 </body>
 </html>
