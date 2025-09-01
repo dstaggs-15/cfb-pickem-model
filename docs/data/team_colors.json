@@ -1,0 +1,82 @@
+{
+  "Arizona Wildcats": {
+    "primary": "#37259d",
+    "text": "#ffffff"
+  },
+  "California Golden Bears": {
+    "primary": "#5f9d25",
+    "text": "#ffffff"
+  },
+  "Clemson Tigers": {
+    "primary": "#639d25",
+    "text": "#ffffff"
+  },
+  "Fresno State Bulldogs": {
+    "primary": "#25499d",
+    "text": "#ffffff"
+  },
+  "Georgia Southern Eagles": {
+    "primary": "#9d8725",
+    "text": "#ffffff"
+  },
+  "Hawai'i Rainbow Warriors": {
+    "primary": "#61259d",
+    "text": "#ffffff"
+  },
+  "LSU Tigers": {
+    "primary": "#259d95",
+    "text": "#ffffff"
+  },
+  "Miami (FL) Hurricanes": {
+    "primary": "#9d3125",
+    "text": "#ffffff"
+  },
+  "Northwestern Wildcats": {
+    "primary": "#31259d",
+    "text": "#ffffff"
+  },
+  "Notre Dame Fighting Irish": {
+    "primary": "#97259d",
+    "text": "#ffffff"
+  },
+  "Ohio State Buckeyes": {
+    "primary": "#25999d",
+    "text": "#ffffff"
+  },
+  "Oregon Ducks": {
+    "primary": "#9d2587",
+    "text": "#ffffff"
+  },
+  "South Carolina Gamecocks": {
+    "primary": "#399d25",
+    "text": "#ffffff"
+  },
+  "Texas Longhorns": {
+    "primary": "#9d2583",
+    "text": "#ffffff"
+  },
+  "Tulane Green Wave": {
+    "primary": "#257f9d",
+    "text": "#ffffff"
+  },
+  "UCLA Bruins": {
+    "primary": "#9d6525",
+    "text": "#ffffff"
+  },
+  "UTEP Miners": {
+    "primary": "#9d254f",
+    "text": "#ffffff"
+  },
+  "Utah State Aggies": {
+    "primary": "#4b9d25",
+    "text": "#ffffff"
+  },
+  "Utah Utes": {
+    "primary": "#253d9d",
+    "text": "#ffffff"
+  },
+  "Virginia Cavaliers": {
+    "primary": "#259d6b",
+    "text": "#ffffff"
+  }
+}

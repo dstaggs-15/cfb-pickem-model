@@ -1,0 +1,2475 @@
+{
+  "season": 2019,
+  "teams": [
+    {
+      "team": "Air Force",
+      "season": 2019,
+      "games": 12,
+      "ppg": 34.44,
+      "papg": 20.89,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.781,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.777,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Akron",
+      "season": 2019,
+      "games": 12,
+      "ppg": 10.6,
+      "papg": 36.3,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.0,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.054,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Alabama",
+      "season": 2019,
+      "games": 12,
+      "ppg": 47.78,
+      "papg": 18.67,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.977,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.877,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Appalachian State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 36.44,
+      "papg": 19.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.846,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.858,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Arizona",
+      "season": 2019,
+      "games": 12,
+      "ppg": 32.89,
+      "papg": 37.33,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.677,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.031,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Arizona State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 23.67,
+      "papg": 22.22,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.223,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.731,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Arkansas",
+      "season": 2019,
+      "games": 12,
+      "ppg": 22.3,
+      "papg": 36.2,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.169,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.062,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Arkansas State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 34.22,
+      "papg": 36.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.75,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.073,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Army",
+      "season": 2019,
+      "games": 13,
+      "ppg": 28.5,
+      "papg": 21.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.462,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.765,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Auburn",
+      "season": 2019,
+      "games": 12,
+      "ppg": 32.67,
+      "papg": 17.44,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.65,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.9,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "BYU",
+      "season": 2019,
+      "games": 12,
+      "ppg": 26.11,
+      "papg": 27.33,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.346,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.481,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Ball State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 32.78,
+      "papg": 29.33,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.662,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.388,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Baylor",
+      "season": 2019,
+      "games": 12,
+      "ppg": 35.33,
+      "papg": 19.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.792,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.869,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Boise State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 35.44,
+      "papg": 22.67,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.8,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.7,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Boston College",
+      "season": 2019,
+      "games": 12,
+      "ppg": 33.8,
+      "papg": 32.1,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.731,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.246,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Bowling Green",
+      "season": 2019,
+      "games": 12,
+      "ppg": 17.56,
+      "papg": 33.78,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.062,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.146,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Buffalo",
+      "season": 2019,
+      "games": 12,
+      "ppg": 28.11,
+      "papg": 22.33,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.431,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.719,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "California",
+      "season": 2019,
+      "games": 12,
+      "ppg": 19.11,
+      "papg": 20.67,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.1,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.796,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Central Michigan",
+      "season": 2019,
+      "games": 12,
+      "ppg": 30.0,
+      "papg": 27.1,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.519,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.523,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Charlotte",
+      "season": 2019,
+      "games": 12,
+      "ppg": 31.7,
+      "papg": 35.5,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.608,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.1,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Cincinnati",
+      "season": 2019,
+      "games": 12,
+      "ppg": 32.67,
+      "papg": 21.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.65,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.765,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Clemson",
+      "season": 2019,
+      "games": 12,
+      "ppg": 45.3,
+      "papg": 11.5,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.962,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.977,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Coastal Carolina",
+      "season": 2019,
+      "games": 12,
+      "ppg": 30.11,
+      "papg": 30.22,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.531,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.335,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Colorado",
+      "season": 2019,
+      "games": 12,
+      "ppg": 24.7,
+      "papg": 32.3,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.277,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.215,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Colorado State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 31.67,
+      "papg": 32.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.6,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.258,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Connecticut",
+      "season": 2019,
+      "games": 12,
+      "ppg": 18.6,
+      "papg": 40.6,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.085,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.015,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Duke",
+      "season": 2019,
+      "games": 12,
+      "ppg": 27.0,
+      "papg": 27.22,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.392,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.496,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "East Carolina",
+      "season": 2019,
+      "games": 12,
+      "ppg": 26.6,
+      "papg": 33.1,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.385,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.162,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Eastern Michigan",
+      "season": 2019,
+      "games": 12,
+      "ppg": 27.8,
+      "papg": 31.3,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.408,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.285,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Florida",
+      "season": 2019,
+      "games": 12,
+      "ppg": 33.3,
+      "papg": 15.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.704,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.931,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Florida Atlantic",
+      "season": 2019,
+      "games": 12,
+      "ppg": 33.5,
+      "papg": 24.1,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.715,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.646,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Florida International",
+      "season": 2019,
+      "games": 12,
+      "ppg": 26.1,
+      "papg": 26.6,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.338,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.55,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Florida State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 28.3,
+      "papg": 29.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.454,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.408,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Fresno State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 34.33,
+      "papg": 32.44,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.765,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.2,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Georgia",
+      "season": 2019,
+      "games": 12,
+      "ppg": 33.67,
+      "papg": 10.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.723,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.985,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Georgia Southern",
+      "season": 2019,
+      "games": 12,
+      "ppg": 25.33,
+      "papg": 29.56,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.308,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.373,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Georgia State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 36.0,
+      "papg": 36.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.819,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.073,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Georgia Tech",
+      "season": 2019,
+      "games": 12,
+      "ppg": 18.33,
+      "papg": 29.56,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.077,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.373,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Hawai'i",
+      "season": 2019,
+      "games": 13,
+      "ppg": 37.3,
+      "papg": 36.4,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.877,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.046,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Houston",
+      "season": 2019,
+      "games": 12,
+      "ppg": 30.67,
+      "papg": 32.56,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.558,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.192,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Illinois",
+      "season": 2019,
+      "games": 12,
+      "ppg": 30.7,
+      "papg": 25.7,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.569,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.592,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Indiana",
+      "season": 2019,
+      "games": 12,
+      "ppg": 34.0,
+      "papg": 20.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.738,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.823,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Iowa",
+      "season": 2019,
+      "games": 12,
+      "ppg": 24.11,
+      "papg": 11.67,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.25,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.969,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Iowa State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 36.44,
+      "papg": 25.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.846,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.627,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Kansas",
+      "season": 2019,
+      "games": 12,
+      "ppg": 25.78,
+      "papg": 33.33,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.323,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.154,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Kansas State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 32.33,
+      "papg": 21.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.638,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.754,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Kent State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 24.89,
+      "papg": 31.33,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.296,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.277,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Kentucky",
+      "season": 2019,
+      "games": 12,
+      "ppg": 20.33,
+      "papg": 20.78,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.123,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.785,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "LSU",
+      "season": 2019,
+      "games": 12,
+      "ppg": 46.67,
+      "papg": 22.33,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.969,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.719,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Liberty",
+      "season": 2019,
+      "games": 12,
+      "ppg": 32.8,
+      "papg": 26.6,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.669,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.55,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Louisiana",
+      "season": 2019,
+      "games": 12,
+      "ppg": 38.33,
+      "papg": 17.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.915,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.912,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Louisiana Monroe",
+      "season": 2019,
+      "games": 12,
+      "ppg": 30.56,
+      "papg": 37.78,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.546,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.023,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Louisiana Tech",
+      "season": 2019,
+      "games": 12,
+      "ppg": 38.11,
+      "papg": 22.89,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.9,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.692,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Louisville",
+      "season": 2019,
+      "games": 12,
+      "ppg": 32.11,
+      "papg": 34.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.623,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.138,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Marshall",
+      "season": 2019,
+      "games": 12,
+      "ppg": 26.22,
+      "papg": 24.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.362,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.654,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Maryland",
+      "season": 2019,
+      "games": 12,
+      "ppg": 28.0,
+      "papg": 34.3,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.423,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.131,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Memphis",
+      "season": 2019,
+      "games": 12,
+      "ppg": 41.11,
+      "papg": 25.78,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.938,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.581,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Miami",
+      "season": 2019,
+      "games": 12,
+      "ppg": 29.3,
+      "papg": 19.2,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.485,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.846,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Miami (OH)",
+      "season": 2019,
+      "games": 12,
+      "ppg": 22.67,
+      "papg": 31.67,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.177,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.269,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Michigan",
+      "season": 2019,
+      "games": 12,
+      "ppg": 31.78,
+      "papg": 17.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.615,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.912,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Michigan State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 23.11,
+      "papg": 23.56,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.185,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.677,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Middle Tennessee",
+      "season": 2019,
+      "games": 12,
+      "ppg": 24.89,
+      "papg": 31.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.296,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.292,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Minnesota",
+      "season": 2019,
+      "games": 12,
+      "ppg": 37.56,
+      "papg": 20.67,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.885,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.796,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Mississippi State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 28.67,
+      "papg": 30.22,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.469,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.335,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Missouri",
+      "season": 2019,
+      "games": 12,
+      "ppg": 28.22,
+      "papg": 19.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.442,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.858,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "NC State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 23.22,
+      "papg": 28.67,
+      "off_ypg": 265.0,
+      "def_yapg": 418.0,
+      "off_3rd_pct": 0.353,
+      "def_3rd_pct": 0.526,
+      "ranks": {
+        "off_ppg_pct": 0.196,
+        "off_ypg_pct": 0.0,
+        "off_3rd_pct": 0.0,
+        "def_papg_pct": 0.415,
+        "def_yapg_pct": 0.0,
+        "def_3rd_pct": 0.0
+      }
+    },
+    {
+      "team": "Navy",
+      "season": 2019,
+      "games": 12,
+      "ppg": 40.12,
+      "papg": 18.12,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.931,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.885,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Nebraska",
+      "season": 2019,
+      "games": 12,
+      "ppg": 26.33,
+      "papg": 29.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.369,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.4,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Nevada",
+      "season": 2019,
+      "games": 12,
+      "ppg": 19.1,
+      "papg": 32.4,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.092,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.208,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "New Mexico",
+      "season": 2019,
+      "games": 12,
+      "ppg": 23.44,
+      "papg": 35.78,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.208,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.085,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "New Mexico State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 16.33,
+      "papg": 42.22,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.054,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.008,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "North Carolina",
+      "season": 2019,
+      "games": 12,
+      "ppg": 27.89,
+      "papg": 27.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.415,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.512,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "North Texas",
+      "season": 2019,
+      "games": 12,
+      "ppg": 33.2,
+      "papg": 34.4,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.692,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.123,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Northern Illinois",
+      "season": 2019,
+      "games": 12,
+      "ppg": 23.22,
+      "papg": 27.89,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.196,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.462,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Northwestern",
+      "season": 2019,
+      "games": 12,
+      "ppg": 11.11,
+      "papg": 25.44,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.008,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.608,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Notre Dame",
+      "season": 2019,
+      "games": 12,
+      "ppg": 34.22,
+      "papg": 19.22,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.75,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.838,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Ohio",
+      "season": 2019,
+      "games": 12,
+      "ppg": 29.8,
+      "papg": 29.7,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.508,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.362,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Ohio State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 51.0,
+      "papg": 8.56,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.992,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.992,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Oklahoma",
+      "season": 2019,
+      "games": 12,
+      "ppg": 48.44,
+      "papg": 25.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.985,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.627,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Oklahoma State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 37.11,
+      "papg": 29.33,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.865,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.388,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Old Dominion",
+      "season": 2019,
+      "games": 12,
+      "ppg": 15.6,
+      "papg": 28.2,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.038,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.431,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Ole Miss",
+      "season": 2019,
+      "games": 12,
+      "ppg": 26.2,
+      "papg": 23.9,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.354,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.662,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Oregon",
+      "season": 2019,
+      "games": 12,
+      "ppg": 38.22,
+      "papg": 15.78,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.908,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.923,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Oregon State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 30.67,
+      "papg": 30.89,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.558,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.3,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Penn State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 37.11,
+      "papg": 12.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.865,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.962,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Pittsburgh",
+      "season": 2019,
+      "games": 12,
+      "ppg": 20.89,
+      "papg": 20.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.146,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.815,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Purdue",
+      "season": 2019,
+      "games": 12,
+      "ppg": 24.5,
+      "papg": 27.8,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.269,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.469,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Rice",
+      "season": 2019,
+      "games": 12,
+      "ppg": 14.89,
+      "papg": 28.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.023,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.438,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Rutgers",
+      "season": 2019,
+      "games": 12,
+      "ppg": 14.67,
+      "papg": 36.67,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.015,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.038,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "SMU",
+      "season": 2019,
+      "games": 12,
+      "ppg": 45.1,
+      "papg": 32.7,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.954,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.185,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "San Diego State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 20.78,
+      "papg": 14.44,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.138,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.938,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "San Jos\u00e9 State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 30.9,
+      "papg": 32.9,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.577,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.169,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "South Alabama",
+      "season": 2019,
+      "games": 12,
+      "ppg": 16.11,
+      "papg": 30.33,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.046,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.323,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "South Carolina",
+      "season": 2019,
+      "games": 12,
+      "ppg": 26.0,
+      "papg": 24.5,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.331,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.638,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "South Florida",
+      "season": 2019,
+      "games": 12,
+      "ppg": 24.0,
+      "papg": 27.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.238,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.512,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Southern Mississippi",
+      "season": 2019,
+      "games": 12,
+      "ppg": 30.0,
+      "papg": 25.78,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.519,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.581,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Stanford",
+      "season": 2019,
+      "games": 12,
+      "ppg": 21.56,
+      "papg": 26.67,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.162,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.538,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Syracuse",
+      "season": 2019,
+      "games": 12,
+      "ppg": 24.11,
+      "papg": 30.67,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.25,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.312,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "TCU",
+      "season": 2019,
+      "games": 12,
+      "ppg": 32.22,
+      "papg": 26.44,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.631,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.562,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Temple",
+      "season": 2019,
+      "games": 12,
+      "ppg": 26.44,
+      "papg": 25.44,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.377,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.608,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Tennessee",
+      "season": 2019,
+      "games": 12,
+      "ppg": 23.9,
+      "papg": 23.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.231,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.685,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Texas",
+      "season": 2019,
+      "games": 12,
+      "ppg": 37.78,
+      "papg": 30.67,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.892,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.312,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Texas A&M",
+      "season": 2019,
+      "games": 12,
+      "ppg": 34.44,
+      "papg": 21.89,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.781,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.738,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Texas State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 17.78,
+      "papg": 29.89,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.069,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.354,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Texas Tech",
+      "season": 2019,
+      "games": 12,
+      "ppg": 31.56,
+      "papg": 28.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.592,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.454,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Toledo",
+      "season": 2019,
+      "games": 12,
+      "ppg": 29.11,
+      "papg": 28.56,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.477,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.423,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Troy",
+      "season": 2019,
+      "games": 12,
+      "ppg": 36.33,
+      "papg": 32.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.831,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.235,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Tulane",
+      "season": 2019,
+      "games": 12,
+      "ppg": 36.44,
+      "papg": 25.44,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.846,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.608,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Tulsa",
+      "season": 2019,
+      "games": 12,
+      "ppg": 25.4,
+      "papg": 32.8,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.315,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.177,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "UAB",
+      "season": 2019,
+      "games": 12,
+      "ppg": 24.22,
+      "papg": 19.67,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.262,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.831,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "UCF",
+      "season": 2019,
+      "games": 12,
+      "ppg": 44.8,
+      "papg": 23.6,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.946,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.669,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "UCLA",
+      "season": 2019,
+      "games": 12,
+      "ppg": 29.33,
+      "papg": 32.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.492,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.258,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "UMass",
+      "season": 2019,
+      "games": 12,
+      "ppg": 20.7,
+      "papg": 53.1,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.131,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.0,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "UNLV",
+      "season": 2019,
+      "games": 12,
+      "ppg": 23.56,
+      "papg": 34.44,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.215,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.115,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "USC",
+      "season": 2019,
+      "games": 12,
+      "ppg": 30.5,
+      "papg": 28.1,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.538,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.446,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "UT San Antonio",
+      "season": 2019,
+      "games": 12,
+      "ppg": 19.33,
+      "papg": 32.22,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.112,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.223,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "UTEP",
+      "season": 2019,
+      "games": 12,
+      "ppg": 19.33,
+      "papg": 35.56,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.112,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.092,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Utah",
+      "season": 2019,
+      "games": 12,
+      "ppg": 33.11,
+      "papg": 12.22,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.685,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.954,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Utah State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 28.22,
+      "papg": 27.33,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.442,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.481,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Vanderbilt",
+      "season": 2019,
+      "games": 12,
+      "ppg": 15.11,
+      "papg": 35.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.031,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.108,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Virginia",
+      "season": 2019,
+      "games": 12,
+      "ppg": 31.0,
+      "papg": 22.5,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.585,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.708,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Virginia Tech",
+      "season": 2019,
+      "games": 12,
+      "ppg": 29.78,
+      "papg": 27.22,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.5,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.496,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Wake Forest",
+      "season": 2019,
+      "games": 12,
+      "ppg": 35.67,
+      "papg": 25.89,
+      "off_ypg": 418.0,
+      "def_yapg": 265.0,
+      "off_3rd_pct": 0.526,
+      "def_3rd_pct": 0.353,
+      "ranks": {
+        "off_ppg_pct": 0.808,
+        "off_ypg_pct": 0.5,
+        "off_3rd_pct": 0.5,
+        "def_papg_pct": 0.569,
+        "def_yapg_pct": 0.5,
+        "def_3rd_pct": 0.5
+      }
+    },
+    {
+      "team": "Washington",
+      "season": 2019,
+      "games": 12,
+      "ppg": 33.3,
+      "papg": 21.2,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.704,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.746,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Washington State",
+      "season": 2019,
+      "games": 12,
+      "ppg": 39.33,
+      "papg": 30.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.923,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.346,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "West Virginia",
+      "season": 2019,
+      "games": 12,
+      "ppg": 21.11,
+      "papg": 32.11,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.154,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.235,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Western Kentucky",
+      "season": 2019,
+      "games": 12,
+      "ppg": 24.8,
+      "papg": 20.5,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.285,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.808,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Western Michigan",
+      "season": 2019,
+      "games": 12,
+      "ppg": 36.0,
+      "papg": 27.0,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.819,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.531,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Wisconsin",
+      "season": 2019,
+      "games": 12,
+      "ppg": 34.33,
+      "papg": 12.56,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.765,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.946,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    },
+    {
+      "team": "Wyoming",
+      "season": 2019,
+      "games": 12,
+      "ppg": 27.56,
+      "papg": 17.89,
+      "off_ypg": null,
+      "def_yapg": null,
+      "off_3rd_pct": null,
+      "def_3rd_pct": null,
+      "ranks": {
+        "off_ppg_pct": 0.4,
+        "off_ypg_pct": null,
+        "off_3rd_pct": null,
+        "def_papg_pct": 0.892,
+        "def_yapg_pct": null,
+        "def_3rd_pct": null
+      }
+    }
+  ]
+}

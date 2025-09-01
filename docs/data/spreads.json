@@ -1,0 +1,85 @@
+{
+  "season": 2019,
+  "games": [
+    {
+      "home": "Texas Longhorns",
+      "away": "Ohio State Buckeyes",
+      "spread_home": null,
+      "over_under": null,
+      "favorite": null,
+      "market_line": null
+    },
+    {
+      "home": "Northwestern Wildcats",
+      "away": "Tulane Green Wave",
+      "spread_home": null,
+      "over_under": null,
+      "favorite": null,
+      "market_line": null
+    },
+    {
+      "home": "LSU Tigers",
+      "away": "Clemson Tigers",
+      "spread_home": null,
+      "over_under": null,
+      "favorite": null,
+      "market_line": null
+    },
+    {
+      "home": "UTEP Miners",
+      "away": "Utah State Aggies",
+      "spread_home": null,
+      "over_under": null,
+      "favorite": null,
+      "market_line": null
+    },
+    {
+      "home": "Fresno State Bulldogs",
+      "away": "Georgia Southern Eagles",
+      "spread_home": null,
+      "over_under": null,
+      "favorite": null,
+      "market_line": null
+    },
+    {
+      "home": "Arizona Wildcats",
+      "away": "Hawai'i Rainbow Warriors",
+      "spread_home": null,
+      "over_under": null,
+      "favorite": null,
+      "market_line": null
+    },
+    {
+      "home": "California Golden Bears",
+      "away": "Oregon Ducks",
+      "spread_home": null,
+      "over_under": null,
+      "favorite": null,
+      "market_line": null
+    },
+    {
+      "home": "Utah Utes",
+      "away": "UCLA Bruins",
+      "spread_home": null,
+      "over_under": null,
+      "favorite": null,
+      "market_line": null
+    },
+    {
+      "home": "South Carolina Gamecocks",
+      "away": "Virginia Cavaliers",
+      "spread_home": null,
+      "over_under": null,
+      "favorite": null,
+      "market_line": null
+    },
+    {
+      "home": "Notre Dame Fighting Irish",
+      "away": "Miami (FL) Hurricanes",
+      "spread_home": null,
+      "over_under": null,
+      "favorite": null,
+      "market_line": null
+    }
+  ]
+}
