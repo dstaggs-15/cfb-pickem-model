@@ -1,9 +1,9 @@
 name: Train and Publish Predictions
 
 on:
-  workflow_dispatch:     # 👈 adds a manual "Run workflow" button
+  workflow_dispatch:     # manual "Run workflow" button
   schedule:
-    - cron: "0 * * * *"  # runs hourly (top of every hour, UTC)
+    - cron: "0 * * * *"  # hourly (UTC)
   push:
     branches: [ main ]
     paths:
@@ -38,14 +38,26 @@ jobs:
         run: |
           python scripts/train_and_predict.py
 
-      - name: Commit predictions if changed
+      - name: Commit predictions if changed (rebase-safe)
         run: |
+          set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin main
+          git checkout main
+          git pull --rebase origin main
+
           git add docs/data/predictions.json
-          if ! git diff --cached --quiet; then
-            git commit -m "Update predictions [skip ci]"
-            git push
-          else
-            echo "No changes to commit"
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Update predictions [skip ci]"
+
+          if ! git push origin HEAD:main; then
+            echo "Push rejected (non-fast-forward). Rebasing and retrying once..."
+            git pull --rebase origin main
+            git push origin HEAD:main
           fi
