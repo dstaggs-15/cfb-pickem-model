@@ -1,96 +1,55 @@
-name: Train and Publish Predictions
+name: predict
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 * * * *"    # train/predict hourly
-    - cron: "15 9 * * *"   # fetch CFBD once daily at 09:15 UTC (add another Sunday if you want)
   push:
-    branches: [ main ]
+    branches: [ "main" ]
     paths:
-      - 'scripts/**'
-      - 'docs/input/**'
-      - '.github/workflows/predict.yml'
-
-permissions:
-  contents: write
-
-concurrency:
-  group: cfb-predictions
-  cancel-in-progress: true
+      - "scripts/**"
+      - "docs/input/**"
+      - ".github/workflows/predict.yml"
 
 jobs:
-  fetch_cfbd:
-    runs-on: ubuntu-latest
-    env:
-      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r scripts/requirements.txt
-
-      - name: Fetch CFBD (multi-season data)
-        run: |
-          if [ -n "${CFBD_API_KEY}" ]; then
-            python scripts/fetch_cfbd.py
-          else
-            echo "CFBD_API_KEY not set; skipping fetch."
-          fi
-
-      - name: Commit fetched data if changed
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/raw/cfbd/*.csv || true
-          if ! git diff --cached --quiet; then
-            git commit -m "Update CFBD raw data [skip ci]"
-            git push
-          else
-            echo "No changes."
-          fi
-
-  train_predict:
-    needs: [fetch_cfbd]
+  run:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r scripts/requirements.txt
+          python -m pip install -r scripts/requirements.txt
 
-      - name: Train & predict (uses local CFBD CSVs if present)
+      - name: Train & predict
         run: |
           python scripts/train_and_predict.py
 
-      - name: Commit predictions if changed
+      - name: Build spreads (market lines)
         run: |
+          python scripts/build_spreads.py
+
+      - name: Build team summaries (cards)
+        run: |
+          python scripts/make_team_cards.py
+
+      - name: Commit artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/data/predictions.json
-          if ! git diff --cached --quiet; then
-            git commit -m "Update predictions [skip ci]"
-            git push
-          else
-            echo "No changes."
-          fi
+
+          # Rebase to avoid conflicts
+          git pull --rebase origin main || true
+
+          git add docs/data/predictions.json docs/data/spreads.json docs/data/team_summaries.json || true
+          git commit -m "Update predictions, spreads & team cards [skip ci]" || echo "No changes to commit"
+
+          git push origin HEAD:main
