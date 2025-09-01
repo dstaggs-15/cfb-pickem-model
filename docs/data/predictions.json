@@ -1,10 +1,12 @@
 {
-  "generated_at": "2025-09-01T01:58:47Z",
+  "generated_at": "2025-09-01T02:00:41Z",
   "season": 0,
   "week": 0,
-  "model": "ensemble_v2 (Elo 60% + last5 stats 40%)",
+  "model": "ensemble_last5 (Elo 60% + stats 40%)",
   "metric": {
-    "test_accuracy": 0.6056
+    "test_accuracy": 0.6056,
+    "auc": 0.5,
+    "brier": 0.2389
   },
   "unknown_teams": [
     "Arizona Wildcats",
