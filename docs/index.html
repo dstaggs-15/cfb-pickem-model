@@ -2,26 +2,31 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>CFB Pick'em — Model Predictions</title>
+  <title>CFB Pick’em Model</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="styles.css" rel="stylesheet" />
+  <link href="./styles.css" rel="stylesheet" />
 </head>
 <body>
-  <header class="page-header">
-    <h1>College Pick'em — Model Predictions</h1>
-    <p id="meta"></p>
-    <div class="actions">
-      <a href="input/games.txt" target="_blank" rel="noopener">games.txt</a>
-      <a href="data/predictions.json" target="_blank" rel="noopener">predictions.json</a>
-      <button id="refresh" type="button">Refresh</button>
-    </div>
+  <header class="site-header">
+    <h1>CFB Pick’em Model</h1>
+    <div id="meta"></div>
   </header>
- 
+
   <main>
-    <section id="cards" class="cards-grid" aria-live="polite"></section>
+    <section id="controls" class="controls">
+      <label>Filter:
+        <input type="text" id="filterBox" placeholder="type a team name..." />
+      </label>
+      <span id="legend">Tap a bubble for team details</span>
+    </section>
+
+    <section id="cards" class="cards"></section>
   </main>
 
-  <!-- Optional: if you later add docs/assets/team_colors.json it will be auto-loaded -->
-  <script src="app.js"></script>
+  <footer class="site-footer">
+    <a href="https://github.com/dstaggs-15/cfb-pickem-model" target="_blank" rel="noreferrer">GitHub Repo</a>
+  </footer>
+
+  <script src="./app.js"></script>
 </body>
 </html>
