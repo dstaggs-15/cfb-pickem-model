@@ -10,6 +10,32 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import accuracy_score, roc_auc_score, brier_score_loss
 
+# --- NaN guard for inference ---
+def _clean_row_for_model(X, columns):
+    """
+    Return a 1-row DataFrame with exactly `columns`, all numeric, no NaNs.
+    Accepts dict, list/ndarray, or DataFrame.
+    """
+    import numpy as np
+    import pandas as pd
+
+    if isinstance(X, dict):
+        df = pd.DataFrame([X])
+    elif isinstance(X, (list, tuple, np.ndarray)):
+        df = pd.DataFrame([X], columns=columns[:len(X)])
+    elif isinstance(X, pd.DataFrame):
+        df = X.copy()
+    else:
+        # last resort: try to wrap whatever it is
+        df = pd.DataFrame(X)
+
+    # ensure exact column set & order; fill missing with 0
+    df = df.reindex(columns=columns, fill_value=0.0)
+    # force numeric and kill NaNs
+    df = df.apply(pd.to_numeric, errors="coerce").fillna(0.0)
+    return df
+
+
 # =========================
 # Paths (prefer local CFBD; fallback to snapshot)
 # =========================
