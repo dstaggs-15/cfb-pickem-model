@@ -224,8 +224,8 @@ def team_rolling_home_away(wide: pd.DataFrame, schedule: pd.DataFrame, n: int) -
     home = home.rename(columns={f"R{n}H_{c}": f"home_R{n}_{c}" for c in STAT_FEATURES})
     away = away.rename(columns={f"R{n}H_{c}": f"away_R{n}_{c}" for c in STAT_FEATURES})
 
-    home = home[["game_id","team","season","week","neutral_site","date"] + [f"home_R{n}_{c}" for c in STAT_FEATURES]]
-    away = away[["game_id","team","season","week","neutral_site","date"] + [f"away_R{n}_{c}" for c in STAT_FEATURES]]
+    home = home[["game_id","team"] + [f"home_R{n}_{c}" for c in STAT_FEATURES]]
+    away = away[["game_id","team"] + [f"away_R{n}_{c}" for c in STAT_FEATURES]]
     return home, away
 
 # -------------------------
@@ -359,7 +359,6 @@ def build_training_examples(schedule: pd.DataFrame,
 
     # engineered features
     eng = rest_and_travel(schedule, teams_df, venues_df)
-    # Drop any columns that already exist in X to avoid suffix collisions
     overlap = [c for c in eng.columns if c in X.columns and c != "game_id"]
     if overlap:
         eng = eng.drop(columns=overlap)
@@ -376,10 +375,9 @@ def build_training_examples(schedule: pd.DataFrame,
 
     # feature columns
     feature_cols = diff_cols + ["rest_diff","shortweek_diff","bye_diff","travel_diff_km","spread_home","over_under","neutral_site","is_postseason"]
-    for col in feature_cols:
-        if col not in X.columns:
-            X[col] = 0.0
-    X[feature_cols] = X[feature_cols].fillna(0.0)
+
+    # >>> fix dtype & FutureWarning: force numeric then fill
+    X[feature_cols] = X[feature_cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
 
     # Optionally limit to recent years
     if RECENT_YEARS_ONLY:
@@ -415,7 +413,8 @@ def season_ahead_metrics(df: pd.DataFrame, features: List[str]) -> Dict[str, flo
         base.fit(X_tr, y_tr)
 
         method = "isotonic" if len(calib_df) >= 400 else "sigmoid"
-        calib = CalibratedClassifierCV(base_estimator=base, method=method, cv="prefit")
+        # sklearn 1.5+: use 'estimator', not 'base_estimator'
+        calib = CalibratedClassifierCV(estimator=base, method=method, cv="prefit")
         calib.fit(X_ca, y_ca)
 
         p = calib.predict_proba(X_te)[:,1]
@@ -452,7 +451,8 @@ def fit_final_calibrated(df: pd.DataFrame, features: List[str]) -> CalibratedCla
 
     base = LogisticRegression(max_iter=600)
     base.fit(X_tr, y_tr)
-    calib = CalibratedClassifierCV(base_estimator=base, method=method, cv="prefit")
+    # sklearn 1.5+: use 'estimator', not 'base_estimator'
+    calib = CalibratedClassifierCV(estimator=base, method=method, cv="prefit")
     calib.fit(X_ca, y_ca)
     return calib
 
@@ -650,7 +650,11 @@ def main():
     home_roll, away_roll = team_rolling_home_away(wide, schedule, LAST_N)
 
     def latest(df, role):
-        d = df.sort_values(["team","date","game_id"]).groupby("team").tail(1).copy()
+        # take latest row per team for that role
+        d = df.copy()
+        d["__order"] = range(len(d))
+        d = d.sort_values("__order")
+        d = d.groupby("team").tail(1).drop(columns="__order")
         d["role"] = role
         d = d.set_index(["team","role"])
         cols = [f"{role}_R{LAST_N}_{c}" for c in STAT_FEATURES]
