@@ -1,9 +1,9 @@
 name: Train and Publish Predictions
 
 on:
-  workflow_dispatch:     # manual "Run workflow" button
+  workflow_dispatch:     # lets you click "Run workflow" manually in Actions tab
   schedule:
-    - cron: "0 * * * *"  # hourly (UTC)
+    - cron: "0 * * * *"  # runs hourly (UTC)
   push:
     branches: [ main ]
     paths:
@@ -41,23 +41,33 @@ jobs:
       - name: Commit predictions if changed (rebase-safe)
         run: |
           set -e
+
+          # Bot identity
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          # Make sure we have the latest remote refs
           git fetch origin main
           git checkout main
-          git pull --rebase origin main
 
+          # Stage the output file
           git add docs/data/predictions.json
+
+          # If nothing changed, exit early
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
 
+          # Commit first so we don't have unstaged changes blocking rebase
           git commit -m "Update predictions [skip ci]"
 
+          # Rebase our new commit on top of the latest main
+          git -c rebase.autoStash=true pull --rebase origin main
+
+          # Push. If a race still happens, rebase once more and retry.
           if ! git push origin HEAD:main; then
             echo "Push rejected (non-fast-forward). Rebasing and retrying once..."
-            git pull --rebase origin main
+            git -c rebase.autoStash=true pull --rebase origin main
             git push origin HEAD:main
           fi
