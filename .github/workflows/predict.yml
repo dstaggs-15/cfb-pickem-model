@@ -1,9 +1,10 @@
 name: Train and Publish Predictions
 
 on:
-  workflow_dispatch:     # manual "Run workflow" button
+  workflow_dispatch:
   schedule:
-    - cron: "0 * * * *"  # hourly (UTC)
+    - cron: "0 * * * *"    # train/predict hourly
+    - cron: "15 9 * * *"   # fetch CFBD once daily at 09:15 UTC
   push:
     branches: [ main ]
     paths:
@@ -14,12 +15,18 @@ on:
 permissions:
   contents: write
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+concurrency:
+  group: cfb-predictions
+  cancel-in-progress: true
 
+jobs:
+  fetch_cfbd:
+    if: ${{ github.event_name != 'push' || github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    env:
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -29,64 +36,62 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install deps
         run: |
           python -m pip install --upgrade pip
           pip install -r scripts/requirements.txt
 
-      - name: Train and predict
+      - name: Fetch CFBD (many seasons) if API key present
+        run: |
+          if [ -n "${CFBD_API_KEY}" ]; then
+            python scripts/fetch_cfbd.py
+          else
+            echo "CFBD_API_KEY not set; skipping fetch."
+          fi
+
+      - name: Commit fetched data if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/raw/cfbd/*.csv || true
+          if ! git diff --cached --quiet; then
+            git commit -m "Update CFBD raw data [skip ci]"
+            git push
+          else
+            echo "No changes."
+          fi
+
+  train_predict:
+    needs: [fetch_cfbd]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r scripts/requirements.txt
+
+      - name: Train & predict (uses local CFBD CSVs if present)
         run: |
           python scripts/train_and_predict.py
 
-      - name: Commit predictions to main (conflict-safe)
+      - name: Commit predictions if changed
         run: |
-          set -e
-
-          # Bot identity
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Ensure we're on main and up to date
-          git fetch origin main
-          git checkout main
-
-          # Stage output
           git add docs/data/predictions.json
-
-          # If nothing changed, exit early
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
-          fi
-
-          # Commit locally
-          git commit -m "Update predictions [skip ci]"
-
-          # Rebase on top of the latest main
-          set +e
-          git -c rebase.autoStash=true pull --rebase origin main
-          REBASE_STATUS=$?
-          set -e
-
-          if [ $REBASE_STATUS -ne 0 ]; then
-            echo "Rebase reported conflicts. Attempting auto-resolve for predictions.json ..."
-            # Keep OUR version of predictions.json (the one just generated)
-            git checkout --ours -- docs/data/predictions.json
-            git add docs/data/predictions.json
-            git rebase --continue || {
-              echo "Rebase continue failed. Aborting rebase and falling back to merge."
-              git rebase --abort
-              # Fallback: fetch latest and do a merge that prefers ours for predictions.json
-              git fetch origin main
-              git merge -X ours origin/main || true
-              git add docs/data/predictions.json
-              git commit -m "Resolve predictions.json conflict [skip ci]" || true
-            }
-          fi
-
-          # Push (with a one-time rebase retry if someone pushes between now and push)
-          if ! git push origin HEAD:main; then
-            echo "Non-fast-forward on push. Rebasing once more and retrying..."
-            git -c rebase.autoStash=true pull --rebase origin main || true
-            git push origin HEAD:main
+          if ! git diff --cached --quiet; then
+            git commit -m "Update predictions [skip ci]"
+            git push
+          else
+            echo "No changes."
           fi
