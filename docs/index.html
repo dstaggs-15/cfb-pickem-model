@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CFB Pick'em Predictions</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="styles.css" rel="stylesheet" />
+</head>
+<body>
+  <header>
+    <h1>College Pick'em — Model Predictions</h1>
+    <p id="meta"></p>
+    <div class="actions">
+      <a href="input/games.txt" target="_blank">games.txt</a>
+      <a href="data/predictions.json" target="_blank">predictions.json</a>
+      <button id="refresh">Refresh</button>
+    </div>
+  </header>
+
+  <main>
+    <table id="predTable">
+      <thead>
+        <tr>
+          <th>Home</th>
+          <th>Away</th>
+          <th>Home Prob</th>
+          <th>Away Prob</th>
+          <th>Pick</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
