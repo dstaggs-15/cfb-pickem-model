@@ -1,103 +1,103 @@
 {
-  "generated_at": "2025-09-01T01:19:58Z",
+  "generated_at": "2025-09-01T01:42:50Z",
   "season": 0,
   "week": 0,
-  "model": "logreg_v1",
+  "model": "ensemble_v1 (elo 60% / stats 40%)",
   "metric": {
     "test_accuracy": 0.6056
   },
   "unknown_teams": [
-    "Arizona",
-    "California",
-    "Clemson",
-    "Fresno State",
-    "Georgia Southern",
-    "Hawai'i",
-    "LSU",
-    "Miami",
-    "Northwestern",
-    "Notre Dame",
-    "Ohio State",
-    "Oregon",
-    "South Carolina",
-    "Texas",
-    "Tulane",
-    "UCLA",
-    "UTEP",
-    "Utah",
-    "Utah State",
-    "Virginia"
+    "Arizona Wildcats",
+    "California Golden Bears",
+    "Clemson Tigers",
+    "Fresno State Bulldogs",
+    "Georgia Southern Eagles",
+    "Hawai'i Rainbow Warriors",
+    "LSU Tigers",
+    "Miami (FL) Hurricanes",
+    "Northwestern Wildcats",
+    "Notre Dame Fighting Irish",
+    "Ohio State Buckeyes",
+    "Oregon Ducks",
+    "South Carolina Gamecocks",
+    "Texas Longhorns",
+    "Tulane Green Wave",
+    "UCLA Bruins",
+    "UTEP Miners",
+    "Utah State Aggies",
+    "Utah Utes",
+    "Virginia Cavaliers"
   ],
   "games": [
     {
-      "home": "Texas",
-      "away": "Ohio State",
-      "home_prob": 0.5989,
-      "away_prob": 0.4011,
-      "pick": "Texas"
+      "home": "Texas Longhorns",
+      "away": "Ohio State Buckeyes",
+      "home_prob": 0.5867,
+      "away_prob": 0.4133,
+      "pick": "Texas Longhorns"
     },
     {
-      "home": "Northwestern",
-      "away": "Tulane",
-      "home_prob": 0.5989,
-      "away_prob": 0.4011,
-      "pick": "Northwestern"
+      "home": "Northwestern Wildcats",
+      "away": "Tulane Green Wave",
+      "home_prob": 0.5867,
+      "away_prob": 0.4133,
+      "pick": "Northwestern Wildcats"
     },
     {
-      "home": "LSU",
-      "away": "Clemson",
-      "home_prob": 0.5989,
-      "away_prob": 0.4011,
-      "pick": "LSU"
+      "home": "LSU Tigers",
+      "away": "Clemson Tigers",
+      "home_prob": 0.5867,
+      "away_prob": 0.4133,
+      "pick": "LSU Tigers"
     },
     {
-      "home": "UTEP",
-      "away": "Utah State",
-      "home_prob": 0.5989,
-      "away_prob": 0.4011,
-      "pick": "UTEP"
+      "home": "UTEP Miners",
+      "away": "Utah State Aggies",
+      "home_prob": 0.5867,
+      "away_prob": 0.4133,
+      "pick": "UTEP Miners"
     },
     {
-      "home": "Fresno State",
-      "away": "Georgia Southern",
-      "home_prob": 0.5989,
-      "away_prob": 0.4011,
-      "pick": "Fresno State"
+      "home": "Fresno State Bulldogs",
+      "away": "Georgia Southern Eagles",
+      "home_prob": 0.5867,
+      "away_prob": 0.4133,
+      "pick": "Fresno State Bulldogs"
     },
     {
-      "home": "Arizona",
-      "away": "Hawai'i",
-      "home_prob": 0.5989,
-      "away_prob": 0.4011,
-      "pick": "Arizona"
+      "home": "Arizona Wildcats",
+      "away": "Hawai'i Rainbow Warriors",
+      "home_prob": 0.5867,
+      "away_prob": 0.4133,
+      "pick": "Arizona Wildcats"
     },
     {
-      "home": "California",
-      "away": "Oregon",
-      "home_prob": 0.5989,
-      "away_prob": 0.4011,
-      "pick": "California"
+      "home": "California Golden Bears",
+      "away": "Oregon Ducks",
+      "home_prob": 0.5867,
+      "away_prob": 0.4133,
+      "pick": "California Golden Bears"
     },
     {
-      "home": "Utah",
-      "away": "UCLA",
-      "home_prob": 0.5989,
-      "away_prob": 0.4011,
-      "pick": "Utah"
+      "home": "Utah Utes",
+      "away": "UCLA Bruins",
+      "home_prob": 0.5867,
+      "away_prob": 0.4133,
+      "pick": "Utah Utes"
     },
     {
-      "home": "South Carolina",
-      "away": "Virginia",
-      "home_prob": 0.5989,
-      "away_prob": 0.4011,
-      "pick": "South Carolina"
+      "home": "South Carolina Gamecocks",
+      "away": "Virginia Cavaliers",
+      "home_prob": 0.5867,
+      "away_prob": 0.4133,
+      "pick": "South Carolina Gamecocks"
     },
     {
-      "home": "Notre Dame",
-      "away": "Miami",
-      "home_prob": 0.5989,
-      "away_prob": 0.4011,
-      "pick": "Notre Dame"
+      "home": "Notre Dame Fighting Irish",
+      "away": "Miami (FL) Hurricanes",
+      "home_prob": 0.5867,
+      "away_prob": 0.4133,
+      "pick": "Notre Dame Fighting Irish"
     }
   ]
 }
