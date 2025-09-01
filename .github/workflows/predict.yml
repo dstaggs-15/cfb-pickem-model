@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 * * * *"    # train/predict hourly
-    - cron: "15 9 * * *"   # fetch CFBD once daily at 09:15 UTC
+    - cron: "15 9 * * *"   # fetch CFBD once daily at 09:15 UTC (add another Sunday if you want)
   push:
     branches: [ main ]
     paths:
@@ -21,7 +21,6 @@ concurrency:
 
 jobs:
   fetch_cfbd:
-    if: ${{ github.event_name != 'push' || github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     env:
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
@@ -41,7 +40,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r scripts/requirements.txt
 
-      - name: Fetch CFBD (many seasons) if API key present
+      - name: Fetch CFBD (multi-season data)
         run: |
           if [ -n "${CFBD_API_KEY}" ]; then
             python scripts/fetch_cfbd.py
