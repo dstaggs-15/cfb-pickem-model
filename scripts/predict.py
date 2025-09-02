@@ -22,9 +22,9 @@ LOCAL_DIR = "data/raw/cfbd"
 LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
 LOCAL_TEAM_STATS = f"{LOCAL_DIR}/cfb_game_team_stats.csv"
 LOCAL_LINES = f"{LOCAL_DIR}/cfb_lines.csv"
-LOCAL_VENUES = f"{LOCAL_DIR}/cfb_venues.csv"
-LOCAL_TEAMS = f"{LOCAL_DIR}/cfb_teams.csv"
-LOCAL_TALENT = f"{LOCAL_DIR}/cfb_talent.csv"
+LOCAL_VENUES = f"{LOCAL_DIR}/cfbd_venues.csv"
+LOCAL_TEAMS = f"{LOCAL_DIR}/cfbd_teams.csv"
+LOCAL_TALENT = f"{LOCAL_DIR}/cfbd_talent.csv"
 RAW_BASE = "https://raw.githubusercontent.com/moneyball-ab/cfb-data/master/csv"
 FALLBACK_SCHEDULE_URL = f"{RAW_BASE}/cfb_schedule.csv"
 FALLBACK_TEAM_STATS_URL = f"{RAW_BASE}/cfb_game_team_stats.csv"
@@ -74,8 +74,8 @@ def main():
     wide_stats = long_stats_to_wide(team_stats)
     home_roll, away_roll = build_sidewise_rollups(schedule, wide_stats, last_n, predict_df)
     
-    X = predict_df.merge(home_roll, left_on=["game_id", "home_team"], right_on=["game_id", "team"], how="left").drop(columns=["team"])
-    X = X.merge(away_roll, left_on=["game_id", "away_team"], right_on=["game_id", "team"], how="left").drop(columns=["team"])
+    X = predict_df.merge(home_roll, left_on=["game_id", "home_team"], right_on=["game_id", "team"], how='left').drop(columns=["team"])
+    X = X.merge(away_roll, left_on=["game_id", "away_team"], right_on=["game_id", "team"], how='left').drop(columns=["team"])
 
     diff_cols = []
     for c in [f for f in feats if f.startswith('diff_')]:
@@ -91,7 +91,6 @@ def main():
     elo_df = pregame_probs(schedule, talent_df, predict_df)
     X = X.merge(elo_df, on="game_id", how="left")
 
-    # Handle market lines
     if not manual_lines_df.empty:
         manual_lines_df.rename(columns={'home': 'home_team', 'away': 'away_team', 'spread': 'spread_home'}, inplace=True)
         X = X.merge(manual_lines_df[['home_team', 'away_team', 'spread_home']], on=['home_team', 'away_team'], how='left')
@@ -115,11 +114,19 @@ def main():
     for i, row in X.iterrows():
         prob = probs[i]
         pick = row['home_team'] if prob > 0.5 else row['away_team']
+        spread = row.get('spread_home')
+        
+        # --- THIS IS THE FIX ---
+        # Convert any potential NaN values from pandas into None, which becomes 'null' in valid JSON.
         output.append({
-            'home_team': row['home_team'], 'away_team': row['away_team'],
-            'neutral_site': bool(row['neutral_site']), 'model_prob_home': prob,
-            'pick': pick, 'spread_home': row.get('spread_home')
+            'home_team': row['home_team'],
+            'away_team': row['away_team'],
+            'neutral_site': bool(row['neutral_site']),
+            'model_prob_home': prob,
+            'pick': pick,
+            'spread_home': None if pd.isna(spread) else spread
         })
+        # --- END OF FIX ---
 
     save_json(PREDICTIONS_JSON, output)
     print(f"Successfully wrote {len(output)} predictions to {PREDICTIONS_JSON}")
