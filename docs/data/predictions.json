@@ -1,102 +1,82 @@
-{
-  "generated": "2025-09-02T15:27:21Z",
-  "model": "ensemble_last5 (Elo 55% + Calibrated stats 45%)",
-  "metric": {
-    "season_ahead_acc": 0.6265,
-    "season_ahead_auc": 0.5946,
-    "season_ahead_brier": 0.2223
+[
+  {
+    "home_team": "Iowa",
+    "away_team": "Iowa State",
+    "neutral_site": true,
+    "model_prob_home": 0.7272727272727273,
+    "pick": "Iowa",
+    "spread_home": NaN
   },
-  "games": [
-    {
-      "home": "Iowa",
-      "away": "Iowa State",
-      "home_prob": 0.6046,
-      "away_prob": 0.3954,
-      "pick": "Iowa",
-      "spread_home": 0.0,
-      "over_under": 0.0
-    },
-    {
-      "home": "Uconn",
-      "away": "Syracuse",
-      "home_prob": 0.5727,
-      "away_prob": 0.4273,
-      "pick": "Uconn",
-      "spread_home": 0.0,
-      "over_under": 0.0
-    },
-    {
-      "home": "Illinois",
-      "away": "Duke",
-      "home_prob": 0.5166,
-      "away_prob": 0.4834,
-      "pick": "Illinois",
-      "spread_home": 0.0,
-      "over_under": 0.0
-    },
-    {
-      "home": "Baylor",
-      "away": "SMU",
-      "home_prob": 0.613,
-      "away_prob": 0.387,
-      "pick": "Baylor",
-      "spread_home": 0.0,
-      "over_under": 0.0
-    },
-    {
-      "home": "Virginia Cavaliers",
-      "away": "NC State",
-      "home_prob": 0.5479,
-      "away_prob": 0.4521,
-      "pick": "Virginia Cavaliers",
-      "spread_home": 0.0,
-      "over_under": 0.0
-    },
-    {
-      "home": "Kansas",
-      "away": "Missouri",
-      "home_prob": 0.4315,
-      "away_prob": 0.5685,
-      "pick": "Missouri",
-      "spread_home": 0.0,
-      "over_under": 0.0
-    },
-    {
-      "home": "West Virginia",
-      "away": "Ohio",
-      "home_prob": 0.6128,
-      "away_prob": 0.3872,
-      "pick": "West Virginia",
-      "spread_home": 0.0,
-      "over_under": 0.0
-    },
-    {
-      "home": "Michigan",
-      "away": "Oklahoma",
-      "home_prob": 0.5479,
-      "away_prob": 0.4521,
-      "pick": "Michigan",
-      "spread_home": 0.0,
-      "over_under": 0.0
-    },
-    {
-      "home": "Arizona State",
-      "away": "Mississippi State",
-      "home_prob": 0.5453,
-      "away_prob": 0.4547,
-      "pick": "Arizona State",
-      "spread_home": 0.0,
-      "over_under": 0.0
-    },
-    {
-      "home": "Vanderbilt",
-      "away": "Virginia Tech",
-      "home_prob": 0.4395,
-      "away_prob": 0.5605,
-      "pick": "Virginia Tech",
-      "spread_home": 0.0,
-      "over_under": 0.0
-    }
-  ],
-  "unknown_teams": []
-}
+  {
+    "home_team": "Uconn",
+    "away_team": "Syracuse",
+    "neutral_site": true,
+    "model_prob_home": 0.41025641025641024,
+    "pick": "Syracuse",
+    "spread_home": NaN
+  },
+  {
+    "home_team": "Illinois",
+    "away_team": "Duke",
+    "neutral_site": true,
+    "model_prob_home": 0.8679245283018868,
+    "pick": "Illinois",
+    "spread_home": NaN
+  },
+  {
+    "home_team": "Baylor",
+    "away_team": "SMU",
+    "neutral_site": true,
+    "model_prob_home": 0.7272727272727273,
+    "pick": "Baylor",
+    "spread_home": NaN
+  },
+  {
+    "home_team": "Virginia",
+    "away_team": "NC State",
+    "neutral_site": true,
+    "model_prob_home": 0.6,
+    "pick": "Virginia",
+    "spread_home": NaN
+  },
+  {
+    "home_team": "Kansas",
+    "away_team": "Missouri",
+    "neutral_site": true,
+    "model_prob_home": 0.10714285714285714,
+    "pick": "Missouri",
+    "spread_home": NaN
+  },
+  {
+    "home_team": "West Virginia",
+    "away_team": "Ohio",
+    "neutral_site": true,
+    "model_prob_home": 0.7272727272727273,
+    "pick": "West Virginia",
+    "spread_home": NaN
+  },
+  {
+    "home_team": "Michigan",
+    "away_team": "Oklahoma",
+    "neutral_site": true,
+    "model_prob_home": 0.7272727272727273,
+    "pick": "Michigan",
+    "spread_home": NaN
+  },
+  {
+    "home_team": "Arizona State",
+    "away_team": "Mississippi State",
+    "neutral_site": true,
+    "model_prob_home": 0.7272727272727273,
+    "pick": "Arizona State",
+    "spread_home": NaN
+  },
+  {
+    "home_team": "Vanderbilt",
+    "away_team": "Virginia Tech",
+    "neutral_site": true,
+    "model_prob_home": 0.3333333333333333,
+    "pick": "Virginia Tech",
+    "spread_home": NaN
+  }
+]
