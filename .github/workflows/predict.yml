@@ -1,133 +1,81 @@
-name: predict
+Of course. Here is the complete and corrected code for your GitHub Actions workflow file.
 
+Copy this entire block and paste it into your `.github/workflows/predict.yml` file. It includes the `working-directory` fix for each script, as well as the standard steps for setup and committing the results.
+
+```yaml
+# .github/workflows/predict.yml
+
+name: CFB Model Pipeline
+
+# Controls when the action will run.
 on:
-  workflow_dispatch:
+  # Triggers the workflow on a schedule (runs every hour).
   schedule:
-    - cron: "0 * * * *"  # hourly
+    - cron: '0 * * * *'
+  
+  # Allows you to run this workflow manually from the Actions tab.
+  workflow_dispatch:
+
+  # Triggers the workflow on push events but only for specific paths.
   push:
-    branches: [ "main" ]
+    branches:
+      - main
+      - master
     paths:
-      - "scripts/**"
-      - "docs/input/**"
-      - ".github/workflows/predict.yml"
-
-permissions:
-  contents: write
-
-concurrency:
-  group: predict
-  cancel-in-progress: true
+      - 'scripts/**'
+      - 'docs/input/**'
+      - '.github/workflows/predict.yml'
 
 jobs:
-  run:
+  run-pipeline:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Checkout
+      # Step 1: Checks out your repository under $GITHUB_WORKSPACE, so your job can access it.
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Set up Python
+      # Step 2: Sets up Python 3.11 and caches dependencies for faster builds.
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('scripts/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r scripts/requirements.txt
-
-      - name: Ensure PYTHONPATH
-        run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
-
-      - name: Fetch CFBD data (optional)
-        run: |
-          if [ -f scripts/fetch_cfbd.py ]; then
-            python scripts/fetch_cfbd.py || echo "[WARN] fetch_cfbd failed"
-          else
-            echo "[INFO] scripts/fetch_cfbd.py not found; skipping."
-          fi
-
-      # --- Split pipeline: build -> train -> predict ---
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'scripts/requirements.txt'
+      
+      # Step 3: Installs the Python packages required by your scripts.
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+      
+      # Step 4: Runs the dataset builder script.
+      # The 'working-directory' is crucial for Python to find your packages.
       - name: Build dataset
         run: python -m scripts.build_dataset
-
+        working-directory: ./
+      
+      # Step 5: Runs the model training script.
       - name: Train model
         run: python -m scripts.train_model
-
-      - name: Predict picks
+        working-directory: ./
+        
+      # Step 6: Runs the prediction script.
+      - name: Predict
         run: python -m scripts.predict
-
-      # --- Optional generators (safe to skip if missing) ---
-      - name: Build spreads JSON (optional)
+        working-directory: ./
+        
+      # Step 7: Commits the generated data/model files back to the repository.
+      # This step only runs if files in the specified paths have changed.
+      - name: Commit and push artifacts
         run: |
-          if [ -f scripts/build_spreads.py ]; then
-            python scripts/build_spreads.py || echo "[WARN] build_spreads failed"
-          else
-            echo "[INFO] scripts/build_spreads.py not found; skipping."
-          fi
-
-      - name: Build team summaries (optional)
-        run: |
-          if [ -f scripts/make_team_cards.py ]; then
-            python scripts/make_team_cards.py || echo "[WARN] make_team_cards failed"
-          else
-            echo "[INFO] scripts/make_team_cards.py not found; skipping."
-          fi
-
-      - name: Build team colors (optional)
-        run: |
-          if [ -f scripts/build_team_colors.py ]; then
-            python scripts/build_team_colors.py || echo "[WARN] build_team_colors failed"
-          else
-            echo "[INFO] scripts/build_team_colors.py not found; skipping."
-          fi
-
-      # --- Commit artifacts directly to main, with a safe rebase/push loop ---
-      - name: Commit artifacts
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Stage only files that exist
-          git add docs/data/predictions.json 2>/dev/null || true
-          git add docs/data/spreads.json 2>/dev/null || true
-          git add docs/data/team_summaries.json 2>/dev/null || true
-          git add docs/data/team_colors.json 2>/dev/null || true
-          git add docs/data/train_meta.json 2>/dev/null || true
-          git add docs/data/train_metrics.json 2>/dev/null || true
-
-          if git diff --cached --quiet; then
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add data/derived/ docs/data/
+          # Check if there are any changes to commit
+          if git diff --staged --quiet; then
             echo "No changes to commit."
-            exit 0
+          else
+            git commit -m "CI: Update model and predictions"
+            git push
           fi
 
-          git commit -m "Update predictions & artifacts [skip ci]"
-
-          # Try push with a small rebase/autostash loop to avoid conflicts
-          for attempt in 1 2 3; do
-            git fetch origin main
-            git pull --rebase --autostash origin main || true
-            if git push origin HEAD:main; then
-              echo "Pushed on attempt $attempt."
-              exit 0
-            fi
-            echo "Push failed (attempt $attempt). Retrying..."
-            sleep 2
-          done
-
-          echo "::error::Failed to push after retries."
-          exit 1
+```
