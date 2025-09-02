@@ -53,14 +53,16 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add data/derived/ docs/data/
-          # Check if there are any changes to commit
-          if git diff --staged --quiet; then
-            echo "No changes to commit."
-          else
+          # Commit the changes if there are any
+          if ! git diff --staged --quiet; then
             git commit -m "CI: Update model and predictions"
-            # --- THIS IS THE FIX ---
-            # Pull with rebase to apply our commit on top of any new remote commits.
-            git pull --rebase
-            git push
+            
+            # --- THIS IS THE FINAL FIX ---
+            # Create/update a dedicated branch for the bot's predictions
+            # and force-push to it. This avoids all conflicts with the main branch.
+            git branch -M bot/predictions
+            git push --force origin bot/predictions
             # --- END OF FIX ---
+          else
+            echo "No changes to commit."
           fi
