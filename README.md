@@ -1,465 +1,152 @@
+Of course. Here is a comprehensive, in-depth engineering notebook for your CFB Pick'em Model, structured to be clear, thorough, and serve as an excellent technical guide for the project.
+
+-----
+
 # CFB Pick’em Model — Engineering Notebook
 
-Predict weekly winners for ESPN College Pick’em using a transparent, reproducible pipeline: **multi-season data**, **last-5 form**, **market lines**, **rest/travel**, **calibrated logistic regression**, and **a smarter Elo** — all glued together by GitHub Actions and rendered on GitHub Pages.
+This project is a complete, automated data and machine learning pipeline for predicting weekly NCAA college football games. It is designed for transparency, reproducibility, and robust performance by leveraging a multi-faceted feature set, a carefully designed validation strategy, and an ensemble of complementary models.
 
----
+The entire system is orchestrated via **GitHub Actions** and serves its predictions through a static **GitHub Pages** website.
 
-## 0) TL;DR (How to use)
+-----
 
-* Put matchups in `docs/input/games.txt` (one per line).
-  Examples:
+## 1\. High-Level Architecture
 
-  * `Ohio State @ Texas`
-  * `LSU vs Clemson`
-  * `South Carolina, Virginia`
+The system is designed as a three-stage pipeline that runs automatically, transforming raw data into calibrated game predictions.
 
-* (Optional) Put manual lines in `docs/input/lines.csv`:
+1.  **Data Ingestion (`build_dataset.py`)**: This stage is responsible for loading all historical data (schedules, team stats, betting lines, etc.), cleaning it, and engineering a rich feature set. The output is a clean, wide-format `training.parquet` file where each row represents a single game with all its associated features and the final outcome.
+2.  **Model Training (`train_model.py`)**: This stage consumes the `training.parquet` file. It trains a gradient boosting model using a "season-ahead" cross-validation strategy to prevent data leakage. The model is then calibrated to ensure its predicted probabilities are reliable. The final trained model is saved as `model.joblib`.
+3.  **Prediction (`predict.py`)**: This stage loads the trained model and applies the *exact same* feature engineering logic to the user-provided weekly matchups from `docs/input/games.txt`. It generates a `predictions.json` file containing the pick and win probability for each game.
 
-  ```
-  home,away,spread,over_under
-  Texas Longhorns,Ohio State Buckeyes,-3.5,55.5
-  ```
+This modular, three-script design ensures a clean separation of concerns, making the system easier to debug, maintain, and extend.
 
-  (Spread is **home relative**: negative = home favored.)
+-----
 
-* (One time) Add your CFBD API key as repo secret **CFBD\_API\_KEY**.
-  Settings → Secrets and variables → Actions → *New repository secret*.
+## 2\. Repository Layout
 
-* The workflow:
-
-  * **Daily** pulls history from CollegeFootballData (CFBD).
-  * **Hourly** re-trains + predicts, writing `docs/data/predictions.json`.
-  * GitHub Pages serves `docs/` → your site renders color-coded “bubbles.”
-
----
-
-## 1) Repository layout
+The repository is organized to separate code, data, user inputs, and website assets.
 
 ```
 /scripts
-  fetch_cfbd.py          # Pulls multi-season FBS schedule, per-team stats, lines, venues, teams, talent
-  train_and_predict.py   # Feature engineering, model training, calibration, Elo, ensemble, predictions
-  requirements.txt       # Python dependencies
+  /lib                     # Shared utility functions (the "how")
+    __init__.py
+    context.py             # Rest, travel, and game context features
+    elo.py                 # Elo rating calculations
+    io_utils.py            # Data loading and saving helpers
+    market.py              # Betting market data processing
+    parsing.py             # Parsing user input and cleaning data
+    rolling.py             # Rolling average feature calculations
+  __init__.py
+  build_dataset.py         # The "what": Stage 1 - Data ingestion and feature engineering
+  train_model.py           # The "what": Stage 2 - Model training and validation
+  predict.py               # The "what": Stage 3 - Prediction generation
+  requirements.txt         # Python dependencies
 
-/data/raw/cfbd
-  cfb_schedule.csv            # schedule with scores
-  cfb_game_team_stats.csv     # long-form per-game team stats
-  cfb_lines.csv               # market lines (multiple providers; we take median)
-  cfbd_venues.csv             # venue metadata (+coords, elevation)
-  cfbd_teams.csv              # team metadata (+coords, conference)
-  cfbd_talent.csv             # team talent by season (preseason priors)
+/data
+  /raw/cfbd                # Raw CSVs from CollegeFootballData API (optional local cache)
+  /derived                 # Intermediate and final model artifacts
+    training.parquet       # The clean, final feature set for model training
+    model.joblib           # The final, trained, and calibrated model object
 
-/docs
-  index.html
-  app.js                      # fetches predictions.json, renders cards/bubbles w/ team colors
-  styles.css
-  /data/predictions.json      # output written by the workflow
-  /input/games.txt            # your weekly matchups
-  /input/lines.csv            # optional manual lines for next week (spread, total)
-  /input/aliases.json         # optional name aliases (e.g., "hawaii" -> "Hawai'i Rainbow Warriors")
+/docs                      # Root folder for the GitHub Pages website
+  /input                   # Files you edit to control the model
+    games.txt              # Your weekly matchups (one per line)
+    aliases.json           # (Optional) Team name aliases
+    lines.csv              # (Optional) Manual betting lines for upcoming games
+  /data                    # Files automatically generated by the workflow
+    predictions.json       # The final output read by the website
+    train_meta.json        # Metadata from training (feature lists, market params)
+    train_metrics.json     # Model performance metrics (AUC, Brier score)
+  index.html               # The website's main page
+  app.js                   # JavaScript to fetch predictions.json and render the UI
 
 /.github/workflows
-  predict.yml            # CI: fetch history (daily), train+predict (hourly), publish JSON
+  predict.yml              # The GitHub Actions workflow that orchestrates the entire pipeline
 ```
 
----
+-----
 
-## 2) Data sources (what we actually use)
+## 3\. Feature Engineering
 
-* **Schedule** (`cfb_schedule.csv`): season, week, teams, scores, neutral flag, date, venue id.
-* **Per-team game stats** (`cfb_game_team_stats.csv`): long-form “box score” (e.g., `thirdDownEff` as “3-of-9”).
-* **Market lines** (`cfb_lines.csv`): multiple books over time (we take **per-game median** of `spread`, `over_under`).
-* **Venues** (`cfbd_venues.csv`): latitude/longitude, elevation, capacity.
-* **Teams** (`cfbd_teams.csv`): team lat/lon (campus), conference.
-* **Talent** (`cfbd_talent.csv`): season-level composite talent metric (recruiting proxy).
+The model's performance relies on a set of carefully engineered features designed to capture different aspects of a team's strength and the context of a specific game.
 
-> The training script **prefers local CFBD CSVs**. If they don’t exist, it falls back to a public snapshot (older).
+### 3.1 Rolling Form Statistics
 
----
+Instead of using season-long averages, which can be misleading, we use a team's **recent form**.
 
-## 3) End-to-end dataflow (the big picture)
+  * **Logic**: We calculate rolling averages for key statistical categories (e.g., `ppa`, `success_rate`, `turnovers`) over a team's **last 5 games**.
+  * **Side-Awareness**: Crucially, these rolling averages are **side-aware**. The home team's form is calculated from its last 5 **home** games, and the away team's form is from its last 5 **away** games. This captures performance differences that arise from playing in familiar vs. hostile environments.
+  * **Leakage Prevention**: All rolling averages are calculated using a `.shift(1)` operation to ensure a game's own stats are never included in the pre-game features.
+  * **Differentials**: The final features fed to the model are the **differences** between the home and away team's rolling stats (e.g., `diff_R5_ppa = home_R5_ppa - away_R5_ppa`).
 
-```
-CFBD API  ─→  /data/raw/cfbd/*.csv  ─→  Feature Engineering  ─→  Models  ─→  Ensemble  ─→  predictions.json  ─→  Web UI
-            (daily fetch job)            (stats + lines +      (Calibrated   (Elo ⊕ Stats)      (hourly)             (GitHub Pages)
-                                          rest/travel)          Logistic +
-                                                                Better Elo)
-```
+### 3.2 Game Context Features
 
----
+This group of features accounts for the logistical and situational factors of a game.
 
-## 4) Input formats you control
+  * **Rest**: We calculate the number of days since each team's last game and compute the difference (`rest_diff`). We also generate flags for short weeks and bye weeks.
+  * **Travel**: Using the haversine formula on latitude/longitude coordinates of team campuses and stadiums, we calculate the travel distance in kilometers for the away team (`travel_away_km`). Home team travel is assumed to be zero.
+  * **Flags**: Simple binary flags for `neutral_site` and `is_postseason` games.
 
-### 4.1 `docs/input/games.txt`
+### 3.3 Market-Derived Features
 
-Accepted patterns (one per line):
+The betting market is an incredibly efficient signal. We incorporate it in two ways:
 
-* `Away @ Home`
-* `Home vs Away`
-* `Home, Away`
-* `# comments allowed`
+  * **Median Lines**: We process historical betting lines data, taking the median `spread` and `over_under` for each game to create stable market indicators.
+  * **Market-Implied Probability**: We don't use the spread directly. Instead, we train a logistic function that maps the historical point spread to the actual win/loss outcome. This gives us a learned function `p(win) = f(spread)`. For any game with a spread, we can then calculate a `market_home_prob`, a powerful predictive feature.
 
-Names are normalized via a large alias map plus `aliases.json`. Canonical names are what appear in the schedule CSV (e.g., `Texas Longhorns`).
+### 3.4 Elo Rating
 
-### 4.2 `docs/input/lines.csv` (optional but powerful)
+Elo provides a long-term, continuously updated power rating for each team.
 
-```
-home,away,spread,over_under
-Texas Longhorns,Ohio State Buckeyes,-3.5,55.5
-```
+  * **Core Logic**: A standard Elo system where teams exchange points based on the game's outcome and the pre-game expected outcome.
+  * **Enhancements**: Our Elo model includes a **home-field advantage** (HFA) of \~65 points (nullified on neutral sites) and **off-season regression to the mean** to account for roster turnover.
+  * **As a Feature**: The final Elo win probability (`elo_home_prob`) is not used as the final prediction but rather as another input feature for the main model to consider.
 
-* **Spread is home-relative**: negative means home is favored.
-* If not supplied, the model still works (it just sets spread/total to 0 for predictions).
+-----
 
-### 4.3 `docs/input/aliases.json` (optional)
+## 4\. Model Training and Validation
 
-```json
-{
-  "hawaii": "Hawai'i Rainbow Warriors",
-  "miami fl": "Miami (FL) Hurricanes"
-}
-```
+The modeling stage is designed for robustness and to produce reliable, well-calibrated probabilities.
 
----
+### 4.1 Model Choice
 
-## 5) Feature engineering (what the model “sees”)
+We use a `HistGradientBoostingClassifier` from scikit-learn. This is a modern, fast, and powerful tree-based model that can effectively capture non-linear relationships between the features.
 
-### 5.1 Box-score stats (per team, per game → numeric → rolling form)
+### 4.2 Season-Ahead Validation
 
-From the long-form stats we extract and numericize:
+To get a realistic estimate of out-of-sample performance and prevent data leakage, we use a **season-ahead validation** strategy. For each season `S` in our history, we:
 
-* `totalYards`
-* `netPassingYards`
-* `rushingYards`
-* `firstDowns`
-* `turnovers`
-* `sacks`
-* `tacklesForLoss`
-* `thirdDownEff` → converts `"3-of-9"` to `3/9`
-* `fourthDownEff` → converts `"1-of-2"` to `1/2`
-* `kickingPoints`
+1.  **Train** the model on all seasons *before* `S`.
+2.  **Test** the model on season `S`.
 
-**Rolling form**: we compute **pre-game rolling means over last N=5** but separately for **home** and **away** contexts.
+We then average the performance metrics (AUC, Brier score, accuracy) across all tested seasons. This mimics the real-world task of predicting a future season using only past data.
 
-* For the home team: last-5 **home** games (pre-game shifted → no leakage)
-* For the away team: last-5 **away** games (pre-game shifted)
+### 4.3 Probability Calibration
 
-Then we form **differentials** used for training/prediction:
+The raw output of a gradient boosting model can be poorly calibrated (e.g., when it predicts 70%, the event might only happen 60% of the time). We fix this using `CalibratedClassifierCV`.
 
-```
-diff_R5_totalYards = home_R5_totalYards - away_R5_totalYards
-... same for each stat ...
-```
+  * **Logic**: After the main model is trained, a second model (an isotonic regression) is trained to correct the probability scores. It learns a mapping from the model's raw predicted probabilities to the true historical frequencies.
+  * **Result**: This ensures that when the final model predicts a 70% chance of winning, that team does, in fact, win approximately 70% of the time over the long run. This is measured by the **Brier score**.
 
-Why: Home/away split captures venue-specific behaviors (e.g., some teams travel poorly).
+-----
 
-### 5.2 Market features (strongest public signal)
+## 5\. Automation with GitHub Actions
 
-* `spread_home` (median across books, sign relative to home)
-* `over_under` (median across books)
+The entire pipeline is orchestrated by a single workflow file at `.github/workflows/predict.yml`.
 
-If you provide `docs/input/lines.csv`, those numbers are used for **your future predictions** even if CFBD hasn’t posted finals yet.
+  * **Triggers**: The workflow runs automatically:
+      * **Hourly**: To re-train the model and generate new predictions.
+      * **On Push**: Whenever code or input files are changed.
+      * **Manually**: Via the "Run workflow" button on the Actions tab.
+  * **Permissions**: The workflow is granted `contents: write` permissions to allow it to commit the generated artifacts (`predictions.json`, `model.joblib`, etc.) back to the repository.
+  * **Commit Strategy**: To prevent conflicts from concurrent runs, the workflow pushes its results to a dedicated **`bot/predictions`** branch. This cleanly separates automated commits from your development work on the `main` branch. The GitHub Pages site is configured to serve from this `bot/predictions` branch, ensuring it always displays the latest results.
 
-### 5.3 Rest & travel features
+-----
 
-* `rest_diff` = (home days since last game) − (away days since last game)
-* `shortweek_diff` = (home short week ≤6 days ?1:0) − (away …)
-* `bye_diff` = (home bye ≥13 days ?1:0) − (away …)
-* `travel_diff_km`:
+## 6\. How to Use and Extend
 
-  * **Neutral site**: distance from each campus → venue; take home − away.
-  * **True home game**: home travel = \~0, away travel = campus→home stadium.
-* `neutral_site` ∈ {0,1}, `is_postseason` ∈ {0,1}
-
-Why: short rest hurts; long travel + neutral shifts variance.
-
----
-
-## 6) Models (plural) and how they combine
-
-### 6.1 Better Elo (ratings over time)
-
-Core expectation:
-
-```
-E(home beats away) = 1 / (1 + 10^(-(R_home + HFA - R_away)/400))
-```
-
-We add:
-
-* **Home-field advantage (HFA)** = 55 Elo points (0 on neutral sites).
-* **Margin-of-victory (MOV) scaling**: larger wins → slightly larger updates.
-* **Early-season higher K**: Weeks 1–4 use `K = 32` (faster learning), then `K = 20`.
-* **Off-season mean reversion**: pull every team `30%` back toward 1500 at season start.
-* **Preseason priors**: bump initial rating by `~25 Elo * talent_zscore` (if `cfbd_talent.csv` exists).
-
-Output per game: **Elo win probability** for the home side.
-
-### 6.2 Calibrated logistic regression (on features)
-
-Base model learns weights `w` over your differential/engineered vector `x`:
-
-```
-p = sigmoid(w·x + b)
-```
-
-We **calibrate** probabilities using the most recent completed season:
-
-* If enough data: **isotonic** calibration (non-parametric).
-* Else: **Platt** (sigmoid) calibration.
-
-**Why calibration?** So that a “0.70” actually behaves like \~70% over many games (Brier score improves).
-
-### 6.3 Season-ahead validation (no leakage)
-
-We don’t just random-split; we compute metrics **year by year**:
-
-* Train on seasons ≤ Y−2
-* Calibrate on season Y−1
-* Test on season Y
-
-Report the **mean** across Y of:
-
-* Accuracy
-* AUC (ranking quality)
-* Brier (probability calibration; lower is better)
-
-This matches the real timeline: yesterday trains today; yesterday calibrates tomorrow.
-
-### 6.4 The ensemble
-
-Final probability is a **weighted average**:
-
-```
-P_home = 0.55 * P_home_from_Elo + 0.45 * P_home_from_CalibratedLogit
-```
-
-The weights are tunable constants at the top of `train_and_predict.py`:
-
-```
-ELO_WEIGHT  = 0.55
-STAT_WEIGHT = 0.45
-```
-
-**Pick rule**: if `P_home ≥ 0.50` → pick home; else pick away.
-
----
-
-## 7) Output format: `docs/data/predictions.json`
-
-Minimal shape:
-
-```json
-{
-  "generated_at": "2025-08-31T19:20:00Z",
-  "model": "ensemble_last5 (Elo 55% + Calibrated stats 45%)",
-  "metric": {
-    "season_ahead_acc": 0.61,
-    "season_ahead_auc": 0.66,
-    "season_ahead_brier": 0.218
-  },
-  "unknown_teams": [],
-  "games": [
-    {
-      "home": "Texas Longhorns",
-      "away": "Ohio State Buckeyes",
-      "home_prob": 0.5742,
-      "away_prob": 0.4258,
-      "pick": "Texas Longhorns"
-    }
-  ]
-}
-```
-
-* `unknown_teams` lists any names we failed to match. Fix by editing `games.txt`/`aliases.json`.
-
----
-
-## 8) Front-end (docs/) — what the webpage does
-
-* `app.js` fetches `docs/data/predictions.json`.
-* Renders each game as a **card/bubble** with:
-
-  * Team names colored by a **134-team color map** (additions welcome).
-  * Predicted winner, probabilities, small badge if neutral/bowl (if exposed).
-* Vanilla JS + CSS for speed; nothing fancy required to view on GitHub Pages.
-
-> Rule of thumb: lighter background, team colors inside “pills/bubbles”, big, readable numbers. This is for fast scanning.
-
----
-
-## 9) GitHub Actions (CI/CD)
-
-File: `.github/workflows/predict.yml`
-
-* **Triggers**
-
-  * `schedule`:
-
-    * `15 9 * * *` → **daily** CFBD fetch (history updates).
-    * `0 * * * *` → **hourly** train + predict (writes JSON).
-  * `workflow_dispatch`: manual “Run workflow.”
-  * `push` to `main` when you change code or inputs.
-
-* **Jobs**
-
-  * `fetch_cfbd`:
-
-    * Requires secret `CFBD_API_KEY`.
-    * Writes CSVs into `/data/raw/cfbd/`.
-    * Commits only if files changed.
-  * `train_predict`:
-
-    * Installs deps.
-    * Runs `scripts/train_and_predict.py`.
-    * Commits `docs/data/predictions.json` if changed.
-
-* **Concurrency**
-
-  * Ensures a new run cancels an old one (`cancel-in-progress: true`) to avoid piles of queued jobs.
-
-* **Commit strategy**
-
-  * Uses bot identity and `[skip ci]` in messages to prevent loops.
-
-**Common CI gotchas**
-
-* “GitHub Actions is not permitted to create/approve PRs”: we commit directly to `main` to avoid PR permissions issues.
-* Merge conflicts in `predictions.json`: concurrency + commit-only-when-changed avoids most. If you still get conflicts, delete the file and re-run; the job will re-write it cleanly.
-
----
-
-## 10) How training “gets better over time”
-
-* **Daily CFBD fetch** adds new games → both Elo and the training set grow.
-* **Hourly re-train** re-fits on all available history (with calibration on the latest finished season).
-* If you **add features** (e.g., weather), the model will learn from them on the next run.
-* If you **enter manual lines** for upcoming games, predictions update immediately.
-
----
-
-## 11) Math & metrics (quick but precise)
-
-### 11.1 Logistic regression
-
-* Decision function: `z = w·x + b`
-* Probability (pre-calibration): `p = 1 / (1 + exp(-z))`
-* Fitted by maximizing conditional log-likelihood.
-
-### 11.2 Calibration
-
-* **Isotonic regression**: non-parametric monotone mapping `p → p'` minimizing squared error on calibration set.
-* **Platt scaling**: fit `p' = 1 / (1 + exp(Ap + B))` on calibration set.
-
-### 11.3 Elo
-
-* Expectation: as above.
-* Update: `R_new = R_old + K * (score - expected)`
-* MOV scaling factor `≈ ln(margin + 1) * 2.2 / ((|ΔR|*0.001) + 2.2)`
-* Seasonal mean reversion: `R = 1500 + (R - 1500)*(1 - λ)` with `λ ≈ 0.30`.
-
-### 11.4 Metrics
-
-* **Accuracy**: % correct (sensitive to class balance; baseline ≈ home win rate).
-* **AUC**: probability a random home-win game is ranked above a home-loss.
-* **Brier**: mean squared error of predicted probabilities; lower is better; perfect=0.
-
----
-
-## 12) Design choices (why we did it this way)
-
-* **Home/away split rolling form** beats pooled averages when teams are venue-sensitive.
-* **Lines** carry sharp crowd wisdom; we use them but still keep a model that can run without them.
-* **Calibration** avoids over-confident 60% “coin flips.”
-* **Season-ahead validation** mirrors reality and avoids time leakage.
-* **Elo + Stats** ensemble: each covers the other’s blind spots (Elo = long-term strength; Stats = matchup form; Lines = market).
-
----
-
-## 13) Running locally
-
-```bash
-# 1) Python env
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-
-# 2) Deps
-pip install -r scripts/requirements.txt
-
-# 3) Fetch multi-season data (requires CFBD_API_KEY in your env)
-export CFBD_API_KEY=YOUR_TOKEN_HERE
-python scripts/fetch_cfbd.py
-
-# 4) Train + predict
-python scripts/train_and_predict.py
-
-# 5) View site locally
-# serve the docs/ folder with any static server (Python example):
-python -m http.server --directory docs 8000
-# open http://localhost:8000
-```
-
----
-
-## 14) Extending the model (roadmap)
-
-* **Weather**: add wind speed and precipitation (feature engineering: wind × pass rate proxy).
-* **QB/coach changes**: flags that reset or dampen rolling form early in season.
-* **Depth charts/injuries**: not free, but a few binary features can move the needle.
-* **Feature importance**: fit a tree model on same features to get SHAP/importance (for insight, not necessarily for picks).
-* **Multi-output**: probability of cover vs win; total over/under lean.
-* **Hyper-parameter search**: tune weights (ELO\_WEIGHT/STAT\_WEIGHT) by season-ahead score.
-
----
-
-## 15) Troubleshooting & FAQs
-
-**“Unknown teams keep showing up.”**
-Add to `docs/input/aliases.json`, or fix spelling in `games.txt`. Check the predictions JSON’s `unknown_teams`.
-
-**“Numbers changed a lot overnight.”**
-The CFBD fetch pulled new games; Elo & rolling form updated; calibration shifted. That’s expected.
-
-**“Why is my accuracy only \~60%?”**
-Random years baseline (home-team bias) can be \~60–64%. Accuracy without lines is hard. Add lines + calibration + last-5 splits to get stable lift; don’t judge off a single 8-game week.
-
-**“Do I need lines?”**
-No. But including `spread_home` and `over_under` generally improves ranking and calibration.
-
-**“What if I don’t have a CFBD key?”**
-The trainer falls back to a public snapshot (older). You’ll still get predictions, just with less up-to-date data.
-
-**“How often does it retrain?”**
-Hourly by default; plus when you push; plus when you press **Run workflow**.
-
----
-
-## 16) Ethics & compliance
-
-* This is an **educational** project to learn ML, data wrangling, and automation.
-* Check your local laws & platform ToS if you use predictions for wagering.
-* Don’t over-fit small weekly slates; respect uncertainty (that’s why we calibrate).
-
----
-
-## 17) Credits
-
-* CollegeFootballData API (awesome community resource).
-* GitHub Actions / Pages.
-* The many open-source maintainers of pandas, NumPy, scikit-learn.
-
----
-
-## 18) Appendix — Implementation details (deep-dive bullets)
-
-* **Parsing “3-of-9”** → decimal efficiency before rolling.
-* **Pre-game shift**: when computing rolling means, we **`shift(1)`** so a game never uses its own stats.
-* **Neutral sites**: Elo HFA = 0; travel computed to venue coordinates.
-* **Median lines**: robust to outlier books; if missing, zeros (model still OK).
-* **Calibration selection**: isotonic if ≥400 games in calibration season, else Platt.
-* **Season-ahead loop**: report mean of per-season metrics (not one giant pool).
-* **Ensemble stability**: we weight Elo slightly higher early season; tuneable constants.
-* **Git hygiene**: `[skip ci]` on bot commits to avoid recursive triggers; concurrency avoids pile-ups.
-* **Front-end perf**: tiny JSON, no frameworks, renders instantly on Pages.
-* **Colors**: a JS object maps 134 FBS teams → primary/secondary hex; picks get a tinted background “pill.”
-
+  * **Weekly Use**: Simply update `docs/input/games.txt` with the new week's matchups and push the change. The workflow will handle the rest.
+  * **Extending**: The modular `scripts/lib` structure makes it easy to add new features. For example, to add weather data, you would:
+    1.  Source historical weather data.
+    2.  Add a `weather.py` file to `scripts/lib` with a function to calculate weather features for a game.
+    3.  Call this new function in `build_dataset.py` and `predict.py` and add the new feature names to the model's feature list.
