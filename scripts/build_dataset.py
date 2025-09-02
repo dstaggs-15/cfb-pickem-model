@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-import os, json, datetime as dt
+# --- bootstrap so 'scripts.lib' imports work when run as a file ---
+import os, sys
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+# -----------------------------------------------------------------
+
+import json, datetime as dt
 import numpy as np, pandas as pd
 from sklearn.metrics import accuracy_score, roc_auc_score, brier_score_loss
 
@@ -24,12 +32,11 @@ FALLBACK_TEAM_STATS_URL = f"{RAW_BASE}/cfb_game_team_stats.csv"
 
 DERIVED = "data/derived"
 TRAIN_PARQUET = f"{DERIVED}/training.parquet"
-META_JSON = "docs/data/train_meta.json"   # feature list + market params
+META_JSON = "docs/data/train_meta.json"
 
 LAST_N = 5
 ENG_FEATURES_BASE = ["rest_diff","shortweek_diff","bye_diff","travel_diff_km","neutral_site","is_postseason"]
 LINE_FEATURES = ["spread_home","over_under"]
-PROB_FEATURES = ["elo_home_prob","market_home_prob"]
 
 def main():
     print("Building training dataset ...")
@@ -90,8 +97,11 @@ def main():
     X = X.drop(columns=["_season"])
 
     # market mapping
+    from scripts.lib.market import fit_market_mapping
     params = fit_market_mapping(X["spread_home"].to_numpy(dtype=float), X["home_win"].to_numpy(dtype=float))
-    X["market_home_prob"] = np.vectorize(lambda s: None if pd.isna(s) else 1/(1+np.exp(-(params["a"] + params["b"]*(-s)))))(X["spread_home"])
+    # market prob per game
+    a, b = params["a"], params["b"]
+    X["market_home_prob"] = X["spread_home"].apply(lambda s: (1/(1+np.exp(-(a + b * (-(s))))) if pd.notna(s) else np.nan))
     X["market_home_prob"] = X.groupby("season")["market_home_prob"].transform(lambda s: s.fillna(s.mean()))
 
     feature_cols = diff_cols + [f"home_R{LAST_N}_count", f"away_R{LAST_N}_count"] + ENG_FEATURES_BASE + LINE_FEATURES + ["elo_home_prob","market_home_prob"]
