@@ -19,13 +19,15 @@ jobs:
   run-pipeline:
     runs-on: ubuntu-latest
     
+    # --- THIS IS THE FIX ---
+    # Grant the GITHUB_TOKEN write permissions to push code back to the repo.
+    permissions:
+      contents: write
+    # --- END OF FIX ---
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # THIS IS THE STEP YOU ARE LOOKING FOR
-      - name: List files for debugging
-        run: ls -R
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
