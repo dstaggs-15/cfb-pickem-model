@@ -41,6 +41,17 @@ def main():
     schedule = load_csv_local_or_url(LOCAL_SCHEDULE, FALLBACK_SCHEDULE_URL)
     schedule = ensure_schedule_columns(schedule)
     team_stats = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL)
+
+    # --- FIX STARTS HERE ---
+    # The team_stats CSV is missing the 'home_away' column, so we create it
+    # by cross-referencing the schedule file, which knows the home team for each game.
+    home_team_map = schedule[['game_id', 'home_team']]
+    team_stats = team_stats.merge(home_team_map, on='game_id', how='left')
+    # If the team in the stat line matches the game's home_team, label it 'home'
+    team_stats['home_away'] = np.where(team_stats['team'] == team_stats['home_team'], 'home', 'away')
+    team_stats = team_stats.drop(columns=['home_team'])
+    # --- FIX ENDS HERE ---
+    
     wide = long_stats_to_wide(team_stats)
 
     lines_df = pd.read_csv(LOCAL_LINES) if os.path.exists(LOCAL_LINES) else pd.DataFrame()
@@ -49,10 +60,7 @@ def main():
     talent_df = pd.read_csv(LOCAL_TALENT) if os.path.exists(LOCAL_TALENT) else pd.DataFrame()
 
     home_roll, away_roll = build_sidewise_rollups(schedule, wide, LAST_N)
-
-    # *** THIS IS THE FIX ***
-    # 'neutral_site' is removed from this list because it will be added later
-    # by the rest_and_travel function, which is the correct source.
+    
     base_cols = ["game_id","season","week","date","home_team","away_team","home_points","away_points","season_type","venue_id"]
     for bc in base_cols:
         if bc not in schedule.columns:
