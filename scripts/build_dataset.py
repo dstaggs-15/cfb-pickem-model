@@ -1,22 +1,18 @@
 #!/usr/bin/env python3
-# --- bootstrap so 'scripts.lib' imports work when run as a file ---
-import os, sys
-_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-_REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
-if _REPO_ROOT not in sys.path:
-    sys.path.insert(0, _REPO_ROOT)
-# -----------------------------------------------------------------
 
 import json, datetime as dt
-import numpy as np, pandas as pd
+import os
+import sys
+import numpy as np
+import pandas as pd
 from sklearn.metrics import accuracy_score, roc_auc_score, brier_score_loss
 
-from scripts.lib.io_utils import load_csv_local_or_url, save_json
-from scripts.lib.parsing import ensure_schedule_columns
-from scripts.lib.rolling import long_stats_to_wide, build_sidewise_rollups, STAT_FEATURES
-from scripts.lib.context import rest_and_travel
-from scripts.lib.market import median_lines, fit_market_mapping
-from scripts.lib.elo import pregame_probs
+from .lib.io_utils import load_csv_local_or_url, save_json
+from .lib.parsing import ensure_schedule_columns
+from .lib.rolling import long_stats_to_wide, build_sidewise_rollups, STAT_FEATURES
+from .lib.context import rest_and_travel
+from .lib.market import median_lines, fit_market_mapping
+from .lib.elo import pregame_probs
 
 LOCAL_DIR = "data/raw/cfbd"
 LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
@@ -49,7 +45,7 @@ def main():
 
     lines_df = pd.read_csv(LOCAL_LINES) if os.path.exists(LOCAL_LINES) else pd.DataFrame()
     venues_df = pd.read_csv(LOCAL_VENUES) if os.path.exists(LOCAL_VENUES) else pd.DataFrame()
-    teams_df  = pd.read_csv(LOCAL_TEAMS)  if os.path.exists(LOCAL_TEAMS)  else pd.DataFrame()
+    teams_df = pd.read_csv(LOCAL_TEAMS) if os.path.exists(LOCAL_TEAMS) else pd.DataFrame()
     talent_df = pd.read_csv(LOCAL_TALENT) if os.path.exists(LOCAL_TALENT) else pd.DataFrame()
 
     home_roll, away_roll = build_sidewise_rollups(schedule, wide, LAST_N)
@@ -97,7 +93,6 @@ def main():
     X = X.drop(columns=["_season"])
 
     # market mapping
-    from scripts.lib.market import fit_market_mapping
     params = fit_market_mapping(X["spread_home"].to_numpy(dtype=float), X["home_win"].to_numpy(dtype=float))
     # market prob per game
     a, b = params["a"], params["b"]
