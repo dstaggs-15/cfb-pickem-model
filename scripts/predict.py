@@ -13,25 +13,21 @@ from .lib.context import rest_and_travel
 from .lib.market import median_lines
 from .lib.elo import pregame_probs
 
-# Define file paths for data and models
+# Define file paths
 DERIVED = "data/derived"
 MODEL_JOBLIB = f"{DERIVED}/model.joblib"
 META_JSON = "docs/data/train_meta.json"
 PREDICTIONS_JSON = "docs/data/predictions.json"
-
 LOCAL_DIR = "data/raw/cfbd"
 LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
 LOCAL_TEAM_STATS = f"{LOCAL_DIR}/cfb_game_team_stats.csv"
 LOCAL_LINES = f"{LOCAL_DIR}/cfb_lines.csv"
-LOCAL_VENUES = f"{LOCAL_DIR}/cfbd_venues.csv"
-LOCAL_TEAMS = f"{LOCAL_DIR}/cfbd_teams.csv"
-LOCAL_TALENT = f"{LOCAL_DIR}/cfbd_talent.csv"
-
+LOCAL_VENUES = f"{LOCAL_DIR}/cfb_venues.csv"
+LOCAL_TEAMS = f"{LOCAL_DIR}/cfb_teams.csv"
+LOCAL_TALENT = f"{LOCAL_DIR}/cfb_talent.csv"
 RAW_BASE = "https://raw.githubusercontent.com/moneyball-ab/cfb-data/master/csv"
 FALLBACK_SCHEDULE_URL = f"{RAW_BASE}/cfb_schedule.csv"
 FALLBACK_TEAM_STATS_URL = f"{RAW_BASE}/cfb_game_team_stats.csv"
-
-# User inputs
 GAMES_TXT = "docs/input/games.txt"
 ALIASES_JSON = "docs/input/aliases.json"
 MANUAL_LINES_CSV = "docs/input/lines.csv"
@@ -39,7 +35,6 @@ MANUAL_LINES_CSV = "docs/input/lines.csv"
 def main():
     print("Generating predictions ...")
     
-    # Load model, metadata, and historical data
     model = joblib.load(MODEL_JOBLIB)
     with open(META_JSON, 'r') as f:
         meta = json.load(f)
@@ -49,10 +44,7 @@ def main():
     market_params = meta["market_params"]
 
     schedule = load_csv_local_or_url(LOCAL_SCHEDULE, FALLBACK_SCHEDULE_URL)
-    # --- FIX STARTS HERE ---
-    # This crucial cleaning step was missing. It standardizes column names (e.g., "Date" -> "date").
     schedule = ensure_schedule_columns(schedule)
-    # --- FIX ENDS HERE ---
     
     team_stats = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL)
     venues_df = pd.read_csv(LOCAL_VENUES) if os.path.exists(LOCAL_VENUES) else pd.DataFrame()
@@ -61,14 +53,12 @@ def main():
     lines_df = pd.read_csv(LOCAL_LINES) if os.path.exists(LOCAL_LINES) else pd.DataFrame()
     manual_lines_df = pd.read_csv(MANUAL_LINES_CSV) if os.path.exists(MANUAL_LINES_CSV) else pd.DataFrame()
 
-    # Perform the exact same data cleaning on team_stats as in build_dataset.py
     team_stats = team_stats.drop_duplicates(subset=['game_id', 'team'])
     home_team_map = schedule[['game_id', 'home_team']]
     team_stats = team_stats.merge(home_team_map, on='game_id', how='left')
     team_stats['home_away'] = np.where(team_stats['team'] == team_stats['home_team'], 'home', 'away')
     team_stats = team_stats.drop(columns=['home_team'])
 
-    # Load and parse user input games
     aliases = load_aliases(ALIASES_JSON)
     games_to_predict = parse_games_txt(GAMES_TXT, aliases)
     
@@ -81,7 +71,6 @@ def main():
     predict_df['game_id'] = [f"predict_{i}" for i in range(len(predict_df))]
     predict_df['season'] = schedule['season'].max()
 
-    # Feature Engineering (ensuring train/predict parity)
     wide_stats = long_stats_to_wide(team_stats)
     home_roll, away_roll = build_sidewise_rollups(schedule, wide_stats, last_n, predict_df)
     
@@ -102,27 +91,21 @@ def main():
     elo_df = pregame_probs(schedule, talent_df, predict_df)
     X = X.merge(elo_df, on="game_id", how="left")
 
+    # Handle market lines
     if not manual_lines_df.empty:
-        manual_lines_map = {}
-        for _, row in manual_lines_df.iterrows():
-            key = (row['home'], row['away'])
-            manual_lines_map[key] = row['spread']
-        predict_df['spread_home'] = predict_df.apply(lambda row: manual_lines_map.get((row['home_team'], row['away_team'])), axis=1)
-        X = X.merge(predict_df[['game_id', 'spread_home']], on='game_id', how='left')
+        manual_lines_df.rename(columns={'home': 'home_team', 'away': 'away_team', 'spread': 'spread_home'}, inplace=True)
+        X = X.merge(manual_lines_df[['home_team', 'away_team', 'spread_home']], on=['home_team', 'away_team'], how='left')
     else:
         med = median_lines(lines_df)
-        # Approximate merge for prediction, may not always find a match
-        X = X.merge(med, on=['home_team', 'away_team'], how='left', suffixes=('', '_median'))
+        X = X.merge(med, on=['home_team', 'away_team'], how='left')
 
     a, b = market_params["a"], market_params["b"]
     X["market_home_prob"] = X["spread_home"].apply(lambda s: (1/(1+np.exp(-(a + b * (-(s))))) if pd.notna(s) else np.nan))
 
     for c in feats:
-        if c not in X.columns:
-            X[c] = np.nan
+        if c not in X.columns: X[c] = np.nan
         X[c] = pd.to_numeric(X[c], errors='coerce')
-        if X[c].isnull().any():
-             X[c] = X[c].fillna(X[c].mean())
+        if X[c].isnull().any(): X[c] = X[c].fillna(X[c].mean())
 
     X_predict = X[feats].fillna(0)
 
@@ -133,12 +116,9 @@ def main():
         prob = probs[i]
         pick = row['home_team'] if prob > 0.5 else row['away_team']
         output.append({
-            'home_team': row['home_team'],
-            'away_team': row['away_team'],
-            'neutral_site': bool(row['neutral_site']),
-            'model_prob_home': prob,
-            'pick': pick,
-            'spread_home': row.get('spread_home')
+            'home_team': row['home_team'], 'away_team': row['away_team'],
+            'neutral_site': bool(row['neutral_site']), 'model_prob_home': prob,
+            'pick': pick, 'spread_home': row.get('spread_home')
         })
 
     save_json(PREDICTIONS_JSON, output)
