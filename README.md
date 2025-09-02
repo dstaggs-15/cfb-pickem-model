@@ -1,8 +1,4 @@
-Of course. Here is a comprehensive, in-depth engineering notebook for your CFB Pick'em Model, structured to be clear, thorough, and serve as an excellent technical guide for the project.
-
------
-
-# CFB Pick’em Model — Engineering Notebook
+CFB Pick’em Model — Notebook
 
 This project is a complete, automated data and machine learning pipeline for predicting weekly NCAA college football games. It is designed for transparency, reproducibility, and robust performance by leveraging a multi-faceted feature set, a carefully designed validation strategy, and an ensemble of complementary models.
 
