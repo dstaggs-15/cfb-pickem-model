@@ -1,19 +1,34 @@
 import json
 import re
 import pandas as pd
+import numpy as np
+
+def parse_ratio_val(val):
+    """
+    Parses a string that might be a ratio (e.g., "3-of-9", "3-9") into a float.
+    Handles existing floats/ints and non-string values gracefully.
+    """
+    if not isinstance(val, str):
+        return val # Assume it's already numeric or NaN
+    
+    val = val.replace('-of-', '-').strip()
+    
+    if '-' in val:
+        try:
+            num, den = map(float, val.split('-'))
+            return num / den if den != 0 else 0.0
+        except (ValueError, TypeError):
+            return np.nan
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return np.nan
 
 def ensure_schedule_columns(df):
     """
     Ensures a DataFrame has the required columns for a schedule,
     renaming and casting types as necessary.
-    
-    Args:
-        df (pd.DataFrame): The raw schedule DataFrame.
-
-    Returns:
-        pd.DataFrame: The cleaned schedule DataFrame.
     """
-    # Mapping of potential column names to our standard names
     column_map = {
         'Game ID': 'game_id',
         'Season': 'season',
@@ -27,17 +42,13 @@ def ensure_schedule_columns(df):
         'Neutral Site': 'neutral_site',
         'Venue ID': 'venue_id'
     }
-
-    # Rename columns that exist in the mapping
     df = df.rename(columns={k: v for k, v in column_map.items() if k in df.columns})
 
-    # Ensure required columns exist, filling with NaN if not
     required_cols = list(column_map.values())
     for col in required_cols:
         if col not in df.columns:
             df[col] = pd.NA
 
-    # Coerce data types
     if 'date' in df.columns:
         df['date'] = pd.to_datetime(df['date'], errors='coerce')
     
@@ -55,23 +66,11 @@ def parse_games_txt(filepath, aliases={}):
     """
     Parses a text file of weekly matchups into a structured list.
     Handles formats like "Away @ Home", "Home vs Away", and "Home vs Away (N)".
-
-    Args:
-        filepath (str): Path to the games.txt file.
-        aliases (dict, optional): Dictionary to map nicknames to official names.
-
-    Returns:
-        list: A list of dictionaries, each representing a game.
     """
     games = []
-    
-    # Regex for "Team vs Team (N)"
     neutral_pattern = re.compile(r"^(.*) vs (.*) \(N\)$", re.IGNORECASE)
-    # Regex for "Away @ Home"
     away_home_pattern = re.compile(r"^(.*) @ (.*)$", re.IGNORECASE)
-    # Regex for "Home vs Away"
     home_away_pattern = re.compile(r"^(.*) vs (.*)$", re.IGNORECASE)
-    # Regex for "Home, Away"
     comma_pattern = re.compile(r"^(.*), (.*)$", re.IGNORECASE)
 
     try:
@@ -83,7 +82,6 @@ def parse_games_txt(filepath, aliases={}):
 
                 home, away, neutral = None, None, False
 
-                # Try patterns in order of specificity
                 match = neutral_pattern.match(line)
                 if match:
                     home, away, neutral = match.group(1).strip(), match.group(2).strip(), True
@@ -101,7 +99,6 @@ def parse_games_txt(filepath, aliases={}):
                                 home, away = match.group(1).strip(), match.group(2).strip()
 
                 if home and away:
-                    # Apply aliases to normalize team names
                     home_norm = aliases.get(home.lower(), home)
                     away_norm = aliases.get(away.lower(), away)
                     
@@ -120,16 +117,9 @@ def parse_games_txt(filepath, aliases={}):
 def load_aliases(filepath):
     """
     Loads a JSON file of team name aliases.
-
-    Args:
-        filepath (str): Path to the aliases.json file.
-
-    Returns:
-        dict: A dictionary of aliases. Returns an empty dict if file not found.
     """
     try:
         with open(filepath, 'r') as f:
-            # Read and convert all keys to lowercase for case-insensitive matching
             return {k.lower(): v for k, v in json.load(f).items()}
     except FileNotFoundError:
         return {}
