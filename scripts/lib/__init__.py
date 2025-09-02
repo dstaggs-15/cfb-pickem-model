@@ -1,4 +1,7 @@
 # scripts/lib/io_utils.py
+# makes scripts.lib a package
+# makes scripts a package (useful for IDEs and -m runs)
+
 import os, json
 from io import StringIO
 from typing import Dict
