@@ -3,12 +3,9 @@
 name: CFB Model Pipeline
 
 on:
-  # This line is ESSENTIAL for the "Run workflow" button to appear.
   workflow_dispatch:
-
   schedule:
     - cron: '0 * * * *'
-
   push:
     branches:
       - main
