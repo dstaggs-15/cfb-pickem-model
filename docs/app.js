@@ -2,7 +2,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const predictionsContainer = document.getElementById('predictions-container');
     const filterInput = document.getElementById('filterInput');
     
-    // Default colors for teams not in our color map
     const defaultColors = {
         primary: '#cccccc',
         secondary: '#888888'
@@ -14,10 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadData = async () => {
         try {
-            // Fetch predictions and team colors simultaneously
             const [predictionsResponse, colorsResponse] = await Promise.all([
                 fetch('data/predictions.json'),
-                fetch('data/team_colors.json').catch(() => ({ ok: false })) // Gracefully handle if colors file is missing
+                fetch('data/team_colors.json').catch(() => ({ ok: false }))
             ]);
 
             if (!predictionsResponse.ok) {
@@ -41,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const renderGames = (games, teamColors) => {
-        predictionsContainer.innerHTML = ''; // Clear previous content
+        predictionsContainer.innerHTML = '';
         
         games.forEach(game => {
             const awayColor = (teamColors[game.away_team] || defaultColors).primary;
@@ -55,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.innerHTML = `
                 <div class="teams">
                     <span class="team-name away">${game.away_team}</span>
-                    <span class="vs">vs</span>
+                    <span class="vs">${game.neutral_site ? '(N)' : 'vs'}</span>
                     <span class="team-name home">${game.home_team}</span>
                 </div>
                 <div class="probability-bar-container">
