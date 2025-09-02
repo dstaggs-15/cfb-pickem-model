@@ -1,15 +1,14 @@
-# scripts/build_dataset.py
 #!/usr/bin/env python3
 import os, json, datetime as dt
 import numpy as np, pandas as pd
 from sklearn.metrics import accuracy_score, roc_auc_score, brier_score_loss
 
-from lib.io_utils import load_csv_local_or_url, save_json
-from lib.parsing import ensure_schedule_columns
-from lib.rolling import long_stats_to_wide, build_sidewise_rollups, STAT_FEATURES
-from lib.context import rest_and_travel
-from lib.market import median_lines, fit_market_mapping
-from lib.elo import pregame_probs
+from scripts.lib.io_utils import load_csv_local_or_url, save_json
+from scripts.lib.parsing import ensure_schedule_columns
+from scripts.lib.rolling import long_stats_to_wide, build_sidewise_rollups, STAT_FEATURES
+from scripts.lib.context import rest_and_travel
+from scripts.lib.market import median_lines, fit_market_mapping
+from scripts.lib.elo import pregame_probs
 
 LOCAL_DIR = "data/raw/cfbd"
 LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
