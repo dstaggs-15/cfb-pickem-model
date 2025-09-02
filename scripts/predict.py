@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-import os, json, datetime as dt
+# --- bootstrap so 'scripts.lib' imports work when run as a file ---
+import os, sys
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+# -----------------------------------------------------------------
+
+import json, datetime as dt
 import numpy as np, pandas as pd
 from joblib import load
 
@@ -49,10 +57,10 @@ def main():
     sched_now = schedule.copy()
     season_max = int(pd.to_numeric(sched_now["season"], errors="coerce").max()) if "season" in sched_now.columns else None
     if season_max is not None:
-        sched_now = sched_now[sched_now["season"]==season_max]
+        sched_now = sched_now[sched_now["season"]]==season_max
     pair_neutral = {}
-    if {"home_team","away_team","neutral_site"}.issubset(sched_now.columns):
-        tmp = sched_now.sort_values(["week","date"]).drop_duplicates(subset=["home_team","away_team"], keep="last")
+    if {"home_team","away_team","neutral_site"}.issubset(schedule.columns):
+        tmp = schedule.sort_values(["season","week","date"]).drop_duplicates(subset=["home_team","away_team"], keep="last")
         for _, r in tmp.iterrows():
             pair_neutral[(str(r["home_team"]), str(r["away_team"]))] = bool(r["neutral_site"])
 
@@ -77,12 +85,10 @@ def main():
     for g in raw_games:
         home=str(g["home"]); away=str(g["away"]); neutral=bool(g.get("neutral", False)) or pair_neutral.get((home,away), False)
 
-        # counts
         feats = {}
         feats[f"home_R{LAST_N}_count"] = float(last_home.loc[home][f"home_R{LAST_N}_count"]) if home in last_home.index else 0.0
         feats[f"away_R{LAST_N}_count"] = float(last_away.loc[away][f"away_R{LAST_N}_count"]) if away in last_away.index else 0.0
 
-        # diffs
         for c in STAT_FEATURES:
             hv = float(last_home.loc[home][f"home_R{LAST_N}_{c}"]) if (home in last_home.index and pd.notna(last_home.loc[home][f"home_R{LAST_N}_{c}"])) else np.nan
             av = float(last_away.loc[away][f"away_R{LAST_N}_{c}"]) if (away in last_away.index and pd.notna(last_away.loc[away][f"away_R{LAST_N}_{c}"])) else np.nan
@@ -99,10 +105,10 @@ def main():
 
         ra = current_ratings.get(home, 1500.0)
         rb = current_ratings.get(away, 1500.0)
+        from scripts.lib.elo import ELO_HFA
         hfa = 0.0 if neutral else ELO_HFA
         feats["elo_home_prob"] = 1.0 / (1.0 + 10 ** (-( (ra+hfa) - rb) / 400.0))
 
-        # align features
         X = pd.DataFrame([{k: feats.get(k, np.nan) for k in feature_cols}])
         p_home = float(model.predict_proba(X)[0,1])
 
