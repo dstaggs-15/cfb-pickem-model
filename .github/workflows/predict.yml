@@ -1,10 +1,9 @@
-# .github/workflows/predict.yml
 name: predict
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "0 * * * *"  # hourly
   push:
     branches: [ "main" ]
     paths:
@@ -22,6 +21,7 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,53 +33,101 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('scripts/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r scripts/requirements.txt
 
+      - name: Ensure PYTHONPATH
+        run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
+
       - name: Fetch CFBD data (optional)
         run: |
           if [ -f scripts/fetch_cfbd.py ]; then
             python scripts/fetch_cfbd.py || echo "[WARN] fetch_cfbd failed"
+          else
+            echo "[INFO] scripts/fetch_cfbd.py not found; skipping."
           fi
 
-      # NEW split pipeline
+      # --- Split pipeline: build -> train -> predict ---
       - name: Build dataset
-        run: python scripts/build_dataset.py
+        run: python -m scripts.build_dataset
 
       - name: Train model
-        run: python scripts/train_model.py
+        run: python -m scripts.train_model
 
       - name: Predict picks
-        run: python scripts/predict.py
+        run: python -m scripts.predict
 
-      - name: Build spreads (market lines)
-        run: python scripts/build_spreads.py || echo "[WARN] spreads step failed"
+      # --- Optional generators (safe to skip if missing) ---
+      - name: Build spreads JSON (optional)
+        run: |
+          if [ -f scripts/build_spreads.py ]; then
+            python scripts/build_spreads.py || echo "[WARN] build_spreads failed"
+          else
+            echo "[INFO] scripts/build_spreads.py not found; skipping."
+          fi
 
-      - name: Build team summaries (cards)
-        run: python scripts/make_team_cards.py || echo "[WARN] cards step failed"
+      - name: Build team summaries (optional)
+        run: |
+          if [ -f scripts/make_team_cards.py ]; then
+            python scripts/make_team_cards.py || echo "[WARN] make_team_cards failed"
+          else
+            echo "[INFO] scripts/make_team_cards.py not found; skipping."
+          fi
 
-      - name: Build team colors
-        run: python scripts/build_team_colors.py || echo "[WARN] colors step failed"
+      - name: Build team colors (optional)
+        run: |
+          if [ -f scripts/build_team_colors.py ]; then
+            python scripts/build_team_colors.py || echo "[WARN] build_team_colors failed"
+          else
+            echo "[INFO] scripts/build_team_colors.py not found; skipping."
+          fi
 
+      # --- Commit artifacts directly to main, with a safe rebase/push loop ---
       - name: Commit artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main || true
-          git add docs/data/predictions.json || true
-          git add docs/data/spreads.json || true
-          git add docs/data/team_summaries.json || true
-          git add docs/data/team_colors.json || true
-          git add docs/data/train_meta.json || true
-          git add docs/data/train_metrics.json || true
-          if ! git diff --cached --quiet; then
-            git commit -m "Update predictions & artifacts [skip ci]"
-            git push origin HEAD:main
-          else
+
+          # Stage only files that exist
+          git add docs/data/predictions.json 2>/dev/null || true
+          git add docs/data/spreads.json 2>/dev/null || true
+          git add docs/data/team_summaries.json 2>/dev/null || true
+          git add docs/data/team_colors.json 2>/dev/null || true
+          git add docs/data/train_meta.json 2>/dev/null || true
+          git add docs/data/train_metrics.json 2>/dev/null || true
+
+          if git diff --cached --quiet; then
             echo "No changes to commit."
+            exit 0
           fi
+
+          git commit -m "Update predictions & artifacts [skip ci]"
+
+          # Try push with a small rebase/autostash loop to avoid conflicts
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git pull --rebase --autostash origin main || true
+            if git push origin HEAD:main; then
+              echo "Pushed on attempt $attempt."
+              exit 0
+            fi
+            echo "Push failed (attempt $attempt). Retrying..."
+            sleep 2
+          done
+
+          echo "::error::Failed to push after retries."
+          exit 1
