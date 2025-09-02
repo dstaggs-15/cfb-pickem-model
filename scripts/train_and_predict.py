@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-CFB Pick'em model — v2
+CFB Pick'em model — v2.1
 
-Key upgrades:
+Upgrades vs v2:
+- Adds score prediction with two regressors (home & away points)
+- Derives expected margin/total and home cover probability vs spread
+
+Still includes from v2:
 - Train/predict feature parity (true last-5, split by home/away)
 - Neutral-site handling (HFA=0; neutral flag into model)
 - Smart imputation (season means) + *_count features
 - Robust stat parsing (5-12, 5/12, 5 of 12, 5 for 12)
-- Non-linear model: HistGradientBoostingClassifier (+ calibration)
+- Non-linear classifier: HistGradientBoostingClassifier (+ calibration)
 - Elo pregame win-prob & Market-implied win-prob as FEATURES
 """
 
@@ -25,7 +29,7 @@ import pandas as pd
 import requests
 
 from sklearn.calibration import CalibratedClassifierCV
-from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, roc_auc_score, brier_score_loss
 
@@ -128,13 +132,12 @@ def ensure_schedule_columns(schedule: pd.DataFrame) -> pd.DataFrame:
         df["date"] = df[date_col].apply(to_dt)
     else:
         df["date"] = pd.NaT
-    # Boolean-ish flags
+    # Flags & ids
     if "season_type" not in df.columns: df["season_type"] = "regular"
     if "neutral_site" not in df.columns: df["neutral_site"] = False
     if "venue_id" not in df.columns: df["venue_id"] = np.nan
     if "home_points" not in df.columns: df["home_points"] = np.nan
     if "away_points" not in df.columns: df["away_points"] = np.nan
-    # GameId
     if "game_id" not in df.columns:
         df["game_id"] = pd.util.hash_pandas_object(
             df[["season","week","home_team","away_team"]].fillna(""),
@@ -153,7 +156,6 @@ def parse_ratio_val(val: str) -> float:
     if m:
         a, b = float(m.group(1)), float(m.group(2))
         return a / b if b else np.nan
-    # fallback numeric
     try:
         return float(val)
     except Exception:
@@ -169,7 +171,6 @@ def long_stats_to_wide(df_stats: pd.DataFrame) -> pd.DataFrame:
     keep["stat_value_num"] = [numericize_stat(c, v) for c, v in zip(keep["category"], keep["stat_value"])]
     wide = keep.pivot_table(index=["game_id","team","homeAway"],
                             columns="category", values="stat_value_num", aggfunc="mean").reset_index()
-    # ensure columns
     for c in STAT_FEATURES:
         if c not in wide.columns:
             wide[c] = np.nan
@@ -198,29 +199,23 @@ def normalize_name(name: str, alias_map: Dict[str, str]) -> str:
 def build_sidewise_rollups(schedule: pd.DataFrame, wide: pd.DataFrame, n: int) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Returns:
-      home_roll: columns = ['game_id','team', f'home_R{n}_<stat>', f'home_R{n}_count']
-      away_roll: columns = ['game_id','team', f'away_R{n}_<stat>', f'away_R{n}_count']
-    For each game_id, values represent the team's average over its last-N *prior* games at that side.
+      home_roll: ['game_id','team', f'home_R{n}_count', f'home_R{n}_<stat>'...]
+      away_roll: ['game_id','team', f'away_R{n}_count', f'away_R{n}_<stat>'...]
+    Values are team's mean over last-N prior games at that side.
     """
-    # Join dates
     sw = schedule[["game_id","date"]].copy()
     w = wide.merge(sw, on="game_id", how="left")
     w = w.sort_values(["team","date","game_id"]).reset_index(drop=True)
 
-    # Rolling per (team, homeAway), shifted by 1
     out = []
     for side in ["home","away"]:
         side_df = w[w["homeAway"]==side].copy()
         side_df = side_df.sort_values(["team","date","game_id"])
         grp = side_df.groupby("team", group_keys=False)
 
-        # counts need min_periods=1 then shift
-        counts = grp.cumcount()
-        side_df[f"{side}_games_so_far"] = counts
-        # rolling mean with min_periods=1, then shift so we don't peek
+        side_df[f"{side}_games_so_far"] = grp.cumcount()
         for c in STAT_FEATURES:
             side_df[f"{side}_R{n}_{c}"] = grp[c].apply(lambda s: s.rolling(window=n, min_periods=1).mean()).shift(1)
-        # count contributing samples for this rolling window (cap at n)
         side_df[f"{side}_R{n}_count"] = grp.apply(lambda g: g[f"{side}_games_so_far"].shift(1).clip(lower=0)).values
         side_df[f"{side}_R{n}_count"] = side_df[f"{side}_R{n}_count"].fillna(0).clip(upper=n)
 
@@ -245,7 +240,6 @@ def haversine_km(lat1, lon1, lat2, lon2):
 def rest_and_travel(schedule: pd.DataFrame, teams_df: pd.DataFrame, venues_df: pd.DataFrame) -> pd.DataFrame:
     df = schedule[["game_id","season","week","date","home_team","away_team","neutral_site","venue_id","season_type"]].copy()
 
-    # rest days
     both = pd.concat([
         df[["game_id","date","home_team"]].rename(columns={"home_team":"team"}),
         df[["game_id","date","away_team"]].rename(columns={"away_team":"team"})
@@ -265,7 +259,6 @@ def rest_and_travel(schedule: pd.DataFrame, teams_df: pd.DataFrame, venues_df: p
     m["home_bye"] = (m["home_rest_days"] >= 13).astype(int)
     m["away_bye"] = (m["away_rest_days"] >= 13).astype(int)
 
-    # travel (campus -> venue; at neutral use venue coords; else away travels to home)
     def team_latlon(school: str):
         if teams_df.empty: return (np.nan, np.nan)
         r = teams_df[teams_df["school"]==school]
@@ -323,13 +316,12 @@ def median_lines(lines: pd.DataFrame) -> pd.DataFrame:
 def fit_market_mapping(spread: np.ndarray, y: np.ndarray) -> Tuple[float,float]:
     """
     Fit logistic: P(home win) = sigmoid(a + b * (-spread_home))
-    Returns (a,b). If not enough data, fall back to simple prior.
+    Returns (a,b). If not enough data, use a mild prior.
     """
     ok = ~np.isnan(spread) & ~np.isnan(y)
     spread = spread[ok]; y = y[ok]
     if len(spread) < 200:
-        # weak prior: roughly converts -7 => ~70%
-        return (0.0, 0.17)
+        return (0.0, 0.17)  # decent default
     X = (-spread).reshape(-1,1)
     lr = LogisticRegression(max_iter=200)
     lr.fit(X, y)
@@ -369,15 +361,9 @@ def preseason_seed_from_talent(talent_df: pd.DataFrame) -> Dict[str, float]:
     return seed
 
 def pregame_elo_probs(schedule: pd.DataFrame, talent_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Walk the schedule in chronological order. For each game, compute Elo P(home win)
-    BEFORE updating ratings with the game result. HFA=0 when neutral.
-    Return: DataFrame [game_id, elo_home_prob]
-    """
     sched = schedule.sort_values(["season","week","date","game_id"]).copy()
     seed = preseason_seed_from_talent(talent_df)
     ratings: Dict[str, float] = {}
-
     cur_season = None
     rows = []
 
@@ -390,11 +376,9 @@ def pregame_elo_probs(schedule: pd.DataFrame, talent_df: pd.DataFrame) -> pd.Dat
         hp = pd.to_numeric(r.get("home_points"), errors="coerce")
         ap = pd.to_numeric(r.get("away_points"), errors="coerce")
 
-        # Offseason mean reversion on first game of a season
         if cur_season is None or season != cur_season:
             for k in list(ratings.keys()):
                 ratings[k] = ELO_START + (ratings[k] - ELO_START) * (1.0 - MEAN_REVERT)
-            # apply seed (blend 50/50 with existing)
             for sc, val in seed.items():
                 ratings[sc] = 0.5*ratings.get(sc, ELO_START) + 0.5*val
             cur_season = season
@@ -405,7 +389,6 @@ def pregame_elo_probs(schedule: pd.DataFrame, talent_df: pd.DataFrame) -> pd.Dat
         p_home = elo_expect(ra + hfa, rb)
         rows.append({"game_id": r["game_id"], "elo_home_prob": p_home})
 
-        # Update only if result known (postgame)
         if pd.notna(hp) and pd.notna(ap):
             score_home = 1.0 if hp > ap else (0.5 if hp == ap else 0.0)
             k = ELO_K_EARLY if week <= 4 else ELO_K_BASE
@@ -422,7 +405,6 @@ def build_training_examples(
     schedule: pd.DataFrame, wide: pd.DataFrame, lines_df: pd.DataFrame,
     teams_df: pd.DataFrame, venues_df: pd.DataFrame, talent_df: pd.DataFrame, n: int
 ) -> Tuple[pd.DataFrame, List[str], Dict[str, float]]:
-    # Core
     home_roll, away_roll = build_sidewise_rollups(schedule, wide, n)
 
     base_cols = ["game_id","season","week","date","home_team","away_team","home_points","away_points","season_type","neutral_site","venue_id"]
@@ -431,11 +413,9 @@ def build_training_examples(
             schedule[bc] = np.nan if bc not in ["season","week","neutral_site","season_type"] else (0 if bc in ["season","week"] else (False if bc=="neutral_site" else "regular"))
     base = schedule[base_cols].copy()
 
-    # Join rolling (home/away)
     X = base.merge(home_roll, left_on=["game_id","home_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
     X = X.merge(away_roll, left_on=["game_id","away_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
 
-    # Build diffs & counts
     diff_cols = []
     for c in STAT_FEATURES:
         hc = f"home_R{n}_{c}"
@@ -444,57 +424,46 @@ def build_training_examples(
         X[dc] = X[hc] - X[ac]
         diff_cols.append(dc)
 
-    # counts
     if f"home_R{n}_count" not in X.columns: X[f"home_R{n}_count"] = 0.0
     if f"away_R{n}_count" not in X.columns: X[f"away_R{n}_count"] = 0.0
 
     eng = rest_and_travel(schedule, teams_df, venues_df)
     X = X.merge(eng, on="game_id", how="left")
 
-    # Lines median + market prob
     med = median_lines(lines_df)
     X = X.merge(med, on="game_id", how="left")
 
-    # Elo pregame prob (no leakage)
     elo_df = pregame_elo_probs(schedule, talent_df)
     X = X.merge(elo_df, on="game_id", how="left")
 
-    # Target
     X["home_win"] = (pd.to_numeric(X["home_points"], errors="coerce") > pd.to_numeric(X["away_points"], errors="coerce")).astype(int)
 
-    # Impute numeric features to season means (no zero fakes)
     feat_cols = diff_cols + [f"home_R{n}_count", f"away_R{n}_count"] + ENG_FEATURES_BASE + LINE_FEATURES + ["elo_home_prob"]
     for c in feat_cols:
         if c not in X.columns:
             X[c] = np.nan
-    # season means
     X["_season"] = pd.to_numeric(X["season"], errors="coerce")
     for c in feat_cols:
-        if c in ["neutral_site","is_postseason"]:  # already 0/1
+        if c in ["neutral_site","is_postseason"]:
             X[c] = X[c].fillna(0.0)
             continue
-        # numeric
         X[c] = pd.to_numeric(X[c], errors="coerce")
         m = X.groupby("_season")[c].transform("mean")
         X[c] = X[c].fillna(m)
     X = X.drop(columns=["_season"])
 
-    # Fit market mapping on available rows
     a, b = fit_market_mapping(X["spread_home"].to_numpy(dtype=float), X["home_win"].to_numpy(dtype=float))
     X["market_home_prob"] = [market_prob(s, a, b) if pd.notna(s) else np.nan for s in X["spread_home"]]
-    # Impute market prob to season mean too
     mkt_season_mean = X.groupby("season")["market_home_prob"].transform("mean")
     X["market_home_prob"] = X["market_home_prob"].fillna(mkt_season_mean)
 
-    # Final feature list
     feature_cols = diff_cols + [f"home_R{n}_count", f"away_R{n}_count"] + ENG_FEATURES_BASE + LINE_FEATURES + PROB_FEATURES
 
-    # Drop rows without result for training
     train_df = X.dropna(subset=["home_points","away_points"]).copy()
     return train_df, feature_cols, {"market_a": a, "market_b": b}
 
 # =========================================================
-# Season-ahead validation & final fit
+# Season-ahead validation & final fit (classifier)
 # =========================================================
 def season_ahead_metrics(df: pd.DataFrame, features: List[str]) -> Dict[str, float]:
     seasons = sorted(pd.to_numeric(df["season"], errors="coerce").dropna().unique().tolist())
@@ -507,7 +476,7 @@ def season_ahead_metrics(df: pd.DataFrame, features: List[str]) -> Dict[str, flo
         ca = df[df["season"]==calib_season]
         te = df[df["season"]==test_season]
 
-        if len(tr) < 200 or len(ca) < 80 or len(te) < 80: 
+        if len(tr) < 200 or len(ca) < 80 or len(te) < 80:
             continue
 
         base = HistGradientBoostingClassifier(max_depth=None, learning_rate=0.08, max_iter=400,
@@ -550,282 +519,41 @@ def fit_final_model(df: pd.DataFrame, features: List[str]) -> CalibratedClassifi
     return cal
 
 # =========================================================
+# Score prediction models (regressors)
+# =========================================================
+def fit_score_models(df: pd.DataFrame, features: List[str]):
+    """
+    Train two regressors to predict home_points and away_points from the same features.
+    Also estimate sigma for margin residuals for cover probability.
+    """
+    # Keep rows with valid scores
+    d = df.dropna(subset=["home_points","away_points"]).copy()
+    y_home = pd.to_numeric(d["home_points"], errors="coerce")
+    y_away = pd.to_numeric(d["away_points"], errors="coerce")
+
+    rg_home = HistGradientBoostingRegressor(max_depth=None, learning_rate=0.08, max_iter=600,
+                                            min_samples_leaf=20, l2_regularization=0.0)
+    rg_away = HistGradientBoostingRegressor(max_depth=None, learning_rate=0.08, max_iter=600,
+                                            min_samples_leaf=20, l2_regularization=0.0)
+
+    rg_home.fit(d[features], y_home)
+    rg_away.fit(d[features], y_away)
+
+    # Estimate residual variance for margin
+    pred_home = rg_home.predict(d[features])
+    pred_away = rg_away.predict(d[features])
+    resid_margin = (y_home - y_away) - (pred_home - pred_away)
+    sigma_margin = float(np.nanstd(resid_margin)) if len(resid_margin) else 13.0  # fallback ~2 TDs
+
+    return rg_home, rg_away, sigma_margin
+
+def std_norm_cdf(x: float) -> float:
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+# =========================================================
 # games.txt parsing (neutral support)
 # =========================================================
 GAMES_PATTERNS = [
-    re.compile(r"^\s*(?P<away>.+?)\s*@\s*(?P<home>.+?)\s*$", re.I),         # Away @ Home
-    re.compile(r"^\s*(?P<home>.+?)\s*vs\.?\s*(?P<away>.+?)(?:\s*\(N\))?\s*$", re.I),  # Home vs Away [(N)]
-    re.compile(r"^\s*(?P<home>.+?)\s*,\s*(?P<away>.+?)\s*$", re.I),         # Home, Away
-]
-
-def parse_games_txt(path: str, alias_map: Dict[str,str]) -> List[Dict[str,object]]:
-    out = []
-    if not os.path.exists(path):
-        return out
-    with open(path, "r") as f:
-        for raw in f:
-            line = raw.strip()
-            if not line or line.startswith("#"): continue
-            neutral = "(N)" in line or " (n)" in line
-            matched = None
-            for pat in GAMES_PATTERNS:
-                m = pat.match(line)
-                if m: matched = m.groupdict(); break
-            if not matched:
-                print(f"[SKIP] Unrecognized line: {line}"); continue
-            home = normalize_name(" ".join(matched["home"].split()), alias_map)
-            away = normalize_name(" ".join(matched["away"].split()), alias_map)
-            out.append({"home": home, "away": away, "neutral": neutral})
-    return out
-
-# =========================================================
-# Predict custom games — build same features
-# =========================================================
-def predict_games(
-    model: CalibratedClassifierCV, features_lastn: List[str],
-    schedule: pd.DataFrame, wide: pd.DataFrame,
-    teams_df: pd.DataFrame, venues_df: pd.DataFrame, talent_df: pd.DataFrame,
-    raw_games: List[Dict[str,object]], manual_lines: pd.DataFrame,
-    market_params: Dict[str,float]
-) -> Tuple[List[Dict], List[str]]:
-    alias_unknown = []
-
-    # Build sidewise rollups using entire history up to "now"
-    home_roll, away_roll = build_sidewise_rollups(schedule, wide, LAST_N)
-
-    # Precompute per-team last observed rolling rows by side
-    def last_row(df: pd.DataFrame, prefix: str):
-        cols = [c for c in df.columns if c.startswith(f"{prefix}_R{LAST_N}_")]
-        cols_count = [f"{prefix}_R{LAST_N}_count"]
-        need = ["team"] + cols_count + cols
-        v = df[need].dropna(how="all", subset=cols).sort_values(["team"]).groupby("team").tail(1).set_index("team")
-        return v
-
-    last_home = last_row(home_roll, "home")
-    last_away = last_row(away_roll, "away")
-
-    # For neutral detection from schedule: map (home,away)->neutral flag if exists this season
-    sched_now = schedule.copy()
-    season_max = int(pd.to_numeric(sched_now["season"], errors="coerce").max()) if "season" in sched_now.columns else None
-    if season_max is not None:
-        sched_now = sched_now[sched_now["season"]==season_max]
-    pair_neutral = {}
-    if {"home_team","away_team","neutral_site"}.issubset(sched_now.columns):
-        tmp = sched_now.sort_values(["week","date"]).drop_duplicates(subset=["home_team","away_team"], keep="last")
-        for _, r in tmp.iterrows():
-            pair_neutral[(str(r["home_team"]), str(r["away_team"]))] = bool(r["neutral_site"])
-
-    # Market mapping params
-    a = float(market_params.get("market_a", 0.0))
-    b = float(market_params.get("market_b", 0.17))
-
-    # Pregame Elo probs (for all historical games) already computed; for new pairs we approximate with current ratings:
-    elo_pregame = pregame_elo_probs(schedule, talent_df)
-    # Use latest Elo per team for custom game probability
-    # Build ratings from last known game (approx: reverse solve expectation):
-    # We can estimate team rating by solving for ra given p and rb ; but simpler:
-    # derive per-team rating from last pregame expectation on a known opponent.
-    # Instead, recompute end-of-history ratings quickly:
-    def end_of_history_ratings():
-        sched = schedule.sort_values(["season","week","date","game_id"]).copy()
-        seed = preseason_seed_from_talent(talent_df)
-        ratings = {}
-        cur_season = None
-        for _, r in sched.iterrows():
-            season = int(r["season"]); week = int(r["week"])
-            home, away = str(r["home_team"]), str(r["away_team"])
-            neutral = bool(r.get("neutral_site", False))
-            hp = pd.to_numeric(r.get("home_points"), errors="coerce")
-            ap = pd.to_numeric(r.get("away_points"), errors="coerce")
-            if cur_season is None or season != cur_season:
-                for k in list(ratings.keys()):
-                    ratings[k] = ELO_START + (ratings[k] - ELO_START) * (1.0 - MEAN_REVERT)
-                for sc, val in seed.items():
-                    ratings[sc] = 0.5*ratings.get(sc, ELO_START) + 0.5*val
-                cur_season = season
-            ra = ratings.get(home, seed.get(home, ELO_START))
-            rb = ratings.get(away, seed.get(away, ELO_START))
-            hfa = 0.0 if neutral else ELO_HFA
-            p_home = elo_expect(ra + hfa, rb)
-            if pd.notna(hp) and pd.notna(ap):
-                score_home = 1.0 if hp > ap else (0.5 if hp == ap else 0.0)
-                k = ELO_K_EARLY if week <= 4 else ELO_K_BASE
-                movm = mov_multiplier(hp - ap, (ra + hfa) - rb)
-                ratings[home] = ra + k * movm * (score_home - p_home)
-                ratings[away] = rb + k * movm * ((1.0 - score_home) - (1.0 - p_home))
-        return ratings
-
-    current_ratings = end_of_history_ratings()
-
-    # Manual lines lookup
-    man = pd.DataFrame()
-    if isinstance(manual_lines, pd.DataFrame) and not manual_lines.empty:
-        man = manual_lines.copy()
-        man.columns = [c.strip().lower() for c in man.columns]
-        if not {"home","away","spread","over_under"}.issubset(set(man.columns)):
-            man = pd.DataFrame()
-        else:
-            man["spread"] = pd.to_numeric(man["spread"], errors="coerce")
-            man["over_under"] = pd.to_numeric(man["over_under"], errors="coerce")
-
-    def lines_for(home, away):
-        if man.empty: return (np.nan, np.nan)
-        r = man[(man["home"]==home) & (man["away"]==away)]
-        if r.empty: return (np.nan, np.nan)
-        return float(r.iloc[0]["spread"]), float(r.iloc[0]["over_under"])
-
-    rows = []
-    for g in raw_games:
-        home = str(g.get("home","")).strip()
-        away = str(g.get("away","")).strip()
-        neutral_flag = bool(g.get("neutral", False))
-        if not home or not away:
-            continue
-
-        # Use schedule's neutral flag if present for this pair this season
-        neutral = neutral_flag or pair_neutral.get((home, away), False)
-
-        # Rolling diffs + counts
-        hrow = last_home.loc[home] if home in last_home.index else None
-        arow = last_away.loc[away] if away in last_away.index else None
-
-        feats = {}
-        # counts
-        feats[f"home_R{LAST_N}_count"] = float(hrow[f"home_R{LAST_N}_count"]) if hrow is not None else 0.0
-        feats[f"away_R{LAST_N}_count"] = float(arow[f"away_R{LAST_N}_count"]) if arow is not None else 0.0
-        # diffs
-        for c in STAT_FEATURES:
-            hv = float(hrow[f"home_R{LAST_N}_{c}"]) if (hrow is not None and pd.notna(hrow[f"home_R{LAST_N}_{c}"])) else np.nan
-            av = float(arow[f"away_R{LAST_N}_{c}"]) if (arow is not None and pd.notna(arow[f"away_R{LAST_N}_{c}"])) else np.nan
-            feats[f"diff_R{LAST_N}_{c}"] = hv - av if (pd.notna(hv) and pd.notna(av)) else np.nan
-
-        # Context: can't know rest/bye future reliably → 0 baseline
-        feats["rest_diff"] = 0.0
-        feats["shortweek_diff"] = 0.0
-        feats["bye_diff"] = 0.0
-        feats["neutral_site"] = 1.0 if neutral else 0.0
-        feats["is_postseason"] = 0.0
-
-        # Travel: away to home campus (neutral assumed center not known)
-        # we approximate travel_diff_km with away->home distance if coords exist
-        # (if not, 0)
-        if os.path.exists(LOCAL_TEAMS):
-            tdf = pd.read_csv(LOCAL_TEAMS)
-            tdf_cols = {c.lower(): c for c in tdf.columns}
-            for req in ["school","latitude","longitude"]:
-                if req not in tdf.columns and req in tdf_cols:
-                    tdf.rename(columns={tdf_cols[req]: req}, inplace=True)
-            def latlon(school):
-                r = tdf[tdf["school"]==school]
-                if r.empty: return (np.nan, np.nan)
-                return (r.iloc[0].get("latitude"), r.iloc[0].get("longitude"))
-            hlat, hlon = latlon(home); alat, alon = latlon(away)
-            feats["travel_diff_km"] = 0.0 if neutral else (haversine_km(alat, alon, hlat, hlon) if all(pd.notna(v) for v in [hlat,hlon,alat,alon]) else 0.0)
-        else:
-            feats["travel_diff_km"] = 0.0
-
-        # Lines & market prob
-        sp, ou = lines_for(home, away)
-        feats["spread_home"] = sp if pd.notna(sp) else np.nan
-        feats["over_under"] = ou if pd.notna(ou) else np.nan
-        feats["market_home_prob"] = market_prob(feats["spread_home"], a, b) if pd.notna(feats["spread_home"]) else np.nan
-
-        # Elo pregame prob (use current ratings)
-        ra = current_ratings.get(home, ELO_START)
-        rb = current_ratings.get(away, ELO_START)
-        hfa = 0.0 if neutral else ELO_HFA
-        feats["elo_home_prob"] = elo_expect(ra + hfa, rb)
-
-        # Impute to global means for this inference set (fallback)
-        # We'll build a 1-row DF and let the model accept NaNs (HGB tolerates),
-        # but to be safe we fill NaNs of key engineered features with mid values.
-        # Assemble row in feature order:
-        feat_order = features_lastn
-        X = pd.DataFrame([{k: feats.get(k, np.nan) for k in feat_order}])
-        # Simple impute for line/prob if fully missing
-        for c in ["market_home_prob","elo_home_prob"]:
-            X[c] = pd.to_numeric(X[c], errors="coerce")
-        # Predict
-        p_home = float(model.predict_proba(X)[0,1])
-        rows.append({
-            "home": home, "away": away,
-            "home_prob": round(p_home, 4),
-            "away_prob": round(1.0 - p_home, 4),
-            "pick": home if p_home >= 0.5 else away,
-            "neutral": bool(neutral),
-            "spread_home": None if pd.isna(sp) else float(sp),
-            "over_under": None if pd.isna(ou) else float(ou),
-            "p_elo": round(float(feats["elo_home_prob"]), 4),
-            "p_market": None if pd.isna(feats["market_home_prob"]) else round(float(feats["market_home_prob"]), 4)
-        })
-
-    return rows, sorted(set(alias_unknown))
-
-# =========================================================
-# Main
-# =========================================================
-def main():
-    print("Loading schedule & team stats ...")
-
-    alias_map = load_alias_map()
-    schedule = load_csv_local_or_url(LOCAL_SCHEDULE, FALLBACK_SCHEDULE_URL)
-    schedule = ensure_schedule_columns(schedule)
-
-    team_stats = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL)
-    wide = long_stats_to_wide(team_stats)
-
-    lines_df = pd.read_csv(LOCAL_LINES) if os.path.exists(LOCAL_LINES) else pd.DataFrame()
-    venues_df = pd.read_csv(LOCAL_VENUES) if os.path.exists(LOCAL_VENUES) else pd.DataFrame()
-    teams_df = pd.read_csv(LOCAL_TEAMS) if os.path.exists(LOCAL_TEAMS) else pd.DataFrame()
-    talent_df = pd.read_csv(LOCAL_TALENT) if os.path.exists(LOCAL_TALENT) else pd.DataFrame()
-
-    # Build training set
-    examples, feature_cols, market_params = build_training_examples(
-        schedule, wide, lines_df, teams_df, venues_df, talent_df, LAST_N
-    )
-
-    # Optionally trim history
-    if RECENT_YEARS_ONLY:
-        max_season = int(pd.to_numeric(examples["season"], errors="coerce").max())
-        examples = examples[pd.to_numeric(examples["season"], errors="coerce") >= max_season - RECENT_YEARS_ONLY + 1]
-
-    # Season-ahead validation
-    metric = {}
-    if USE_SEASON_AHEAD_CV:
-        try:
-            m = season_ahead_metrics(examples, feature_cols)
-            metric = {
-                "season_ahead_acc": round(m["acc"], 4) if pd.notna(m["acc"]) else None,
-                "season_ahead_auc": round(m["auc"], 4) if pd.notna(m["auc"]) else None,
-                "season_ahead_brier": round(m["brier"], 4) if pd.notna(m["brier"]) else None,
-            }
-        except Exception as e:
-            print(f"[WARN] Season-ahead CV failed: {e}")
-
-    # Fit final calibrated model
-    cal_model = fit_final_model(examples, feature_cols)
-
-    # Read user games + manual lines
-    raw_games = parse_games_txt(INPUT_GAMES_TXT, alias_map)
-    manual_lines = pd.read_csv(INPUT_LINES_CSV) if os.path.exists(INPUT_LINES_CSV) else pd.DataFrame()
-
-    # Predict
-    rows, unknown = predict_games(
-        cal_model, feature_cols, schedule, wide, teams_df, venues_df, talent_df,
-        raw_games, manual_lines, market_params
-    )
-
-    out = {
-        "generated": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "model": f"ensemble_last{LAST_N} (HGB + calib; Elo/Market as features)",
-        "metric": metric,
-        "games": rows,
-        "unknown_teams": unknown,
-    }
-    os.makedirs(os.path.dirname(PRED_OUT_JSON), exist_ok=True)
-    with open(PRED_OUT_JSON, "w") as f:
-        json.dump(out, f, indent=2)
-    print(f"Wrote {PRED_OUT_JSON}")
-
-if __name__ == "__main__":
-    main()
+    re.compile(r"^\s*(?P<away>.+?)\s*@\s*(?P<home>.+?)\s*$", re.I),
+    re.compile(r"^\s*(?P<home>.+?)\s*vs\.?\s*(?P<away>.+?)(?:\s*\(N\))?\s*$", re.I),
+    re.compile(r"^\s*(?P<home>.+?)\s*,\s*(?P
