@@ -12,9 +12,19 @@ STAT_FEATURES = [
 
 def long_stats_to_wide(team_stats):
     """Pivots the long-format team stats to a wide format."""
-    return team_stats.pivot(
-        index="game_id", columns="home_away", values=[c for c in team_stats.columns if c not in ["game_id", "home_away"]]
+    # Pivot the data, which creates a multi-level column index
+    pivoted = team_stats.pivot(
+        index="game_id", 
+        columns="home_away", 
+        values=[c for c in team_stats.columns if c not in ["game_id", "home_away", "team"]]
     )
+    
+    # --- FIX STARTS HERE ---
+    # Flatten the multi-level columns (e.g., ('ppa', 'home')) into a single level ('ppa_home')
+    pivoted.columns = [f'{col[0]}_{col[1]}' for col in pivoted.columns]
+    # --- FIX ENDS HERE ---
+    
+    return pivoted
 
 def _get_rollups(df, last_n):
     """Helper to compute rolling stats for a given DataFrame of one-sided stats."""
@@ -39,13 +49,6 @@ def _get_rollups(df, last_n):
 def build_sidewise_rollups(schedule, wide_stats, last_n, predict_df=None):
     """
     Builds rolling average features for teams based on their side (home/away).
-    
-    Args:
-        schedule (pd.DataFrame): DataFrame of game schedules.
-        wide_stats (pd.DataFrame): DataFrame of game stats in wide format.
-        last_n (int): The window size for the rolling average.
-        predict_df (pd.DataFrame, optional): New games to generate features for.
-                                              If None, calculates for all historical games.
     """
     # Merge schedule and stats
     schedule['date'] = pd.to_datetime(schedule['date'])
@@ -53,12 +56,16 @@ def build_sidewise_rollups(schedule, wide_stats, last_n, predict_df=None):
 
     # Prepare home stats DataFrame
     home_df = full_df[["game_id", "date", "home_team"]].rename(columns={"home_team": "team"})
-    home_stats = full_df[[c for c in full_df.columns if c[1] == "home"]].droplevel(1, axis=1)
+    home_stats_cols = [c for c in full_df.columns if c.endswith('_home')]
+    home_stats = full_df[home_stats_cols]
+    home_stats.columns = [c.replace('_home', '') for c in home_stats.columns]
     home_df = pd.concat([home_df, home_stats], axis=1)
 
     # Prepare away stats DataFrame
     away_df = full_df[["game_id", "date", "away_team"]].rename(columns={"away_team": "team"})
-    away_stats = full_df[[c for c in full_df.columns if c[1] == "away"]].droplevel(1, axis=1)
+    away_stats_cols = [c for c in full_df.columns if c.endswith('_away')]
+    away_stats = full_df[away_stats_cols]
+    away_stats.columns = [c.replace('_away', '') for c in away_stats.columns]
     away_df = pd.concat([away_df, away_stats], axis=1)
 
     # If predicting, append historical data to the prediction set to form a complete timeline
