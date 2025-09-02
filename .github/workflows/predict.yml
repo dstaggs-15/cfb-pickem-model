@@ -23,7 +23,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # NEW DIAGNOSTIC STEP: This will print your entire file structure to the log.
+      # THIS IS THE STEP YOU ARE LOOKING FOR
       - name: List files for debugging
         run: ls -R
 
