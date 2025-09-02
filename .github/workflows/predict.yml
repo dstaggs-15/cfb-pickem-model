@@ -1,23 +1,20 @@
+# .github/workflows/predict.yml
 name: predict
 
 on:
   workflow_dispatch:
   schedule:
-    # Hourly (UTC). GitHub Actions uses UTC; 0 * * * * ≈ hourly in Chicago too.
     - cron: "0 * * * *"
   push:
     branches: [ "main" ]
-    # Only re-run on code/input/workflow changes (not on data outputs)
     paths:
       - "scripts/**"
       - "docs/input/**"
       - ".github/workflows/predict.yml"
 
-# Needed so the workflow can push updated JSON artifacts back to the repo
 permissions:
   contents: write
 
-# Avoid overlapping runs that could race on committing artifacts
 concurrency:
   group: predict
   cancel-in-progress: true
@@ -29,7 +26,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # safer rebase/push
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -41,30 +38,30 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r scripts/requirements.txt
 
-      # Optional but recommended: fetch/refresh CFBD CSVs used by training & color builder
-      - name: Fetch CFBD data
+      - name: Fetch CFBD data (optional)
         run: |
           if [ -f scripts/fetch_cfbd.py ]; then
-            python scripts/fetch_cfbd.py || echo "[WARN] fetch_cfbd failed; training may fall back to snapshot URLs."
-          else
-            echo "[INFO] scripts/fetch_cfbd.py not found; using snapshot URLs in train script."
+            python scripts/fetch_cfbd.py || echo "[WARN] fetch_cfbd failed"
           fi
 
-      - name: Train & predict
-        run: |
-          python scripts/train_and_predict.py
+      # NEW split pipeline
+      - name: Build dataset
+        run: python scripts/build_dataset.py
+
+      - name: Train model
+        run: python scripts/train_model.py
+
+      - name: Predict picks
+        run: python scripts/predict.py
 
       - name: Build spreads (market lines)
-        run: |
-          python scripts/build_spreads.py
+        run: python scripts/build_spreads.py || echo "[WARN] spreads step failed"
 
       - name: Build team summaries (cards)
-        run: |
-          python scripts/make_team_cards.py
+        run: python scripts/make_team_cards.py || echo "[WARN] cards step failed"
 
       - name: Build team colors
-        run: |
-          python scripts/build_team_colors.py
+        run: python scripts/build_team_colors.py || echo "[WARN] colors step failed"
 
       - name: Commit artifacts
         env:
@@ -73,18 +70,15 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Rebase to avoid non-fast-forward errors if main moved
           git pull --rebase origin main || true
-
           git add docs/data/predictions.json || true
           git add docs/data/spreads.json || true
           git add docs/data/team_summaries.json || true
           git add docs/data/team_colors.json || true
-
-          # Commit only if there are staged changes
+          git add docs/data/train_meta.json || true
+          git add docs/data/train_metrics.json || true
           if ! git diff --cached --quiet; then
-            git commit -m "Update predictions, spreads, team cards & colors [skip ci]"
+            git commit -m "Update predictions & artifacts [skip ci]"
             git push origin HEAD:main
           else
             echo "No changes to commit."
