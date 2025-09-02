@@ -56,6 +56,18 @@ def main():
     lines_df = pd.read_csv(LOCAL_LINES) if os.path.exists(LOCAL_LINES) else pd.DataFrame()
     manual_lines_df = pd.read_csv(MANUAL_LINES_CSV) if os.path.exists(MANUAL_LINES_CSV) else pd.DataFrame()
 
+    # --- FIX STARTS HERE ---
+    # Perform the exact same data cleaning on team_stats as in build_dataset.py
+    # 1. Remove duplicate stat lines for the same team in the same game.
+    team_stats = team_stats.drop_duplicates(subset=['game_id', 'team'])
+    
+    # 2. Create the 'home_away' column by cross-referencing the schedule.
+    home_team_map = schedule[['game_id', 'home_team']]
+    team_stats = team_stats.merge(home_team_map, on='game_id', how='left')
+    team_stats['home_away'] = np.where(team_stats['team'] == team_stats['home_team'], 'home', 'away')
+    team_stats = team_stats.drop(columns=['home_team'])
+    # --- FIX ENDS HERE ---
+
     # Load and parse user input games
     aliases = load_aliases(ALIASES_JSON)
     games_to_predict = parse_games_txt(GAMES_TXT, aliases)
@@ -65,14 +77,12 @@ def main():
         save_json(PREDICTIONS_JSON, [])
         return
 
-    # Convert parsed games to a DataFrame
     predict_df = pd.DataFrame(games_to_predict)
     predict_df['game_id'] = [f"predict_{i}" for i in range(len(predict_df))]
-    predict_df['season'] = schedule['season'].max() # Assume current season
+    predict_df['season'] = schedule['season'].max()
 
     # --- Feature Engineering (ensuring train/predict parity) ---
     
-    # 1. Rolling Stats
     wide_stats = long_stats_to_wide(team_stats)
     home_roll, away_roll = build_sidewise_rollups(schedule, wide_stats, last_n, predict_df)
     
@@ -83,50 +93,46 @@ def main():
     for c in [f for f in feats if f.startswith('diff_')]:
         stat_name = c.replace(f'diff_R{last_n}_', '')
         hc, ac = f"home_R{last_n}_{stat_name}", f"away_R{last_n}_{stat_name}"
-        X[c] = X[hc] - X[ac]
-        diff_cols.append(c)
+        if hc in X.columns and ac in X.columns:
+            X[c] = X[hc] - X[ac]
+            diff_cols.append(c)
 
-    # 2. Context Features
     eng = rest_and_travel(schedule, teams_df, venues_df, predict_df)
     X = X.merge(eng, on="game_id", how="left")
 
-    # 3. Elo Features
     elo_df = pregame_probs(schedule, talent_df, predict_df)
     X = X.merge(elo_df, on="game_id", how="left")
 
-    # 4. Market Features
-    # Use manual lines first, then fall back to historical/fetched lines
     if not manual_lines_df.empty:
+        # Create a mapping for easier lookup
+        manual_lines_map = {}
+        for _, row in manual_lines_df.iterrows():
+            key = (row['home'], row['away'])
+            manual_lines_map[key] = row['spread']
+
         predict_df['spread_home'] = predict_df.apply(
-            lambda row: manual_lines_df[
-                (manual_lines_df['home'] == row['home_team']) & 
-                (manual_lines_df['away'] == row['away_team'])
-            ]['spread'].values[0] if not manual_lines_df[
-                (manual_lines_df['home'] == row['home_team']) & 
-                (manual_lines_df['away'] == row['away_team'])
-            ].empty else np.nan, axis=1
+            lambda row: manual_lines_map.get((row['home_team'], row['away_team'])),
+            axis=1
         )
         X = X.merge(predict_df[['game_id', 'spread_home']], on='game_id', how='left')
     else:
         med = median_lines(lines_df)
-        X = X.merge(med, on=['home_team', 'away_team'], how='left') # Approximate match
+        X = X.merge(med, on=['home_team', 'away_team'], how='left', suffixes=('', '_median'))
 
     a, b = market_params["a"], market_params["b"]
     X["market_home_prob"] = X["spread_home"].apply(lambda s: (1/(1+np.exp(-(a + b * (-(s))))) if pd.notna(s) else np.nan))
 
-    # Impute missing values using training set means (from meta.json)
-    # This is a simplification; a more robust approach would save training means
     for c in feats:
         if c not in X.columns:
             X[c] = np.nan
         X[c] = pd.to_numeric(X[c], errors='coerce')
-        X[c] = X[c].fillna(X[c].mean()) # Simple mean impute for prediction
+        # A more robust imputation would use saved means from the training set
+        # For simplicity, we use the column's own mean if any values are present
+        if X[c].isnull().any():
+             X[c] = X[c].fillna(X[c].mean())
 
-    # Ensure all feature columns are present and in the correct order
-    X_predict = X[feats]
+    X_predict = X[feats].fillna(0) # Final fillna(0) for any remaining NaNs
 
-    # --- Make Predictions ---
-    
     probs = model.predict_proba(X_predict)[:, 1]
     
     output = []
@@ -136,10 +142,10 @@ def main():
         output.append({
             'home_team': row['home_team'],
             'away_team': row['away_team'],
-            'neutral_site': row['neutral_site'],
+            'neutral_site': bool(row['neutral_site']),
             'model_prob_home': prob,
             'pick': pick,
-            'spread_home': row.get('spread_home') # Include spread if available
+            'spread_home': row.get('spread_home')
         })
 
     save_json(PREDICTIONS_JSON, output)
