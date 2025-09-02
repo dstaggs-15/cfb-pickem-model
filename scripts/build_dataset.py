@@ -43,14 +43,17 @@ def main():
     team_stats = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL)
 
     # --- FIX STARTS HERE ---
+    # The source data may contain duplicate stat lines for the same team in the same game.
+    # We remove them, keeping the first entry for each game-team combination.
+    team_stats = team_stats.drop_duplicates(subset=['game_id', 'team'])
+    # --- FIX ENDS HERE ---
+
     # The team_stats CSV is missing the 'home_away' column, so we create it
     # by cross-referencing the schedule file, which knows the home team for each game.
     home_team_map = schedule[['game_id', 'home_team']]
     team_stats = team_stats.merge(home_team_map, on='game_id', how='left')
-    # If the team in the stat line matches the game's home_team, label it 'home'
     team_stats['home_away'] = np.where(team_stats['team'] == team_stats['home_team'], 'home', 'away')
     team_stats = team_stats.drop(columns=['home_team'])
-    # --- FIX ENDS HERE ---
     
     wide = long_stats_to_wide(team_stats)
 
