@@ -24,24 +24,26 @@ def _get_rollups(df, last_n):
     """Helper to compute rolling stats for a given DataFrame of one-sided stats."""
     df = df.sort_values(by=["team", "date"])
 
-    # --- FIX STARTS HERE ---
-    # Intersect the desired STAT_FEATURES with columns that actually exist in the dataframe.
-    # This makes the script robust to missing data columns in the source file.
     existing_features = [feat for feat in STAT_FEATURES if feat in df.columns]
-    # --- FIX ENDS HERE ---
 
-    # Group by team and calculate rolling average, shifting to prevent data leakage
-    grp = df.groupby("team")[existing_features] # Use the dynamic list of existing features
+    grp = df.groupby("team")[existing_features]
     rollups = grp.rolling(window=last_n, min_periods=1).mean().shift(1)
-
+    
     counts = grp.cumcount().rename(f"R{last_n}_count") + 1
     counts[counts > last_n] = last_n
     
-    # Rename columns to reflect the rolling window size
-    rollups.columns = [f"R{last_n}_{c}" for c in existing_features] # Use the dynamic list here too
+    rollups.columns = [f"R{last_n}_{c}" for c in existing_features]
 
+    # --- FIX STARTS HERE ---
+    # Reset the complex multi-index created by groupby() before concatenating.
+    # This ensures all dataframes have a simple, compatible index.
+    rollups = rollups.reset_index(drop=True)
+    counts = counts.reset_index(drop=True)
+    df = df.reset_index(drop=True)
+    # --- FIX ENDS HERE ---
+    
     final = pd.concat([df[["game_id", "team"]], rollups, counts], axis=1)
-    return final.reset_index(drop=True)
+    return final
 
 def build_sidewise_rollups(schedule, wide_stats, last_n, predict_df=None):
     """
@@ -50,14 +52,12 @@ def build_sidewise_rollups(schedule, wide_stats, last_n, predict_df=None):
     schedule['date'] = pd.to_datetime(schedule['date'])
     full_df = schedule.merge(wide_stats, on="game_id", how="left")
 
-    # Prepare home stats DataFrame
     home_df = full_df[["game_id", "date", "home_team"]].rename(columns={"home_team": "team"})
     home_stats_cols = [c for c in full_df.columns if c.endswith('_home')]
     home_stats = full_df[home_stats_cols]
     home_stats.columns = [c.replace('_home', '') for c in home_stats.columns]
     home_df = pd.concat([home_df, home_stats], axis=1)
 
-    # Prepare away stats DataFrame
     away_df = full_df[["game_id", "date", "away_team"]].rename(columns={"away_team": "team"})
     away_stats_cols = [c for c in full_df.columns if c.endswith('_away')]
     away_stats = full_df[away_stats_cols]
