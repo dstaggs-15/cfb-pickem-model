@@ -7,7 +7,7 @@ import joblib
 import os
 
 from .lib.io_utils import load_csv_local_or_url, save_json
-from .lib.parsing import load_aliases, parse_games_txt
+from .lib.parsing import load_aliases, parse_games_txt, ensure_schedule_columns
 from .lib.rolling import long_stats_to_wide, build_sidewise_rollups
 from .lib.context import rest_and_travel
 from .lib.market import median_lines
@@ -49,6 +49,11 @@ def main():
     market_params = meta["market_params"]
 
     schedule = load_csv_local_or_url(LOCAL_SCHEDULE, FALLBACK_SCHEDULE_URL)
+    # --- FIX STARTS HERE ---
+    # This crucial cleaning step was missing. It standardizes column names (e.g., "Date" -> "date").
+    schedule = ensure_schedule_columns(schedule)
+    # --- FIX ENDS HERE ---
+    
     team_stats = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL)
     venues_df = pd.read_csv(LOCAL_VENUES) if os.path.exists(LOCAL_VENUES) else pd.DataFrame()
     teams_df = pd.read_csv(LOCAL_TEAMS) if os.path.exists(LOCAL_TEAMS) else pd.DataFrame()
@@ -56,17 +61,12 @@ def main():
     lines_df = pd.read_csv(LOCAL_LINES) if os.path.exists(LOCAL_LINES) else pd.DataFrame()
     manual_lines_df = pd.read_csv(MANUAL_LINES_CSV) if os.path.exists(MANUAL_LINES_CSV) else pd.DataFrame()
 
-    # --- FIX STARTS HERE ---
     # Perform the exact same data cleaning on team_stats as in build_dataset.py
-    # 1. Remove duplicate stat lines for the same team in the same game.
     team_stats = team_stats.drop_duplicates(subset=['game_id', 'team'])
-    
-    # 2. Create the 'home_away' column by cross-referencing the schedule.
     home_team_map = schedule[['game_id', 'home_team']]
     team_stats = team_stats.merge(home_team_map, on='game_id', how='left')
     team_stats['home_away'] = np.where(team_stats['team'] == team_stats['home_team'], 'home', 'away')
     team_stats = team_stats.drop(columns=['home_team'])
-    # --- FIX ENDS HERE ---
 
     # Load and parse user input games
     aliases = load_aliases(ALIASES_JSON)
@@ -81,8 +81,7 @@ def main():
     predict_df['game_id'] = [f"predict_{i}" for i in range(len(predict_df))]
     predict_df['season'] = schedule['season'].max()
 
-    # --- Feature Engineering (ensuring train/predict parity) ---
-    
+    # Feature Engineering (ensuring train/predict parity)
     wide_stats = long_stats_to_wide(team_stats)
     home_roll, away_roll = build_sidewise_rollups(schedule, wide_stats, last_n, predict_df)
     
@@ -104,19 +103,15 @@ def main():
     X = X.merge(elo_df, on="game_id", how="left")
 
     if not manual_lines_df.empty:
-        # Create a mapping for easier lookup
         manual_lines_map = {}
         for _, row in manual_lines_df.iterrows():
             key = (row['home'], row['away'])
             manual_lines_map[key] = row['spread']
-
-        predict_df['spread_home'] = predict_df.apply(
-            lambda row: manual_lines_map.get((row['home_team'], row['away_team'])),
-            axis=1
-        )
+        predict_df['spread_home'] = predict_df.apply(lambda row: manual_lines_map.get((row['home_team'], row['away_team'])), axis=1)
         X = X.merge(predict_df[['game_id', 'spread_home']], on='game_id', how='left')
     else:
         med = median_lines(lines_df)
+        # Approximate merge for prediction, may not always find a match
         X = X.merge(med, on=['home_team', 'away_team'], how='left', suffixes=('', '_median'))
 
     a, b = market_params["a"], market_params["b"]
@@ -126,12 +121,10 @@ def main():
         if c not in X.columns:
             X[c] = np.nan
         X[c] = pd.to_numeric(X[c], errors='coerce')
-        # A more robust imputation would use saved means from the training set
-        # For simplicity, we use the column's own mean if any values are present
         if X[c].isnull().any():
              X[c] = X[c].fillna(X[c].mean())
 
-    X_predict = X[feats].fillna(0) # Final fillna(0) for any remaining NaNs
+    X_predict = X[feats].fillna(0)
 
     probs = model.predict_proba(X_predict)[:, 1]
     
