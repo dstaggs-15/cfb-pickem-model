@@ -1,22 +1,14 @@
-Of course. Here is the complete and corrected code for your GitHub Actions workflow file.
-
-Copy this entire block and paste it into your `.github/workflows/predict.yml` file. It includes the `working-directory` fix for each script, as well as the standard steps for setup and committing the results.
-
-```yaml
 # .github/workflows/predict.yml
 
 name: CFB Model Pipeline
 
-# Controls when the action will run.
 on:
-  # Triggers the workflow on a schedule (runs every hour).
-  schedule:
-    - cron: '0 * * * *'
-  
-  # Allows you to run this workflow manually from the Actions tab.
+  # This line is ESSENTIAL for the "Run workflow" button to appear.
   workflow_dispatch:
 
-  # Triggers the workflow on push events but only for specific paths.
+  schedule:
+    - cron: '0 * * * *'
+
   push:
     branches:
       - main
@@ -31,11 +23,9 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      # Step 1: Checks out your repository under $GITHUB_WORKSPACE, so your job can access it.
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Sets up Python 3.11 and caches dependencies for faster builds.
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -43,39 +33,29 @@ jobs:
           cache: 'pip'
           cache-dependency-path: 'scripts/requirements.txt'
       
-      # Step 3: Installs the Python packages required by your scripts.
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
       
-      # Step 4: Runs the dataset builder script.
-      # The 'working-directory' is crucial for Python to find your packages.
       - name: Build dataset
         run: python -m scripts.build_dataset
         working-directory: ./
       
-      # Step 5: Runs the model training script.
       - name: Train model
         run: python -m scripts.train_model
         working-directory: ./
         
-      # Step 6: Runs the prediction script.
       - name: Predict
         run: python -m scripts.predict
         working-directory: ./
         
-      # Step 7: Commits the generated data/model files back to the repository.
-      # This step only runs if files in the specified paths have changed.
       - name: Commit and push artifacts
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add data/derived/ docs/data/
-          # Check if there are any changes to commit
           if git diff --staged --quiet; then
             echo "No changes to commit."
           else
             git commit -m "CI: Update model and predictions"
             git push
           fi
-
-```
