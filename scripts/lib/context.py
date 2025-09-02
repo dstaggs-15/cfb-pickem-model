@@ -1,63 +1,73 @@
 # scripts/lib/context.py
-import math, pandas as pd, numpy as np
 
-def haversine_km(lat1, lon1, lat2, lon2):
-    if any(pd.isna(v) for v in [lat1,lon1,lat2,lon2]): return np.nan
-    R = 6371.0
-    p1, p2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2-lat1)
-    dlmb = math.radians(lon2-lon1)
-    a = math.sin(dphi/2)**2 + math.cos(p1)*math.cos(p2)*math.sin(dlmb/2)**2
-    return 2*R*math.asin(math.sqrt(a))
+import numpy as np
+import pandas as pd
+from haversine import haversine
 
-def rest_and_travel(schedule: pd.DataFrame, teams_df: pd.DataFrame, venues_df: pd.DataFrame) -> pd.DataFrame:
-    df = schedule[["game_id","season","week","date","home_team","away_team","neutral_site","venue_id","season_type"]].copy()
-    both = pd.concat([
-        df[["game_id","date","home_team"]].rename(columns={"home_team":"team"}),
-        df[["game_id","date","away_team"]].rename(columns={"away_team":"team"})
-    ], ignore_index=True).sort_values(["team","date"])
-    both["prev_date"] = both.groupby("team")["date"].shift(1)
-    both["rest_days"] = (both["date"] - both["prev_date"]).dt.days
-    rest_map = both[["game_id","team","rest_days"]]
-    m = df.merge(rest_map.rename(columns={"team":"home_team","rest_days":"home_rest_days"}),
-                 on=["game_id","home_team"], how="left")
-    m = m.merge(rest_map.rename(columns={"team":"away_team","rest_days":"away_rest_days"}),
-                 on=["game_id","away_team"], how="left")
-    m["home_rest_days"] = m["home_rest_days"].fillna(14)
-    m["away_rest_days"] = m["away_rest_days"].fillna(14)
-    m["home_short_week"] = (m["home_rest_days"] <= 6).astype(int)
-    m["away_short_week"] = (m["away_rest_days"] <= 6).astype(int)
-    m["home_bye"] = (m["home_rest_days"] >= 13).astype(int)
-    m["away_bye"] = (m["away_rest_days"] >= 13).astype(int)
+def rest_and_travel(schedule, teams_df, venues_df, predict_df=None):
+    """
+    Engineers context features like rest, travel distance, and special game flags.
+    """
+    df = schedule if predict_df is None else pd.concat([schedule, predict_df])
+    df['date'] = pd.to_datetime(df['date'])
+    df = df.sort_values(by='date')
 
-    def team_latlon(school: str):
-        if teams_df.empty: return (np.nan, np.nan)
-        r = teams_df[teams_df["school"]==school]
-        if r.empty: return (np.nan, np.nan)
-        return (r.iloc[0].get("latitude"), r.iloc[0].get("longitude"))
-    def venue_latlon(vid):
-        if venues_df.empty: return (np.nan, np.nan)
-        r = venues_df[venues_df["venue_id"]==vid]
-        if r.empty: return (np.nan, np.nan)
-        return (r.iloc[0].get("latitude"), r.iloc[0].get("longitude"))
+    # Calculate days of rest
+    df['last_game_date_home'] = df.groupby('home_team')['date'].shift(1)
+    df['last_game_date_away'] = df.groupby('away_team')['date'].shift(1)
+    df['rest_home'] = (df['date'] - df['last_game_date_home']).dt.days
+    df['rest_away'] = (df['date'] - df['last_game_date_away']).dt.days
 
-    m["home_lat"], m["home_lon"] = zip(*m["home_team"].map(team_latlon))
-    m["away_lat"], m["away_lon"] = zip(*m["away_team"].map(team_latlon))
-    m["ven_lat"], m["ven_lon"] = zip(*m["venue_id"].map(venue_latlon))
+    # Merge location data
+    if not teams_df.empty and 'latitude' in teams_df.columns:
+        teams_loc = teams_df[['school', 'latitude', 'longitude']].rename(columns={'school': 'team'})
+        home_loc = teams_loc.rename(columns={'team': 'home_team', 'latitude': 'home_lat', 'longitude': 'home_lon'})
+        away_loc = teams_loc.rename(columns={'team': 'away_team', 'latitude': 'away_lat', 'longitude': 'away_lon'})
+        df = df.merge(home_loc, on='home_team', how='left')
+        df = df.merge(away_loc, on='away_team', how='left')
 
-    def travel(row):
-        if bool(row["neutral_site"]) and pd.notna(row["ven_lat"]) and pd.notna(row["ven_lon"]):
-            hd = haversine_km(row["home_lat"], row["home_lon"], row["ven_lat"], row["ven_lon"])
-            ad = haversine_km(row["away_lat"], row["away_lon"], row["ven_lat"], row["ven_lon"])
+    if not venues_df.empty and 'latitude' in venues_df.columns:
+        venues_loc = venues_df[['id', 'latitude', 'longitude']].rename(columns={'id': 'venue_id', 'latitude': 'venue_lat', 'longitude': 'venue_lon'})
+        df = df.merge(venues_loc, on='venue_id', how='left')
+
+    # Calculate travel distance
+    def calculate_travel(row):
+        # No travel for home team
+        home_travel = 0
+        
+        # Away team travels from their location to the venue location
+        if pd.notna(row['away_lat']) and pd.notna(row['venue_lat']):
+            away_loc = (row['away_lat'], row['away_lon'])
+            venue_loc = (row['venue_lat'], row['venue_lon'])
+            away_travel = haversine(away_loc, venue_loc)
         else:
-            hd = 0.0
-            ad = haversine_km(row["away_lat"], row["away_lon"], row["home_lat"], row["home_lon"])
-        return hd, ad
+            away_travel = np.nan
+        
+        return home_travel, away_travel
 
-    m["home_travel_km"], m["away_travel_km"] = zip(*m.apply(travel, axis=1))
-    m["rest_diff"] = m["home_rest_days"] - m["away_rest_days"]
-    m["shortweek_diff"] = m["home_short_week"] - m["away_short_week"]
-    m["bye_diff"] = m["home_bye"] - m["away_bye"]
-    m["travel_diff_km"] = m["home_travel_km"] - m["away_travel_km"]
-    m["is_postseason"] = (m["season_type"].astype(str) != "regular").astype(int)
-    return m[["game_id","rest_diff","shortweek_diff","bye_diff","travel_diff_km","neutral_site","is_postseason"]]
+    if 'away_lat' in df.columns and 'venue_lat' in df.columns:
+        travel_distances = df.apply(calculate_travel, axis=1, result_type='expand')
+        df['travel_home_km'] = travel_distances[0]
+        df['travel_away_km'] = travel_distances[1]
+    else:
+        df['travel_home_km'] = 0
+        df['travel_away_km'] = np.nan
+
+
+    # Feature differences and flags
+    df['rest_diff'] = df['rest_home'] - df['rest_away']
+    df['travel_diff_km'] = df['travel_home_km'] - df['travel_away_km']
+    df['shortweek_home'] = (df['rest_home'] < 7).astype(int)
+    df['shortweek_away'] = (df['rest_away'] < 7).astype(int)
+    df['shortweek_diff'] = df['shortweek_home'] - df['shortweek_away']
+    df['bye_home'] = (df['rest_home'] > 9).astype(int)
+    df['bye_away'] = (df['rest_away'] > 9).astype(int)
+    df['bye_diff'] = df['bye_home'] - df['bye_away']
+    df['is_postseason'] = df['season_type'].str.contains('post', case=False, na=False).astype(int)
+
+    feature_cols = [
+        'game_id', 'rest_diff', 'shortweek_diff', 'bye_diff', 'travel_diff_km', 
+        'neutral_site', 'is_postseason'
+    ]
+    
+    return df[feature_cols]
