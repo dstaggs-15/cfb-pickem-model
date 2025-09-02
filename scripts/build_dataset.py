@@ -50,7 +50,10 @@ def main():
 
     home_roll, away_roll = build_sidewise_rollups(schedule, wide, LAST_N)
 
-    base_cols = ["game_id","season","week","date","home_team","away_team","home_points","away_points","season_type","neutral_site","venue_id"]
+    # *** THIS IS THE FIX ***
+    # 'neutral_site' is removed from this list because it will be added later
+    # by the rest_and_travel function, which is the correct source.
+    base_cols = ["game_id","season","week","date","home_team","away_team","home_points","away_points","season_type","venue_id"]
     for bc in base_cols:
         if bc not in schedule.columns:
             schedule[bc] = np.nan
