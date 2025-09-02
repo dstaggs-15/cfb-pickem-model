@@ -34,18 +34,18 @@ MANUAL_LINES_CSV = "docs/input/lines.csv"
 
 def main():
     print("Generating predictions ...")
-    
+
     model = joblib.load(MODEL_JOBLIB)
     with open(META_JSON, 'r') as f:
         meta = json.load(f)
-    
+
     feats = meta["features"]
     last_n = meta["last_n"]
     market_params = meta["market_params"]
 
     schedule = load_csv_local_or_url(LOCAL_SCHEDULE, FALLBACK_SCHEDULE_URL)
     schedule = ensure_schedule_columns(schedule)
-    
+
     team_stats = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL)
     venues_df = pd.read_csv(LOCAL_VENUES) if os.path.exists(LOCAL_VENUES) else pd.DataFrame()
     teams_df = pd.read_csv(LOCAL_TEAMS) if os.path.exists(LOCAL_TEAMS) else pd.DataFrame()
@@ -61,7 +61,7 @@ def main():
 
     aliases = load_aliases(ALIASES_JSON)
     games_to_predict = parse_games_txt(GAMES_TXT, aliases)
-    
+
     if not games_to_predict:
         print("No games found in games.txt. Exiting.")
         save_json(PREDICTIONS_JSON, [])
@@ -73,7 +73,7 @@ def main():
 
     wide_stats = long_stats_to_wide(team_stats)
     home_roll, away_roll = build_sidewise_rollups(schedule, wide_stats, last_n, predict_df)
-    
+
     X = predict_df.merge(home_roll, left_on=["game_id", "home_team"], right_on=["game_id", "team"], how='left').drop(columns=["team"])
     X = X.merge(away_roll, left_on=["game_id", "away_team"], right_on=["game_id", "team"], how='left').drop(columns=["team"])
 
@@ -109,15 +109,13 @@ def main():
     X_predict = X[feats].fillna(0)
 
     probs = model.predict_proba(X_predict)[:, 1]
-    
+
     output = []
     for i, row in X.iterrows():
         prob = probs[i]
         pick = row['home_team'] if prob > 0.5 else row['away_team']
         spread = row.get('spread_home')
-        
-        # --- THIS IS THE FIX ---
-        # Convert any potential NaN values from pandas into None, which becomes 'null' in valid JSON.
+
         output.append({
             'home_team': row['home_team'],
             'away_team': row['away_team'],
@@ -126,7 +124,6 @@ def main():
             'pick': pick,
             'spread_home': None if pd.isna(spread) else spread
         })
-        # --- END OF FIX ---
 
     save_json(PREDICTIONS_JSON, output)
     print(f"Successfully wrote {len(output)} predictions to {PREDICTIONS_JSON}")
