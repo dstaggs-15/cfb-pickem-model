@@ -1,137 +1,149 @@
-#!/usr/bin/env python3
-# --- bootstrap so 'scripts.lib' imports work when run as a file ---
-import os, sys
-_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-_REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
-if _REPO_ROOT not in sys.path:
-    sys.path.insert(0, _REPO_ROOT)
-# -----------------------------------------------------------------
+# scripts/predict.py
 
-import json, datetime as dt
-import numpy as np, pandas as pd
-from joblib import load
+import pandas as pd
+import numpy as np
+import json
+import joblib
+import os
 
-from scripts.lib.io_utils import load_csv_local_or_url, save_json
-from scripts.lib.parsing import ensure_schedule_columns, load_alias_map, parse_games_txt
-from scripts.lib.rolling import long_stats_to_wide, build_sidewise_rollups, latest_per_team, STAT_FEATURES
-from scripts.lib.market import market_prob
-from scripts.lib.elo import end_of_history_ratings, ELO_HFA
+from .lib.io_utils import load_csv_local_or_url, save_json
+from .lib.parsing import load_aliases, parse_games_txt
+from .lib.rolling import long_stats_to_wide, build_sidewise_rollups
+from .lib.context import rest_and_travel
+from .lib.market import median_lines
+from .lib.elo import pregame_probs
+
+# Define file paths for data and models
+DERIVED = "data/derived"
+MODEL_JOBLIB = f"{DERIVED}/model.joblib"
+META_JSON = "docs/data/train_meta.json"
+PREDICTIONS_JSON = "docs/data/predictions.json"
 
 LOCAL_DIR = "data/raw/cfbd"
 LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
 LOCAL_TEAM_STATS = f"{LOCAL_DIR}/cfb_game_team_stats.csv"
+LOCAL_LINES = f"{LOCAL_DIR}/cfb_lines.csv"
+LOCAL_VENUES = f"{LOCAL_DIR}/cfbd_venues.csv"
+LOCAL_TEAMS = f"{LOCAL_DIR}/cfbd_teams.csv"
 LOCAL_TALENT = f"{LOCAL_DIR}/cfbd_talent.csv"
 
 RAW_BASE = "https://raw.githubusercontent.com/moneyball-ab/cfb-data/master/csv"
 FALLBACK_SCHEDULE_URL = f"{RAW_BASE}/cfb_schedule.csv"
 FALLBACK_TEAM_STATS_URL = f"{RAW_BASE}/cfb_game_team_stats.csv"
 
-INPUT_GAMES_TXT = "docs/input/games.txt"
-INPUT_ALIASES_JSON = "docs/input/aliases.json"
-INPUT_LINES_CSV = "docs/input/lines.csv"
-
-MODEL_PATH = "data/derived/model.joblib"
-META_JSON = "docs/data/train_meta.json"
-PRED_OUT_JSON = "docs/data/predictions.json"
+# User inputs
+GAMES_TXT = "docs/input/games.txt"
+ALIASES_JSON = "docs/input/aliases.json"
+MANUAL_LINES_CSV = "docs/input/lines.csv"
 
 def main():
-    meta=json.load(open(META_JSON,"r"))
-    LAST_N=int(meta["last_n"])
-    feature_cols=list(meta["features"])
-    market_params=meta["market_params"]
-    model=load(MODEL_PATH)
-
-    alias_map = load_alias_map(INPUT_ALIASES_JSON)
+    print("Generating predictions ...")
+    
+    # Load model, metadata, and historical data
+    model = joblib.load(MODEL_JOBLIB)
+    with open(META_JSON, 'r') as f:
+        meta = json.load(f)
+    
+    feats = meta["features"]
+    last_n = meta["last_n"]
+    market_params = meta["market_params"]
 
     schedule = load_csv_local_or_url(LOCAL_SCHEDULE, FALLBACK_SCHEDULE_URL)
-    schedule = ensure_schedule_columns(schedule)
     team_stats = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL)
-    wide = long_stats_to_wide(team_stats)
-
-    # Build rollups once
-    home_roll, away_roll = build_sidewise_rollups(schedule, wide, LAST_N)
-    last_home = latest_per_team(home_roll, "home", LAST_N)
-    last_away = latest_per_team(away_roll, "away", LAST_N)
-
-    # Neutral hint from schedule (this season)
-    sched_now = schedule.copy()
-    season_max = int(pd.to_numeric(sched_now["season"], errors="coerce").max()) if "season" in sched_now.columns else None
-    if season_max is not None:
-        sched_now = sched_now[sched_now["season"]]==season_max
-    pair_neutral = {}
-    if {"home_team","away_team","neutral_site"}.issubset(schedule.columns):
-        tmp = schedule.sort_values(["season","week","date"]).drop_duplicates(subset=["home_team","away_team"], keep="last")
-        for _, r in tmp.iterrows():
-            pair_neutral[(str(r["home_team"]), str(r["away_team"]))] = bool(r["neutral_site"])
-
-    # Current Elo ratings
+    venues_df = pd.read_csv(LOCAL_VENUES) if os.path.exists(LOCAL_VENUES) else pd.DataFrame()
+    teams_df = pd.read_csv(LOCAL_TEAMS) if os.path.exists(LOCAL_TEAMS) else pd.DataFrame()
     talent_df = pd.read_csv(LOCAL_TALENT) if os.path.exists(LOCAL_TALENT) else pd.DataFrame()
-    current_ratings = end_of_history_ratings(schedule, talent_df)
+    lines_df = pd.read_csv(LOCAL_LINES) if os.path.exists(LOCAL_LINES) else pd.DataFrame()
+    manual_lines_df = pd.read_csv(MANUAL_LINES_CSV) if os.path.exists(MANUAL_LINES_CSV) else pd.DataFrame()
 
-    # Parse input games + manual lines
-    raw_games = parse_games_txt(INPUT_GAMES_TXT, alias_map)
-    man = pd.read_csv(INPUT_LINES_CSV) if os.path.exists(INPUT_LINES_CSV) else pd.DataFrame()
-    man.columns = [c.strip().lower() for c in man.columns]
-    if not {"home","away","spread","over_under"}.issubset(set(man.columns)):
-        man = pd.DataFrame()
+    # Load and parse user input games
+    aliases = load_aliases(ALIASES_JSON)
+    games_to_predict = parse_games_txt(GAMES_TXT, aliases)
+    
+    if not games_to_predict:
+        print("No games found in games.txt. Exiting.")
+        save_json(PREDICTIONS_JSON, [])
+        return
 
-    def lines_for(home, away):
-        if man.empty: return (np.nan, np.nan)
-        r = man[(man["home"]==home) & (man["away"]==away)]
-        if r.empty: return (np.nan, np.nan)
-        return float(r.iloc[0]["spread"]), float(r.iloc[0]["over_under"])
+    # Convert parsed games to a DataFrame
+    predict_df = pd.DataFrame(games_to_predict)
+    predict_df['game_id'] = [f"predict_{i}" for i in range(len(predict_df))]
+    predict_df['season'] = schedule['season'].max() # Assume current season
 
-    rows=[]
-    for g in raw_games:
-        home=str(g["home"]); away=str(g["away"]); neutral=bool(g.get("neutral", False)) or pair_neutral.get((home,away), False)
+    # --- Feature Engineering (ensuring train/predict parity) ---
+    
+    # 1. Rolling Stats
+    wide_stats = long_stats_to_wide(team_stats)
+    home_roll, away_roll = build_sidewise_rollups(schedule, wide_stats, last_n, predict_df)
+    
+    X = predict_df.merge(home_roll, left_on=["game_id", "home_team"], right_on=["game_id", "team"], how="left").drop(columns=["team"])
+    X = X.merge(away_roll, left_on=["game_id", "away_team"], right_on=["game_id", "team"], how="left").drop(columns=["team"])
 
-        feats = {}
-        feats[f"home_R{LAST_N}_count"] = float(last_home.loc[home][f"home_R{LAST_N}_count"]) if home in last_home.index else 0.0
-        feats[f"away_R{LAST_N}_count"] = float(last_away.loc[away][f"away_R{LAST_N}_count"]) if away in last_away.index else 0.0
+    diff_cols = []
+    for c in [f for f in feats if f.startswith('diff_')]:
+        stat_name = c.replace(f'diff_R{last_n}_', '')
+        hc, ac = f"home_R{last_n}_{stat_name}", f"away_R{last_n}_{stat_name}"
+        X[c] = X[hc] - X[ac]
+        diff_cols.append(c)
 
-        for c in STAT_FEATURES:
-            hv = float(last_home.loc[home][f"home_R{LAST_N}_{c}"]) if (home in last_home.index and pd.notna(last_home.loc[home][f"home_R{LAST_N}_{c}"])) else np.nan
-            av = float(last_away.loc[away][f"away_R{LAST_N}_{c}"]) if (away in last_away.index and pd.notna(last_away.loc[away][f"away_R{LAST_N}_{c}"])) else np.nan
-            feats[f"diff_R{LAST_N}_{c}"] = hv - av if (pd.notna(hv) and pd.notna(av)) else np.nan
+    # 2. Context Features
+    eng = rest_and_travel(schedule, teams_df, venues_df, predict_df)
+    X = X.merge(eng, on="game_id", how="left")
 
-        feats["rest_diff"]=0.0; feats["shortweek_diff"]=0.0; feats["bye_diff"]=0.0
-        feats["neutral_site"]=1.0 if neutral else 0.0
-        feats["is_postseason"]=0.0
+    # 3. Elo Features
+    elo_df = pregame_probs(schedule, talent_df, predict_df)
+    X = X.merge(elo_df, on="game_id", how="left")
 
-        sp, ou = lines_for(home, away)
-        feats["spread_home"] = sp if pd.notna(sp) else np.nan
-        feats["over_under"]  = ou if pd.notna(ou) else np.nan
-        feats["market_home_prob"] = market_prob(feats["spread_home"], market_params["a"], market_params["b"]) if pd.notna(feats["spread_home"]) else np.nan
+    # 4. Market Features
+    # Use manual lines first, then fall back to historical/fetched lines
+    if not manual_lines_df.empty:
+        predict_df['spread_home'] = predict_df.apply(
+            lambda row: manual_lines_df[
+                (manual_lines_df['home'] == row['home_team']) & 
+                (manual_lines_df['away'] == row['away_team'])
+            ]['spread'].values[0] if not manual_lines_df[
+                (manual_lines_df['home'] == row['home_team']) & 
+                (manual_lines_df['away'] == row['away_team'])
+            ].empty else np.nan, axis=1
+        )
+        X = X.merge(predict_df[['game_id', 'spread_home']], on='game_id', how='left')
+    else:
+        med = median_lines(lines_df)
+        X = X.merge(med, on=['home_team', 'away_team'], how='left') # Approximate match
 
-        ra = current_ratings.get(home, 1500.0)
-        rb = current_ratings.get(away, 1500.0)
-        from scripts.lib.elo import ELO_HFA
-        hfa = 0.0 if neutral else ELO_HFA
-        feats["elo_home_prob"] = 1.0 / (1.0 + 10 ** (-( (ra+hfa) - rb) / 400.0))
+    a, b = market_params["a"], market_params["b"]
+    X["market_home_prob"] = X["spread_home"].apply(lambda s: (1/(1+np.exp(-(a + b * (-(s))))) if pd.notna(s) else np.nan))
 
-        X = pd.DataFrame([{k: feats.get(k, np.nan) for k in feature_cols}])
-        p_home = float(model.predict_proba(X)[0,1])
+    # Impute missing values using training set means (from meta.json)
+    # This is a simplification; a more robust approach would save training means
+    for c in feats:
+        if c not in X.columns:
+            X[c] = np.nan
+        X[c] = pd.to_numeric(X[c], errors='coerce')
+        X[c] = X[c].fillna(X[c].mean()) # Simple mean impute for prediction
 
-        rows.append({
-            "home": home, "away": away,
-            "home_prob": round(p_home,4),
-            "away_prob": round(1.0-p_home,4),
-            "pick": home if p_home>=0.5 else away,
-            "neutral": bool(neutral),
-            "spread_home": None if pd.isna(sp) else float(sp),
-            "over_under": None if pd.isna(ou) else float(ou),
-            "p_elo": round(float(feats["elo_home_prob"]),4),
-            "p_market": None if pd.isna(feats["market_home_prob"]) else round(float(feats["market_home_prob"]),4),
+    # Ensure all feature columns are present and in the correct order
+    X_predict = X[feats]
+
+    # --- Make Predictions ---
+    
+    probs = model.predict_proba(X_predict)[:, 1]
+    
+    output = []
+    for i, row in X.iterrows():
+        prob = probs[i]
+        pick = row['home_team'] if prob > 0.5 else row['away_team']
+        output.append({
+            'home_team': row['home_team'],
+            'away_team': row['away_team'],
+            'neutral_site': row['neutral_site'],
+            'model_prob_home': prob,
+            'pick': pick,
+            'spread_home': row.get('spread_home') # Include spread if available
         })
 
-    out={
-        "generated": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "model": f"HGB + calib, last{LAST_N} side-split; Elo/Market as feats",
-        "games": rows,
-        "unknown_teams": [],
-    }
-    save_json(PRED_OUT_JSON, out)
-    print(f"Wrote {PRED_OUT_JSON}")
+    save_json(PREDICTIONS_JSON, output)
+    print(f"Successfully wrote {len(output)} predictions to {PREDICTIONS_JSON}")
 
 if __name__ == "__main__":
     main()
