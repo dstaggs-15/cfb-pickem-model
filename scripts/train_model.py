@@ -1,80 +1,111 @@
-#!/usr/bin/env python3
-# --- bootstrap so 'scripts.lib' imports work when run as a file ---
-import os, sys
-_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-_REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
-if _REPO_ROOT not in sys.path:
-    sys.path.insert(0, _REPO_ROOT)
-# -----------------------------------------------------------------
-
-import json, datetime as dt
 import pandas as pd
+import numpy as np
+import json
+import joblib
+import os
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.calibration import CalibratedClassifierCV
-from sklearn.metrics import accuracy_score, roc_auc_score, brier_score_loss
-from joblib import dump
+from sklearn.metrics import roc_auc_score, brier_score_loss, accuracy_score
 
-TRAIN_PARQUET = "data/derived/training.parquet"
+# Define file paths
+DERIVED = "data/derived"
+TRAIN_PARQUET = f"{DERIVED}/training.parquet"
+MODEL_JOBLIB = f"{DERIVED}/model.joblib"
 META_JSON = "docs/data/train_meta.json"
-MODEL_PATH = "data/derived/model.joblib"
 METRICS_JSON = "docs/data/train_metrics.json"
 
-def season_ahead(df: pd.DataFrame, feats):
+def season_ahead(df, feats):
+    """
+    Trains and calibrates a model using season-ahead cross-validation.
+    For each season, it trains on all prior seasons, calibrates on the current,
+    and tests on the next, providing a robust out-of-sample performance metric.
+    """
     seasons = sorted(pd.to_numeric(df["season"], errors="coerce").dropna().unique().tolist())
-    res=[]
-    for i in range(2,len(seasons)):
-        test=seasons[i]; calib=seasons[i-1]; train=seasons[:i-1]
-        tr=df[df["season"].isin(train)]; ca=df[df["season"]==calib]; te=df[df["season"]==test]
-        if len(tr)<200 or len(ca)<80 or len(te)<80: continue
-        base=HistGradientBoostingClassifier(max_depth=None,learning_rate=0.08,max_iter=400,min_samples_leaf=20)
-        base.fit(tr[feats], tr["home_win"])
-        method="isotonic" if len(ca)>=400 else "sigmoid"
-        cal=CalibratedClassifierCV(estimator=base, method=method, cv="prefit")
-        cal.fit(ca[feats], ca["home_win"])
-        p=cal.predict_proba(te[feats])[:,1]
-        res.append({
-            "season": int(test),
-            "acc": accuracy_score(te["home_win"], (p>=0.5).astype(int)),
-            "auc": roc_auc_score(te["home_win"], p),
-            "brier": brier_score_loss(te["home_win"], p),
+    metrics = []
+    
+    # We can't evaluate the last season, so we iterate up to the second to last
+    for i, season in enumerate(seasons[:-1]):
+        print(f"  Processing season {season} ...")
+        
+        # Train on all data up to the current season
+        train_df = df[df["season"] < season]
+        
+        # Calibrate on the current season
+        calibrate_df = df[df["season"] == season]
+        
+        # Test on the next season
+        test_df = df[df["season"] == season + 1]
+
+        if len(train_df) == 0 or len(calibrate_df) == 0 or len(test_df) == 0:
+            continue
+
+        X_train, y_train = train_df[feats], train_df["home_win"]
+        X_cal, y_cal = calibrate_df[feats], calibrate_df["home_win"]
+        X_test, y_test = test_df[feats], test_df["home_win"]
+
+        # Base model (uncalibrated)
+        base_model = HistGradientBoostingClassifier(random_state=42)
+        base_model.fit(X_train, y_train)
+
+        # Calibrated model
+        calibrated_model = CalibratedClassifierCV(base_model, method='isotonic', cv='prefit')
+        calibrated_model.fit(X_cal, y_cal)
+
+        # Evaluate on the test set
+        preds = calibrated_model.predict_proba(X_test)[:, 1]
+        
+        metrics.append({
+            'season': season + 1,
+            'auc': roc_auc_score(y_test, preds),
+            'brier': brier_score_loss(y_test, preds),
+            'accuracy': accuracy_score(y_test, preds > 0.5)
         })
-    if not res: return {"acc": None,"auc": None,"brier": None}
-    import numpy as np, pandas as pd
-    d=pd.DataFrame(res)
-    return {"acc": float(d["acc"].mean()), "auc": float(d["auc"].mean()), "brier": float(d["brier"].mean())}
+
+    # Final model: train on all available historical data
+    print("  Training final model on all data ...")
+    X_full, y_full = df[feats], df["home_win"]
+    final_base_model = HistGradientBoostingClassifier(random_state=42)
+    final_base_model.fit(X_full, y_full)
+
+    # Use the last complete season for calibration data
+    last_season_df = df[df["season"] == seasons[-1]]
+    X_final_cal, y_final_cal = last_season_df[feats], last_season_df["home_win"]
+    
+    final_calibrated_model = CalibratedClassifierCV(final_base_model, method='isotonic', cv='prefit')
+    final_calibrated_model.fit(X_final_cal, y_final_cal)
+    
+    return final_calibrated_model, metrics
 
 def main():
-    meta=json.load(open(META_JSON,"r"))
-    feats=meta["features"]
-    df=pd.read_parquet(TRAIN_PARQUET).copy()
+    print("Training model ...")
+    os.makedirs(DERIVED, exist_ok=True)
 
-    seasons=sorted(pd.to_numeric(df["season"], errors="coerce").dropna().unique().tolist())
-    if len(seasons)>=2:
-        calib_season=seasons[-1]
-        tr=df[df["season"]<calib_season]; ca=df[df["season"]==calib_season]
-        method="isotonic" if len(ca)>=400 else "sigmoid"
-    else:
-        df=df.sort_values("date"); split=int(len(df)*0.9)
-        tr,ca=df.iloc[:split], df.iloc[split:]
-        method="sigmoid"
+    df = pd.read_parquet(TRAIN_PARQUET)
+    with open(META_JSON, 'r') as f:
+        meta = json.load(f)
+    
+    feats = meta["features"]
+    
+    # Filter for games with results to be used in training
+    train_df = df[df["home_points"].notna()].copy()
+    
+    model, metrics = season_ahead(train_df, feats)
+    
+    # Save the final trained model
+    joblib.dump(model, MODEL_JOBLIB)
+    print(f"Wrote model to {MODEL_JOBLIB}")
 
-    base=HistGradientBoostingClassifier(max_depth=None,learning_rate=0.08,max_iter=400,min_samples_leaf=20)
-    base.fit(tr[feats], tr["home_win"])
-    cal=CalibratedClassifierCV(estimator=base, method=method, cv="prefit")
-    cal.fit(ca[feats], ca["home_win"])
-
-    m=season_ahead(df,feats)
-    metrics={
-        "generated": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "season_ahead_acc": None if m["acc"] is None else round(m["acc"],4),
-        "season_ahead_auc": None if m["auc"] is None else round(m["auc"],4),
-        "season_ahead_brier": None if m["brier"] is None else round(m["brier"],4),
-        "cal_method": method,
-    }
-    json.dump(metrics, open(METRICS_JSON,"w"), indent=2)
-
-    dump(cal, MODEL_PATH)
-    print(f"Wrote {MODEL_PATH} and {METRICS_JSON}")
+    # Save the metrics
+    if metrics:
+        metrics_df = pd.DataFrame(metrics)
+        avg_metrics = metrics_df.mean().to_dict()
+        print("Season-ahead metrics (avg):")
+        for k, v in avg_metrics.items():
+            print(f"  {k}: {v:.4f}")
+        
+        with open(METRICS_JSON, 'w') as f:
+            json.dump({'season_ahead_avg': avg_metrics}, f, indent=2)
+        print(f"Wrote metrics to {METRICS_JSON}")
 
 if __name__ == "__main__":
     main()
