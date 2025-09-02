@@ -42,14 +42,8 @@ def main():
     schedule = ensure_schedule_columns(schedule)
     team_stats = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL)
 
-    # --- FIX STARTS HERE ---
-    # The source data may contain duplicate stat lines for the same team in the same game.
-    # We remove them, keeping the first entry for each game-team combination.
     team_stats = team_stats.drop_duplicates(subset=['game_id', 'team'])
-    # --- FIX ENDS HERE ---
-
-    # The team_stats CSV is missing the 'home_away' column, so we create it
-    # by cross-referencing the schedule file, which knows the home team for each game.
+    
     home_team_map = schedule[['game_id', 'home_team']]
     team_stats = team_stats.merge(home_team_map, on='game_id', how='left')
     team_stats['home_away'] = np.where(team_stats['team'] == team_stats['home_team'], 'home', 'away')
@@ -78,15 +72,22 @@ def main():
     for c in STAT_FEATURES:
         hc, ac = f"home_R{LAST_N}_{c}", f"away_R{LAST_N}_{c}"
         dc = f"diff_R{LAST_N}_{c}"
-        X[dc] = X[hc] - X[ac]
-        diff_cols.append(dc)
+        
+        # --- FIX STARTS HERE ---
+        # Only create a difference feature if both home and away rolling stats exist.
+        # This prevents KeyErrors if a stat is missing from the source data.
+        if hc in X.columns and ac in X.columns:
+            X[dc] = X[hc] - X[ac]
+            diff_cols.append(dc)
+        # --- FIX ENDS HERE ---
+
     if f"home_R{LAST_N}_count" not in X.columns: X[f"home_R{LAST_N}_count"]=0.0
     if f"away_R{LAST_N}_count" not in X.columns: X[f"away_R{LAST_N}_count"]=0.0
 
     eng = rest_and_travel(schedule, teams_df, venues_df)
     X = X.merge(eng, on="game_id", how="left")
 
-    med = median_lines(lines_df)
+    med = median_lines(lines_dsf)
     X = X.merge(med, on="game_id", how="left")
 
     elo_df = pregame_probs(schedule, talent_df)
@@ -99,21 +100,23 @@ def main():
     feat_cols = diff_cols + [f"home_R{LAST_N}_count", f"away_R{LAST_N}_count"] + ENG_FEATURES_BASE + LINE_FEATURES + ["elo_home_prob"]
     X["_season"] = pd.to_numeric(X["season"], errors="coerce")
     for c in feat_cols:
-        if c in ["neutral_site","is_postseason"]:
-            X[c] = X[c].fillna(0.0); continue
-        X[c] = pd.to_numeric(X[c], errors="coerce")
-        m = X.groupby("_season")[c].transform("mean")
-        X[c] = X[c].fillna(m)
+        if c in X.columns: # Add a check to ensure column exists before imputation
+            if c in ["neutral_site","is_postseason"]:
+                X[c] = X[c].fillna(0.0); continue
+            X[c] = pd.to_numeric(X[c], errors="coerce")
+            m = X.groupby("_season")[c].transform("mean")
+            X[c] = X[c].fillna(m)
     X = X.drop(columns=["_season"])
 
     # market mapping
     params = fit_market_mapping(X["spread_home"].to_numpy(dtype=float), X["home_win"].to_numpy(dtype=float))
-    # market prob per game
     a, b = params["a"], params["b"]
     X["market_home_prob"] = X["spread_home"].apply(lambda s: (1/(1+np.exp(-(a + b * (-(s))))) if pd.notna(s) else np.nan))
     X["market_home_prob"] = X.groupby("season")["market_home_prob"].transform(lambda s: s.fillna(s.mean()))
 
     feature_cols = diff_cols + [f"home_R{LAST_N}_count", f"away_R{LAST_N}_count"] + ENG_FEATURES_BASE + LINE_FEATURES + ["elo_home_prob","market_home_prob"]
+    # Filter final feature list to only include columns that actually exist in X
+    feature_cols = [col for col in feature_cols if col in X.columns]
 
     train_df = X.dropna(subset=["home_points","away_points"]).copy()
     train_df.to_parquet(TRAIN_PARQUET, index=False)
