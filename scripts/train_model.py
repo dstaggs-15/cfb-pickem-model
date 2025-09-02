@@ -1,112 +1,80 @@
 #!/usr/bin/env python3
-import os, json, datetime as dt
-import numpy as np, pandas as pd
+# --- bootstrap so 'scripts.lib' imports work when run as a file ---
+import os, sys
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+# -----------------------------------------------------------------
+
+import json, datetime as dt
+import pandas as pd
+from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import accuracy_score, roc_auc_score, brier_score_loss
+from joblib import dump
 
-from scripts.lib.io_utils import load_csv_local_or_url, save_json
-from scripts.lib.parsing import ensure_schedule_columns
-from scripts.lib.rolling import long_stats_to_wide, build_sidewise_rollups, STAT_FEATURES
-from scripts.lib.context import rest_and_travel
-from scripts.lib.market import median_lines, fit_market_mapping
-from scripts.lib.elo import pregame_probs
+TRAIN_PARQUET = "data/derived/training.parquet"
+META_JSON = "docs/data/train_meta.json"
+MODEL_PATH = "data/derived/model.joblib"
+METRICS_JSON = "docs/data/train_metrics.json"
 
-LOCAL_DIR = "data/raw/cfbd"
-LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
-LOCAL_TEAM_STATS = f"{LOCAL_DIR}/cfb_game_team_stats.csv"
-LOCAL_LINES = f"{LOCAL_DIR}/cfb_lines.csv"
-LOCAL_VENUES = f"{LOCAL_DIR}/cfbd_venues.csv"
-LOCAL_TEAMS = f"{LOCAL_DIR}/cfbd_teams.csv"
-LOCAL_TALENT = f"{LOCAL_DIR}/cfbd_talent.csv"
-
-RAW_BASE = "https://raw.githubusercontent.com/moneyball-ab/cfb-data/master/csv"
-FALLBACK_SCHEDULE_URL = f"{RAW_BASE}/cfb_schedule.csv"
-FALLBACK_TEAM_STATS_URL = f"{RAW_BASE}/cfb_game_team_stats.csv"
-
-DERIVED = "data/derived"
-TRAIN_PARQUET = f"{DERIVED}/training.parquet"
-META_JSON = "docs/data/train_meta.json"   # feature list + market params
-
-LAST_N = 5
-ENG_FEATURES_BASE = ["rest_diff","shortweek_diff","bye_diff","travel_diff_km","neutral_site","is_postseason"]
-LINE_FEATURES = ["spread_home","over_under"]
-PROB_FEATURES = ["elo_home_prob","market_home_prob"]
+def season_ahead(df: pd.DataFrame, feats):
+    seasons = sorted(pd.to_numeric(df["season"], errors="coerce").dropna().unique().tolist())
+    res=[]
+    for i in range(2,len(seasons)):
+        test=seasons[i]; calib=seasons[i-1]; train=seasons[:i-1]
+        tr=df[df["season"].isin(train)]; ca=df[df["season"]==calib]; te=df[df["season"]==test]
+        if len(tr)<200 or len(ca)<80 or len(te)<80: continue
+        base=HistGradientBoostingClassifier(max_depth=None,learning_rate=0.08,max_iter=400,min_samples_leaf=20)
+        base.fit(tr[feats], tr["home_win"])
+        method="isotonic" if len(ca)>=400 else "sigmoid"
+        cal=CalibratedClassifierCV(estimator=base, method=method, cv="prefit")
+        cal.fit(ca[feats], ca["home_win"])
+        p=cal.predict_proba(te[feats])[:,1]
+        res.append({
+            "season": int(test),
+            "acc": accuracy_score(te["home_win"], (p>=0.5).astype(int)),
+            "auc": roc_auc_score(te["home_win"], p),
+            "brier": brier_score_loss(te["home_win"], p),
+        })
+    if not res: return {"acc": None,"auc": None,"brier": None}
+    import numpy as np, pandas as pd
+    d=pd.DataFrame(res)
+    return {"acc": float(d["acc"].mean()), "auc": float(d["auc"].mean()), "brier": float(d["brier"].mean())}
 
 def main():
-    print("Building training dataset ...")
-    os.makedirs(DERIVED, exist_ok=True)
+    meta=json.load(open(META_JSON,"r"))
+    feats=meta["features"]
+    df=pd.read_parquet(TRAIN_PARQUET).copy()
 
-    schedule = load_csv_local_or_url(LOCAL_SCHEDULE, FALLBACK_SCHEDULE_URL)
-    schedule = ensure_schedule_columns(schedule)
-    team_stats = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL)
-    wide = long_stats_to_wide(team_stats)
+    seasons=sorted(pd.to_numeric(df["season"], errors="coerce").dropna().unique().tolist())
+    if len(seasons)>=2:
+        calib_season=seasons[-1]
+        tr=df[df["season"]<calib_season]; ca=df[df["season"]==calib_season]
+        method="isotonic" if len(ca)>=400 else "sigmoid"
+    else:
+        df=df.sort_values("date"); split=int(len(df)*0.9)
+        tr,ca=df.iloc[:split], df.iloc[split:]
+        method="sigmoid"
 
-    lines_df = pd.read_csv(LOCAL_LINES) if os.path.exists(LOCAL_LINES) else pd.DataFrame()
-    venues_df = pd.read_csv(LOCAL_VENUES) if os.path.exists(LOCAL_VENUES) else pd.DataFrame()
-    teams_df  = pd.read_csv(LOCAL_TEAMS)  if os.path.exists(LOCAL_TEAMS)  else pd.DataFrame()
-    talent_df = pd.read_csv(LOCAL_TALENT) if os.path.exists(LOCAL_TALENT) else pd.DataFrame()
+    base=HistGradientBoostingClassifier(max_depth=None,learning_rate=0.08,max_iter=400,min_samples_leaf=20)
+    base.fit(tr[feats], tr["home_win"])
+    cal=CalibratedClassifierCV(estimator=base, method=method, cv="prefit")
+    cal.fit(ca[feats], ca["home_win"])
 
-    home_roll, away_roll = build_sidewise_rollups(schedule, wide, LAST_N)
-
-    base_cols = ["game_id","season","week","date","home_team","away_team","home_points","away_points","season_type","neutral_site","venue_id"]
-    for bc in base_cols:
-        if bc not in schedule.columns:
-            schedule[bc] = np.nan
-    base = schedule[base_cols].copy()
-
-    X = base.merge(home_roll, left_on=["game_id","home_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
-    X = X.merge(away_roll, left_on=["game_id","away_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
-
-    # diffs + counts
-    diff_cols = []
-    for c in STAT_FEATURES:
-        hc, ac = f"home_R{LAST_N}_{c}", f"away_R{LAST_N}_{c}"
-        dc = f"diff_R{LAST_N}_{c}"
-        X[dc] = X[hc] - X[ac]
-        diff_cols.append(dc)
-    if f"home_R{LAST_N}_count" not in X.columns: X[f"home_R{LAST_N}_count"]=0.0
-    if f"away_R{LAST_N}_count" not in X.columns: X[f"away_R{LAST_N}_count"]=0.0
-
-    eng = rest_and_travel(schedule, teams_df, venues_df)
-    X = X.merge(eng, on="game_id", how="left")
-
-    med = median_lines(lines_df)
-    X = X.merge(med, on="game_id", how="left")
-
-    elo_df = pregame_probs(schedule, talent_df)
-    X = X.merge(elo_df, on="game_id", how="left")
-
-    # target
-    X["home_win"] = (pd.to_numeric(X["home_points"], errors="coerce") > pd.to_numeric(X["away_points"], errors="coerce")).astype(int)
-
-    # season-wise mean impute (not zero)
-    feat_cols = diff_cols + [f"home_R{LAST_N}_count", f"away_R{LAST_N}_count"] + ENG_FEATURES_BASE + LINE_FEATURES + ["elo_home_prob"]
-    X["_season"] = pd.to_numeric(X["season"], errors="coerce")
-    for c in feat_cols:
-        if c in ["neutral_site","is_postseason"]:
-            X[c] = X[c].fillna(0.0); continue
-        X[c] = pd.to_numeric(X[c], errors="coerce")
-        m = X.groupby("_season")[c].transform("mean")
-        X[c] = X[c].fillna(m)
-    X = X.drop(columns=["_season"])
-
-    # market mapping
-    params = fit_market_mapping(X["spread_home"].to_numpy(dtype=float), X["home_win"].to_numpy(dtype=float))
-    X["market_home_prob"] = np.vectorize(lambda s: None if pd.isna(s) else 1/(1+np.exp(-(params["a"] + params["b"]*(-s)))))(X["spread_home"])
-    X["market_home_prob"] = X.groupby("season")["market_home_prob"].transform(lambda s: s.fillna(s.mean()))
-
-    feature_cols = diff_cols + [f"home_R{LAST_N}_count", f"away_R{LAST_N}_count"] + ENG_FEATURES_BASE + LINE_FEATURES + ["elo_home_prob","market_home_prob"]
-
-    train_df = X.dropna(subset=["home_points","away_points"]).copy()
-    train_df.to_parquet(TRAIN_PARQUET, index=False)
-
-    meta = {
+    m=season_ahead(df,feats)
+    metrics={
         "generated": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "last_n": LAST_N,
-        "features": feature_cols,
-        "market_params": params,
+        "season_ahead_acc": None if m["acc"] is None else round(m["acc"],4),
+        "season_ahead_auc": None if m["auc"] is None else round(m["auc"],4),
+        "season_ahead_brier": None if m["brier"] is None else round(m["brier"],4),
+        "cal_method": method,
     }
-    save_json(META_JSON, meta)
-    print(f"Wrote {TRAIN_PARQUET} and {META_JSON}")
+    json.dump(metrics, open(METRICS_JSON,"w"), indent=2)
+
+    dump(cal, MODEL_PATH)
+    print(f"Wrote {MODEL_PATH} and {METRICS_JSON}")
 
 if __name__ == "__main__":
     main()
