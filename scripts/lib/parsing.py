@@ -1,3 +1,5 @@
+# scripts/lib/parsing.py
+
 import json
 import re
 import pandas as pd
@@ -11,7 +13,7 @@ def parse_ratio_val(val):
     if not isinstance(val, str):
         return val # Assume it's already numeric or NaN
     
-    val = val.replace('-of-', '-').strip()
+    val = val.lower().replace('-of-', '-').strip()
     
     if '-' in val:
         try:
@@ -30,16 +32,10 @@ def ensure_schedule_columns(df):
     renaming and casting types as necessary.
     """
     column_map = {
-        'Game ID': 'game_id',
-        'Season': 'season',
-        'Week': 'week',
-        'Date': 'date',
-        'Home Team': 'home_team',
-        'Away Team': 'away_team',
-        'Home Points': 'home_points',
-        'Away Points': 'away_points',
-        'Season Type': 'season_type',
-        'Neutral Site': 'neutral_site',
+        'Game ID': 'game_id', 'Season': 'season', 'Week': 'week',
+        'Date': 'date', 'Home Team': 'home_team', 'Away Team': 'away_team',
+        'Home Points': 'home_points', 'Away Points': 'away_points',
+        'Season Type': 'season_type', 'Neutral Site': 'neutral_site',
         'Venue ID': 'venue_id'
     }
     df = df.rename(columns={k: v for k, v in column_map.items() if k in df.columns})
@@ -58,14 +54,14 @@ def ensure_schedule_columns(df):
             df[col] = pd.to_numeric(df[col], errors='coerce')
             
     if 'neutral_site' in df.columns:
-        df['neutral_site'] = df['neutral_site'].astype(bool)
+        # FIX: Fill missing values with False, then convert to boolean type.
+        df['neutral_site'] = df['neutral_site'].fillna(False).astype(bool)
 
     return df
 
 def parse_games_txt(filepath, aliases={}):
     """
     Parses a text file of weekly matchups into a structured list.
-    Handles formats like "Away @ Home", "Home vs Away", and "Home vs Away (N)".
     """
     games = []
     neutral_pattern = re.compile(r"^(.*) vs (.*) \(N\)$", re.IGNORECASE)
