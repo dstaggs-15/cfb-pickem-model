@@ -67,19 +67,14 @@ def main():
     X = base.merge(home_roll, left_on=["game_id","home_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
     X = X.merge(away_roll, left_on=["game_id","away_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
 
-    # diffs + counts
     diff_cols = []
     for c in STAT_FEATURES:
         hc, ac = f"home_R{LAST_N}_{c}", f"away_R{LAST_N}_{c}"
         dc = f"diff_R{LAST_N}_{c}"
         
-        # --- FIX STARTS HERE ---
-        # Only create a difference feature if both home and away rolling stats exist.
-        # This prevents KeyErrors if a stat is missing from the source data.
         if hc in X.columns and ac in X.columns:
             X[dc] = X[hc] - X[ac]
             diff_cols.append(dc)
-        # --- FIX ENDS HERE ---
 
     if f"home_R{LAST_N}_count" not in X.columns: X[f"home_R{LAST_N}_count"]=0.0
     if f"away_R{LAST_N}_count" not in X.columns: X[f"away_R{LAST_N}_count"]=0.0
@@ -87,20 +82,18 @@ def main():
     eng = rest_and_travel(schedule, teams_df, venues_df)
     X = X.merge(eng, on="game_id", how="left")
 
-    med = median_lines(lines_dsf)
+    med = median_lines(lines_df) # <-- TYPO FIXED HERE
     X = X.merge(med, on="game_id", how="left")
 
     elo_df = pregame_probs(schedule, talent_df)
     X = X.merge(elo_df, on="game_id", how="left")
 
-    # target
     X["home_win"] = (pd.to_numeric(X["home_points"], errors="coerce") > pd.to_numeric(X["away_points"], errors="coerce")).astype(int)
 
-    # season-wise mean impute (not zero)
     feat_cols = diff_cols + [f"home_R{LAST_N}_count", f"away_R{LAST_N}_count"] + ENG_FEATURES_BASE + LINE_FEATURES + ["elo_home_prob"]
     X["_season"] = pd.to_numeric(X["season"], errors="coerce")
     for c in feat_cols:
-        if c in X.columns: # Add a check to ensure column exists before imputation
+        if c in X.columns:
             if c in ["neutral_site","is_postseason"]:
                 X[c] = X[c].fillna(0.0); continue
             X[c] = pd.to_numeric(X[c], errors="coerce")
@@ -108,14 +101,12 @@ def main():
             X[c] = X[c].fillna(m)
     X = X.drop(columns=["_season"])
 
-    # market mapping
     params = fit_market_mapping(X["spread_home"].to_numpy(dtype=float), X["home_win"].to_numpy(dtype=float))
     a, b = params["a"], params["b"]
     X["market_home_prob"] = X["spread_home"].apply(lambda s: (1/(1+np.exp(-(a + b * (-(s))))) if pd.notna(s) else np.nan))
     X["market_home_prob"] = X.groupby("season")["market_home_prob"].transform(lambda s: s.fillna(s.mean()))
 
     feature_cols = diff_cols + [f"home_R{LAST_N}_count", f"away_R{LAST_N}_count"] + ENG_FEATURES_BASE + LINE_FEATURES + ["elo_home_prob","market_home_prob"]
-    # Filter final feature list to only include columns that actually exist in X
     feature_cols = [col for col in feature_cols if col in X.columns]
 
     train_df = X.dropna(subset=["home_points","away_points"]).copy()
