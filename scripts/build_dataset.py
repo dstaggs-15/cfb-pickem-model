@@ -20,7 +20,7 @@ LOCAL_TEAM_STATS = f"{LOCAL_DIR}/cfb_game_team_stats.csv"
 LOCAL_LINES = f"{LOCAL_DIR}/cfb_lines.csv"
 LOCAL_VENUES = f"{LOCAL_DIR}/cfbd_venues.csv"
 LOCAL_TEAMS = f"{LOCAL_DIR}/cfbd_teams.csv"
-LOCAL_TALENT = f"{LOCAL_DIR}/cfbd_talent.csv"
+LOCAL_TALENT = f"{LOCAL_DIR}/cfb_talent.csv"
 RAW_BASE = "https://raw.githubusercontent.com/moneyball-ab/cfb-data/master/csv"
 FALLBACK_SCHEDULE_URL = f"{RAW_BASE}/cfb_schedule.csv"
 FALLBACK_TEAM_STATS_URL = f"{RAW_BASE}/cfb_game_team_stats.csv"
@@ -37,9 +37,13 @@ LINE_FEATURES = ["spread_home","over_under"]
 def parse_ratio(s):
     if isinstance(s, str) and '-' in s:
         parts = s.split('-')
-        if len(parts) == 2 and parts[1] != '0' and parts[1] is not None:
+        if len(parts) == 2 and parts[1] is not None and parts[1] != '0':
             try:
-                return float(parts[0]) / float(parts[1])
+                # Handle cases where parts might not be convertible to float
+                num = float(parts[0])
+                den = float(parts[1])
+                if den == 0: return 0.0
+                return num / den
             except (ValueError, TypeError):
                 return np.nan
     return np.nan
@@ -66,23 +70,25 @@ def main():
     team_stats.rename(columns={'school': 'team'}, inplace=True)
     
     # --- CORRECTED SECTION: Using the correct column names from the raw data ---
-    team_stats['third_down_eff'] = team_stats['third_down_efficiency'].apply(parse_ratio)
-    team_stats['fourth_down_eff'] = team_stats['fourth_down_efficiency'].apply(parse_ratio)
+    # The raw data file uses 'third_down_eff', not 'third_down_efficiency'.
+    team_stats['third_down_eff_rate'] = team_stats['third_down_eff'].apply(parse_ratio)
+    team_stats['fourth_down_eff_rate'] = team_stats['fourth_down_eff'].apply(parse_ratio)
     
-    # The raw data has a 'completion_attempts' column with "C-A" format. Let's parse it.
-    attempts = team_stats['completion_attempts'].str.split('-', expand=True)[1]
-    completions = team_stats['completion_attempts'].str.split('-', expand=True)[0]
-    team_stats['completion_rate'] = (pd.to_numeric(completions, errors='coerce') / pd.to_numeric(attempts, errors='coerce')).fillna(0)
-    team_stats['attempts'] = pd.to_numeric(attempts, errors='coerce')
+    completions, attempts = team_stats['completion_attempts'].str.split('-', expand=True).get(0), team_stats['completion_attempts'].str.split('-', expand=True).get(1)
+    
+    numeric_completions = pd.to_numeric(completions, errors='coerce')
+    numeric_attempts = pd.to_numeric(attempts, errors='coerce')
+
+    team_stats['completion_rate'] = (numeric_completions / numeric_attempts).fillna(0)
+    team_stats['attempts'] = numeric_attempts
 
     team_stats['possession_seconds'] = team_stats['possession_time'].apply(parse_possession_time)
 
-    # Simplified feature creation
-    total_plays = team_stats['rushing_attempts'] + team_stats['attempts']
-    team_stats['ppa'] = (team_stats['total_yards'] / total_plays).fillna(0)
-    team_stats['success_rate'] = (team_stats['first_downs'] / total_plays).fillna(0)
+    total_plays = team_stats['rushing_attempts'].fillna(0) + team_stats['attempts'].fillna(0)
+    # Avoid division by zero
+    team_stats['ppa'] = (team_stats['total_yards'] / total_plays.replace(0, np.nan)).fillna(0)
+    team_stats['success_rate'] = (team_stats['first_downs'] / total_plays.replace(0, np.nan)).fillna(0)
     team_stats['explosiveness'] = (team_stats['yards_per_pass'].fillna(0) * 0.5 + team_stats['yards_per_rush_attempt'].fillna(0) * 0.5)
-    # --- END CORRECTED SECTION ---
 
     team_stats = team_stats.drop_duplicates(subset=['game_id', 'team'])
     
