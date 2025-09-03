@@ -5,7 +5,6 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score, roc_auc_score, brier_score_loss
 
 from .lib.io_utils import load_csv_local_or_url, save_json
 from .lib.parsing import ensure_schedule_columns
@@ -29,7 +28,7 @@ FALLBACK_TEAM_STATS_URL = f"{RAW_BASE}/cfb_game_team_stats.csv"
 DERIVED = "data/derived"
 TRAIN_PARQUET = f"{DERIVED}/training.parquet"
 META_JSON = "docs/data/train_meta.json"
-SEASON_AVG_PARQUET = f"{DERIVED}/season_averages.parquet" # NEW: File path for season averages
+SEASON_AVG_PARQUET = f"{DERIVED}/season_averages.parquet"
 
 LAST_N = 5
 ENG_FEATURES_BASE = ["rest_diff","shortweek_diff","bye_diff","travel_diff_km","neutral_site","is_postseason"]
@@ -45,6 +44,18 @@ def main():
 
     team_stats = team_stats.drop_duplicates(subset=['game_id', 'team'])
     
+    # --- MODIFIED SECTION: Calculate season averages from the correct source ---
+    print("  Calculating and saving season average stats...")
+    # Add season info to team_stats so we can group by it
+    game_season_map = schedule[['game_id', 'season']]
+    team_stats_with_season = team_stats.merge(game_season_map, on='game_id', how='left')
+
+    # Now, calculate the averages from the long-format data
+    season_avg_stats = team_stats_with_season.groupby(['season', 'team'])[STAT_FEATURES].mean().reset_index()
+    season_avg_stats.to_parquet(SEASON_AVG_PARQUET, index=False)
+    print(f"  Wrote season averages to {SEASON_AVG_PARQUET}")
+    # --- END MODIFIED SECTION ---
+
     home_team_map = schedule[['game_id', 'home_team']]
     team_stats = team_stats.merge(home_team_map, on='game_id', how='left')
     team_stats['home_away'] = np.where(team_stats['team'] == team_stats['home_team'], 'home', 'away')
@@ -56,14 +67,6 @@ def main():
     venues_df = pd.read_csv(LOCAL_VENUES) if os.path.exists(LOCAL_VENUES) else pd.DataFrame()
     teams_df = pd.read_csv(LOCAL_TEAMS) if os.path.exists(LOCAL_TEAMS) else pd.DataFrame()
     talent_df = pd.read_csv(LOCAL_TALENT) if os.path.exists(LOCAL_TALENT) else pd.DataFrame()
-
-    # --- NEW: Calculate and save season-level average stats ---
-    # This block creates the season_averages.parquet file we'll need in the next step.
-    print("  Calculating and saving season average stats...")
-    season_avg_stats = wide.groupby(['season', 'team'])[STAT_FEATURES].mean().reset_index()
-    season_avg_stats.to_parquet(SEASON_AVG_PARQUET, index=False)
-    print(f"  Wrote season averages to {SEASON_AVG_PARQUET}")
-    # --- END NEW SECTION ---
 
     home_roll, away_roll = build_sidewise_rollups(schedule, wide, LAST_N)
     
