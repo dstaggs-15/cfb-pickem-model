@@ -111,15 +111,13 @@ def main():
 
     train_df = X.dropna(subset=["home_points","away_points"]).copy()
 
-    # --- NEW: Final, robust data cleaning and type conversion ---
-    # This loop guarantees every feature column is a clean numeric type.
+    # --- MODIFIED SECTION: Final, robust data cleaning ---
+    # This safer loop ensures all feature columns are numeric and fills
+    # any remaining nulls with 0.0 instead of deleting rows.
     for col in feature_cols:
         if col in train_df.columns:
-            train_df[col] = pd.to_numeric(train_df[col], errors='coerce').astype('float32')
-
-    # As a final safeguard, drop any rows that still have nulls in feature columns
-    train_df.dropna(subset=feature_cols, inplace=True)
-    # --- END NEW SECTION ---
+            train_df[col] = pd.to_numeric(train_df[col], errors='coerce').fillna(0.0).astype('float32')
+    # --- END MODIFIED SECTION ---
 
     train_df.to_parquet(TRAIN_PARQUET, index=False)
 
