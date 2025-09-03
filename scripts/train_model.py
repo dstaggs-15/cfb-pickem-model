@@ -15,25 +15,14 @@ META_JSON = "docs/data/train_meta.json"
 METRICS_JSON = "docs/data/train_metrics.json"
 
 def season_ahead(df, feats):
-    """
-    Trains and calibrates a model using season-ahead cross-validation.
-    For each season, it trains on all prior seasons, calibrates on the current,
-    and tests on the next, providing a robust out-of-sample performance metric.
-    """
     seasons = sorted(pd.to_numeric(df["season"], errors="coerce").dropna().unique().tolist())
     metrics = []
     
-    # We can't evaluate the last season, so we iterate up to the second to last
     for i, season in enumerate(seasons[:-1]):
         print(f"  Processing season {season} ...")
         
-        # Train on all data up to the current season
         train_df = df[df["season"] < season]
-        
-        # Calibrate on the current season
         calibrate_df = df[df["season"] == season]
-        
-        # Test on the next season
         test_df = df[df["season"] == season + 1]
 
         if len(train_df) == 0 or len(calibrate_df) == 0 or len(test_df) == 0:
@@ -43,16 +32,12 @@ def season_ahead(df, feats):
         X_cal, y_cal = calibrate_df[feats], calibrate_df["home_win"]
         X_test, y_test = test_df[feats], test_df["home_win"]
 
-        # Base model (uncalibrated)
-        base_model = HistGradientBoostingClassifier(random_state=42, l2_regularization=2.0) # <-- MODIFIED LINE 1
-
+        base_model = HistGradientBoostingClassifier(random_state=42, l2_regularization=2.0)
         base_model.fit(X_train, y_train)
 
-        # Calibrated model
         calibrated_model = CalibratedClassifierCV(base_model, method='isotonic', cv='prefit')
         calibrated_model.fit(X_cal, y_cal)
 
-        # Evaluate on the test set
         preds = calibrated_model.predict_proba(X_test)[:, 1]
         
         metrics.append({
@@ -62,14 +47,12 @@ def season_ahead(df, feats):
             'accuracy': accuracy_score(y_test, preds > 0.5)
         })
 
-    # Final model: train on all available historical data
     print("  Training final model on all data ...")
     X_full, y_full = df[feats], df["home_win"]
     
-    final_base_model = HistGradientBoostingClassifier(random_state=42, l2_regularization=2.0) # <-- MODIFIED LINE 2
+    final_base_model = HistGradientBoostingClassifier(random_state=42, l2_regularization=2.0)
     final_base_model.fit(X_full, y_full)
 
-    # Use the last complete season for calibration data
     last_season_df = df[df["season"] == seasons[-1]]
     X_final_cal, y_final_cal = last_season_df[feats], last_season_df["home_win"]
     
@@ -88,16 +71,20 @@ def main():
     
     feats = meta["features"]
     
-    # Filter for games with results to be used in training
     train_df = df[df["home_points"].notna()].copy()
     
-    model, metrics = season_ahead(train_df, feats)
+    calibrated_model, metrics = season_ahead(train_df, feats)
     
-    # Save the final trained model
-    joblib.dump(model, MODEL_JOBLIB)
-    print(f"Wrote model to {MODEL_JOBLIB}")
-
-    # Save the metrics
+    # --- MODIFIED SECTION ---
+    # We now save a dictionary containing both models.
+    model_payload = {
+        'calibrated_model': calibrated_model,
+        'base_model': calibrated_model.estimator 
+    }
+    joblib.dump(model_payload, MODEL_JOBLIB)
+    print(f"Wrote model payload to {MODEL_JOBLIB}")
+    # --- END MODIFIED SECTION ---
+    
     if metrics:
         metrics_df = pd.DataFrame(metrics)
         avg_metrics = metrics_df.mean().to_dict()
