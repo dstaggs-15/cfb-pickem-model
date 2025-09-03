@@ -5,17 +5,19 @@ import os
 DERIVED = "data/derived"
 SEASON_AVG_PARQUET = f"{DERIVED}/season_averages.parquet"
 
-# --- CORRECTED: This list now matches the actual columns in your data ---
-# We will create the ratio-based features like ppa and success_rate in the build_dataset script.
+# --- CORRECTED: This list now matches the actual categories in your data after pivoting and cleaning ---
 STAT_FEATURES = [
-    'net_passing_yards', 'yards_per_pass', 'passing_tds',
-    'rushing_attempts', 'rushing_yards', 'rushing_tds', 'yards_per_rush_attempt',
-    'turnovers', 'fumbles_lost', 'interceptions_lost',
-    'possession_seconds', 'ppa', 'success_rate', 'explosiveness'
+    'ppa',
+    'success_rate',
+    'explosiveness',
+    'rushing_yards',
+    'net_passing_yards',
+    'turnovers',
+    'possession_seconds'
 ]
 
 def long_stats_to_wide(team_stats):
-    """Pivots the long-format team stats to a wide format."""
+    """Pivots the home/away team stats to a single row per game."""
     pivoted = team_stats.pivot(
         index="game_id",
         columns="home_away",
