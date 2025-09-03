@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
         predictionsContainer.innerHTML = `<div class="status-message">${message}</div>`;
     };
 
-    // NEW: A helper function to make the feature names readable
     const formatFeatureName = (feature) => {
         return feature
             .replace(/_/g, ' ')
@@ -26,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadData = async () => {
         try {
             const [predictionsResponse, colorsResponse] = await Promise.all([
-                fetch('data/predictions.json?cache_bust=' + new Date().getTime()), // Added cache bust
+                fetch('data/predictions.json?cache_bust=' + new Date().getTime()),
                 fetch('data/team_colors.json').catch(() => ({ ok: false }))
             ]);
 
@@ -63,7 +62,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'game-card';
 
-            // --- IMPROVED: Display logic for home/away vs neutral site ---
             const matchupSeparator = game.neutral_site ? '(N)' : '@';
             
             card.innerHTML = `
@@ -83,15 +81,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="explanation-details" style="display: none;"></div>
             `;
             
-            // --- NEW: Add click event listener to each card ---
             card.addEventListener('click', () => {
                 const detailsDiv = card.querySelector('.explanation-details');
                 const isHidden = detailsDiv.style.display === 'none';
                 
-                // Toggle visibility
                 detailsDiv.style.display = isHidden ? 'block' : 'none';
 
-                // Populate the explanation the first time it's opened
                 if (isHidden && detailsDiv.innerHTML === '') {
                     renderExplanation(detailsDiv, game.explanation, homeColor, awayColor);
                 }
@@ -101,22 +96,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // --- NEW: Function to render the explanation details ---
     const renderExplanation = (element, explanation, homeColor, awayColor) => {
         if (!explanation || explanation.length === 0) {
             element.innerHTML = '<div class="explanation-row">No explanation data available.</div>';
             return;
         }
 
-        let maxVal = Math.max(...explanation.map(e => Math.abs(e.value)));
+        // --- MODIFIED SECTION: Scale bars relative to the sum of impacts ---
+        const totalImpact = explanation.reduce((sum, item) => sum + Math.abs(item.value), 0);
         
         let html = '<h4>Top Factors</h4>';
         explanation.forEach(item => {
-            const barWidth = (Math.abs(item.value) / maxVal) * 100;
-            const isPositive = item.value > 0; // Positive SHAP value helps the home team
+            // Calculate width as a percentage of the total impact sum
+            const barWidth = totalImpact > 0 ? (Math.abs(item.value) / totalImpact) * 100 : 0;
+            const isPositive = item.value > 0;
             const color = isPositive ? homeColor : awayColor;
-            const textAlign = isPositive ? 'left' : 'right';
-
+            
             html += `
                 <div class="explanation-row">
                     <span class="feature-name">${formatFeatureName(item.feature)}</span>
@@ -128,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         element.innerHTML = html;
     };
+    // --- END MODIFIED SECTION ---
 
     filterInput.addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase();
