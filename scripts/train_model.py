@@ -32,7 +32,8 @@ def season_ahead(df, feats):
         X_cal, y_cal = calibrate_df[feats], calibrate_df["home_win"]
         X_test, y_test = test_df[feats], test_df["home_win"]
 
-        base_model = HistGradientBoostingClassifier(random_state=42, l2_regularization=2.0)
+        # --- MODIFIED: Increased regularization penalty ---
+        base_model = HistGradientBoostingClassifier(random_state=42, l2_regularization=10.0)
         base_model.fit(X_train, y_train)
 
         calibrated_model = CalibratedClassifierCV(base_model, method='isotonic', cv='prefit')
@@ -50,7 +51,8 @@ def season_ahead(df, feats):
     print("  Training final model on all data ...")
     X_full, y_full = df[feats], df["home_win"]
     
-    final_base_model = HistGradientBoostingClassifier(random_state=42, l2_regularization=2.0)
+    # --- MODIFIED: Increased regularization penalty ---
+    final_base_model = HistGradientBoostingClassifier(random_state=42, l2_regularization=10.0)
     final_base_model.fit(X_full, y_full)
 
     last_season_df = df[df["season"] == seasons[-1]]
@@ -75,15 +77,12 @@ def main():
     
     calibrated_model, metrics = season_ahead(train_df, feats)
     
-    # --- MODIFIED SECTION ---
-    # We now save a dictionary containing both models.
     model_payload = {
         'calibrated_model': calibrated_model,
         'base_model': calibrated_model.estimator 
     }
     joblib.dump(model_payload, MODEL_JOBLIB)
     print(f"Wrote model payload to {MODEL_JOBLIB}")
-    # --- END MODIFIED SECTION ---
     
     if metrics:
         metrics_df = pd.DataFrame(metrics)
