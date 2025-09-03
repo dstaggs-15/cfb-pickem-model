@@ -2,6 +2,31 @@ CFB Pick’em Model — Notebook
 
 This project is a complete, automated data and machine learning pipeline for predicting weekly NCAA college football games. It is designed for transparency, reproducibility, and robust performance by leveraging a multi-faceted feature set, a carefully designed validation strategy, and an ensemble of complementary models.
 
+TLDR: How it works (3 steps):
+
+Data Ingestion – Collects past stats, schedules, and betting lines → cleans it → makes one big training file.
+
+Model Training – Uses gradient boosting + cross-validation to train on old seasons → saves the model.
+
+Prediction – Applies the trained model to upcoming games → outputs JSON with picks & win chances.
+
+Features it uses:
+
+Rolling stats (last 5 games, home vs. away splits).
+
+Game context (rest days, travel distance, neutral site, postseason).
+
+Betting market info (spread → win probability).
+
+Elo rating (long-term team strength).
+
+Validation & calibration:
+
+Tests by training on past seasons and predicting the next one.
+
+Calibrates probabilities so “70% chance” actually means ~70% wins long-term.
+
+  
 The entire system is orchestrated via **GitHub Actions** and serves its predictions through a static **GitHub Pages** website.
 
 -----
