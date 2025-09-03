@@ -40,21 +40,37 @@ def main():
 
     schedule = load_csv_local_or_url(LOCAL_SCHEDULE, FALLBACK_SCHEDULE_URL)
     schedule = ensure_schedule_columns(schedule)
-    team_stats = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL)
+    team_stats_long = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL)
+    
+    # --- NEW AND CRITICAL: Pivot the raw data from long to wide format ---
+    print("  Pivoting raw team stats...")
+    # First, ensure the 'stat' column is numeric
+    team_stats_long['stat'] = pd.to_numeric(team_stats_long['stat'], errors='coerce')
+    
+    # Pivot the table
+    team_stats = team_stats_long.pivot_table(
+        index=['game_id', 'team'],
+        columns='stat_type',
+        values='stat'
+    ).reset_index()
+
+    # The raw data uses camelCase, but STAT_FEATURES uses snake_case. Let's fix the column names.
+    # e.g., 'successRate' -> 'success_rate'
+    def camel_to_snake(name):
+        return ''.join(['_' + c.lower() if c.isupper() else c for c in name]).lstrip('_')
+    team_stats.columns = [camel_to_snake(col) for col in team_stats.columns]
+    # --- END NEW SECTION ---
 
     team_stats = team_stats.drop_duplicates(subset=['game_id', 'team'])
     
-    # --- MODIFIED SECTION: Calculate season averages from the correct source ---
     print("  Calculating and saving season average stats...")
-    # Add season info to team_stats so we can group by it
     game_season_map = schedule[['game_id', 'season']]
     team_stats_with_season = team_stats.merge(game_season_map, on='game_id', how='left')
-
-    # Now, calculate the averages from the long-format data
+    
+    # Now this will work because the columns exist
     season_avg_stats = team_stats_with_season.groupby(['season', 'team'])[STAT_FEATURES].mean().reset_index()
     season_avg_stats.to_parquet(SEASON_AVG_PARQUET, index=False)
     print(f"  Wrote season averages to {SEASON_AVG_PARQUET}")
-    # --- END MODIFIED SECTION ---
 
     home_team_map = schedule[['game_id', 'home_team']]
     team_stats = team_stats.merge(home_team_map, on='game_id', how='left')
