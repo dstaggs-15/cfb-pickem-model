@@ -11,10 +11,22 @@ document.addEventListener('DOMContentLoaded', () => {
         predictionsContainer.innerHTML = `<div class="status-message">${message}</div>`;
     };
 
+    // NEW: A helper function to make the feature names readable
+    const formatFeatureName = (feature) => {
+        return feature
+            .replace(/_/g, ' ')
+            .replace('R5', 'Last 5')
+            .replace('ppa', 'PPA')
+            .replace('diff', 'Diff')
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+    };
+
     const loadData = async () => {
         try {
             const [predictionsResponse, colorsResponse] = await Promise.all([
-                fetch('data/predictions.json'),
+                fetch('data/predictions.json?cache_bust=' + new Date().getTime()), // Added cache bust
                 fetch('data/team_colors.json').catch(() => ({ ok: false }))
             ]);
 
@@ -50,36 +62,78 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const card = document.createElement('div');
             card.className = 'game-card';
+
+            // --- IMPROVED: Display logic for home/away vs neutral site ---
+            const matchupSeparator = game.neutral_site ? '(N)' : '@';
+            
             card.innerHTML = `
                 <div class="teams">
                     <span class="team-name away">${game.away_team}</span>
-                    <span class="vs">${game.neutral_site ? '(N)' : 'vs'}</span>
+                    <span class="vs">${matchupSeparator}</span>
                     <span class="team-name home">${game.home_team}</span>
                 </div>
                 <div class="probability-bar-container">
-                    <div class="probability-bar" style="width: ${awayProbPercent}%; background-color: ${awayColor};">${awayProbPercent}%</div>
-                    <div class="probability-bar" style="width: ${homeProbPercent}%; background-color: ${homeColor};">${homeProbPercent}%</div>
+                    <div class="probability-bar" style="background-color: ${awayColor}; width: ${awayProbPercent}%;">${awayProbPercent}%</div>
+                    <div class="probability-bar" style="background-color: ${homeColor}; width: ${homeProbPercent}%;">${homeProbPercent}%</div>
                 </div>
                 <div class="pick-container">
                     <span class="pick-label">PICK:</span>
                     <span class="pick-team">${game.pick}</span>
                 </div>
+                <div class="explanation-details" style="display: none;"></div>
             `;
+            
+            // --- NEW: Add click event listener to each card ---
+            card.addEventListener('click', () => {
+                const detailsDiv = card.querySelector('.explanation-details');
+                const isHidden = detailsDiv.style.display === 'none';
+                
+                // Toggle visibility
+                detailsDiv.style.display = isHidden ? 'block' : 'none';
+
+                // Populate the explanation the first time it's opened
+                if (isHidden && detailsDiv.innerHTML === '') {
+                    renderExplanation(detailsDiv, game.explanation, homeColor, awayColor);
+                }
+            });
+
             predictionsContainer.appendChild(card);
         });
     };
 
+    // --- NEW: Function to render the explanation details ---
+    const renderExplanation = (element, explanation, homeColor, awayColor) => {
+        if (!explanation || explanation.length === 0) {
+            element.innerHTML = '<div class="explanation-row">No explanation data available.</div>';
+            return;
+        }
+
+        let maxVal = Math.max(...explanation.map(e => Math.abs(e.value)));
+        
+        let html = '<h4>Top Factors</h4>';
+        explanation.forEach(item => {
+            const barWidth = (Math.abs(item.value) / maxVal) * 100;
+            const isPositive = item.value > 0; // Positive SHAP value helps the home team
+            const color = isPositive ? homeColor : awayColor;
+            const textAlign = isPositive ? 'left' : 'right';
+
+            html += `
+                <div class="explanation-row">
+                    <span class="feature-name">${formatFeatureName(item.feature)}</span>
+                    <div class="feature-bar-container">
+                        <div class="feature-bar ${isPositive ? 'positive' : 'negative'}" style="width: ${barWidth}%; background-color: ${color};"></div>
+                    </div>
+                </div>
+            `;
+        });
+        element.innerHTML = html;
+    };
+
     filterInput.addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase();
-        const gameCards = document.querySelectorAll('.game-card');
-
-        gameCards.forEach(card => {
+        document.querySelectorAll('.game-card').forEach(card => {
             const cardText = card.textContent.toLowerCase();
-            if (cardText.includes(searchTerm)) {
-                card.classList.remove('hidden');
-            } else {
-                card.classList.add('hidden');
-            }
+            card.classList.toggle('hidden', !cardText.includes(searchTerm));
         });
     });
 
