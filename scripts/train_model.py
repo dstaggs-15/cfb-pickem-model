@@ -44,7 +44,8 @@ def season_ahead(df, feats):
         X_test, y_test = test_df[feats], test_df["home_win"]
 
         # Base model (uncalibrated)
-        base_model = HistGradientBoostingClassifier(random_state=42)
+        base_model = HistGradientBoostingClassifier(random_state=42, l2_regularization=2.0) # <-- MODIFIED LINE 1
+
         base_model.fit(X_train, y_train)
 
         # Calibrated model
@@ -64,7 +65,8 @@ def season_ahead(df, feats):
     # Final model: train on all available historical data
     print("  Training final model on all data ...")
     X_full, y_full = df[feats], df["home_win"]
-    final_base_model = HistGradientBoostingClassifier(random_state=42)
+    
+    final_base_model = HistGradientBoostingClassifier(random_state=42, l2_regularization=2.0) # <-- MODIFIED LINE 2
     final_base_model.fit(X_full, y_full)
 
     # Use the last complete season for calibration data
