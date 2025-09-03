@@ -59,7 +59,13 @@ h1 {
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    transition: transform 0.2s ease-in-out;
+    transition: background-color 0.2s ease-in-out;
+    cursor: pointer; /* --- ADDED: Makes it obvious the cards are clickable --- */
+}
+
+/* --- ADDED: Subtle hover effect for interactivity --- */
+.game-card:hover {
+    background-color: var(--border-color);
 }
 
 .game-card.hidden {
@@ -144,4 +150,55 @@ footer {
 a {
     color: var(--accent-color);
     text-decoration: none;
+}
+
+/* --- NEW STYLES FOR THE EXPLANATION SECTION --- */
+
+.explanation-details {
+    padding: 1rem 0 0 0;
+    margin-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.explanation-details h4 {
+    margin: 0 0 12px 0;
+    font-size: 0.9em;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.explanation-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.85em;
+}
+
+.feature-name {
+    width: 45%;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 10px;
+}
+
+.feature-bar-container {
+    width: 55%;
+    height: 14px;
+    background-color: rgba(0,0,0,0.2);
+    border-radius: 7px;
+    display: flex;
+}
+
+.feature-bar {
+    height: 100%;
+    border-radius: 7px;
+}
+
+.feature-bar.negative {
+    margin-left: auto; /* Pushes the bar to the right side */
 }
