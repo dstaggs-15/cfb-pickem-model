@@ -1,83 +1,33 @@
-# scripts/lib/rolling.py
-
 import pandas as pd
-from .parsing import parse_ratio_val
+import numpy as np
+import os
+
+# \--- NEW: Define path for the season averages file ---
+
+DERIVED = "data/derived"
+SEASON\_AVG\_PARQUET = f"{DERIVED}/season\_averages.parquet"
 
 # Define the list of statistical features to be used for rolling averages
-STAT_FEATURES = [
-    "ppa", "success_rate", "explosiveness", "power_success", "stuff_rate",
-    "line_yards", "second_level_yards", "open_field_yards", "points_per_opportunity",
-    "havoc", "turnovers", "field_pos_avg_start"
+
+STAT\_FEATURES = [
+"ppa", "success\_rate", "explosiveness", "power\_success", "stuff\_rate",
+"line\_yards", "second\_level\_yards", "open\_field\_yards", "points\_per\_opportunity",
+"havoc", "turnovers", "field\_pos\_avg\_start"
 ]
 
-def long_stats_to_wide(team_stats):
-    """Pivots the long-format team stats to a wide format."""
-    pivoted = team_stats.pivot(
-        index="game_id",
-        columns="home_away",
-        values=[c for c in team_stats.columns if c not in ["game_id", "home_away", "team"]]
-    )
-    pivoted.columns = [f'{col[0]}_{col[1]}' for col in pivoted.columns]
-    return pivoted
+def long\_stats\_to\_wide(team\_stats):
+"""Pivots the long-format team stats to a wide format."""
+pivoted = team\_stats.pivot(
+index="game\_id",
+columns="home\_away",
+values=[c for c in team\_stats.columns if c not in ["game\_id", "home\_away", "team"]]
+)
+pivoted.columns = [f'{col[0]}\_{col[1]}' for col in pivoted.columns]
+return pivoted
 
-def _get_rollups(df, last_n):
-    """Helper to compute rolling stats for a given DataFrame of one-sided stats."""
-    df = df.sort_values(by=["team", "date"])
-
-    existing_features = [feat for feat in STAT_FEATURES if feat in df.columns]
-
-    grp = df.groupby("team")[existing_features]
-    rollups = grp.rolling(window=last_n, min_periods=1).mean().shift(1)
-    
-    counts = grp.cumcount().rename(f"R{last_n}_count") + 1
-    counts[counts > last_n] = last_n
-    
-    rollups.columns = [f"R{last_n}_{c}" for c in existing_features]
-
-    # --- FIX STARTS HERE ---
-    # Reset the complex multi-index created by groupby() before concatenating.
-    # This ensures all dataframes have a simple, compatible index.
-    rollups = rollups.reset_index(drop=True)
-    counts = counts.reset_index(drop=True)
-    df = df.reset_index(drop=True)
-    # --- FIX ENDS HERE ---
-    
-    final = pd.concat([df[["game_id", "team"]], rollups, counts], axis=1)
-    return final
-
-def build_sidewise_rollups(schedule, wide_stats, last_n, predict_df=None):
-    """
-    Builds rolling average features for teams based on their side (home/away).
-    """
-    schedule['date'] = pd.to_datetime(schedule['date'])
-    full_df = schedule.merge(wide_stats, on="game_id", how="left")
-
-    home_df = full_df[["game_id", "date", "home_team"]].rename(columns={"home_team": "team"})
-    home_stats_cols = [c for c in full_df.columns if c.endswith('_home')]
-    home_stats = full_df[home_stats_cols]
-    home_stats.columns = [c.replace('_home', '') for c in home_stats.columns]
-    home_df = pd.concat([home_df, home_stats], axis=1)
-
-    away_df = full_df[["game_id", "date", "away_team"]].rename(columns={"away_team": "team"})
-    away_stats_cols = [c for c in full_df.columns if c.endswith('_away')]
-    away_stats = full_df[away_stats_cols]
-    away_stats.columns = [c.replace('_away', '') for c in away_stats.columns]
-    away_df = pd.concat([away_df, away_stats], axis=1)
-
-    if predict_df is not None:
-        predict_df['date'] = pd.to_datetime("2099-01-01")
-        home_predict = predict_df[["game_id", "date", "home_team"]].rename(columns={"home_team": "team"})
-        away_predict = predict_df[["game_id", "date", "away_team"]].rename(columns={"away_team": "team"})
-        
-        home_df = pd.concat([home_df, home_predict])
-        away_df = pd.concat([away_df, away_predict])
-
-    home_rollups = _get_rollups(home_df, last_n)
-    away_rollups = _get_rollups(away_df, last_n)
-
-    if predict_df is not None:
-        game_ids_to_predict = predict_df["game_id"].unique()
-        home_rollups = home_rollups[home_rollups["game_id"].isin(game_ids_to_predict)]
-        away_rollups = away_rollups[away_rollups["game_id"].isin(game_ids_to_predict)]
-
-    return home_rollups, away_rollups
+def \_get\_rollups(df, last\_n, season\_averages\_df):
+"""
+\--- NEW AND IMPROVED ---
+Helper to compute rolling stats, now with season-average carry-forward logic.
+"""
+df = df.sort\_values(by=["team", "date"]).reset\_index(drop=True)
