@@ -102,14 +102,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // --- MODIFIED SECTION: Scale bars relative to the sum of impacts ---
-        const totalImpact = explanation.reduce((sum, item) => sum + Math.abs(item.value), 0);
-        
         let html = '<h4>Top Factors</h4>';
+        
+        // Find the maximum absolute impact value among the top factors for consistent scaling
+        const maxImpact = explanation.reduce((max, item) => Math.max(max, Math.abs(item.value)), 0);
+
         explanation.forEach(item => {
-            // Calculate width as a percentage of the total impact sum
-            const barWidth = totalImpact > 0 ? (Math.abs(item.value) / totalImpact) * 100 : 0;
-            const isPositive = item.value > 0;
+            // Scale bar width relative to the max impact, with a minimum visual presence
+            const scaledWidth = maxImpact > 0 ? (Math.abs(item.value) / maxImpact) * 100 : 0;
+            const barWidth = Math.max(scaledWidth, 5); // Ensure a minimum width of 5% for visibility
+            
+            const isPositive = item.value > 0; // Positive value means it supports the home team (or picked team)
             const color = isPositive ? homeColor : awayColor;
             
             html += `
@@ -118,12 +121,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="feature-bar-container">
                         <div class="feature-bar ${isPositive ? 'positive' : 'negative'}" style="width: ${barWidth}%; background-color: ${color};"></div>
                     </div>
+                    <span class="feature-value">${item.value.toFixed(3)}</span>
                 </div>
             `;
         });
         element.innerHTML = html;
     };
-    // --- END MODIFIED SECTION ---
 
     filterInput.addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase();
