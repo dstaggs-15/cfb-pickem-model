@@ -33,15 +33,15 @@ LAST_N = 5
 ENG_FEATURES_BASE = ["rest_diff","shortweek_diff","bye_diff","travel_diff_km","neutral_site","is_postseason"]
 LINE_FEATURES = ["spread_home","over_under"]
 
-def parse_ratio(s):
-    if isinstance(s, str) and '-' in s:
-        parts = s.split('-')
-        if len(parts) == 2 and parts[1] is not None and parts[1] != '0':
-            try:
-                num, den = float(parts[0]), float(parts[1])
-                return num / den if den != 0 else 0.0
-            except (ValueError, TypeError): return np.nan
-    return np.nan
+# --- NEW: Robust helper function for parsing possession time ---
+def parse_possession_time(s):
+    if not isinstance(s, str) or ':' not in s:
+        return 0.0
+    try:
+        minutes, seconds = s.split(':')
+        return int(minutes) * 60 + int(seconds)
+    except (ValueError, TypeError):
+        return 0.0
 
 def main():
     print("Building training dataset ...")
@@ -64,13 +64,26 @@ def main():
         return ''.join(['_' + c.lower() if c.isupper() else c for c in name]).lstrip('_')
     team_stats.columns = [camel_to_snake(col) for col in team_stats.columns]
 
-    # Create derived features
-    total_plays = team_stats.get('rushing_attempts', 0) + team_stats.get('pass_attempts', 0)
+    # --- CORRECTED AND VERIFIED DATA CLEANING ---
+    # Create derived features safely, checking if columns exist
+    
+    # Calculate total plays
+    rushing_attempts = team_stats.get('rushing_attempts', 0)
+    pass_attempts = team_stats.get('pass_attempts', 0)
+    total_plays = rushing_attempts.fillna(0) + pass_attempts.fillna(0)
+    
+    # Calculate derived stats, avoiding division by zero
     team_stats['ppa'] = (team_stats.get('total_yards', 0) / total_plays.replace(0, np.nan)).fillna(0)
     team_stats['success_rate'] = (team_stats.get('first_downs', 0) / total_plays.replace(0, np.nan)).fillna(0)
     team_stats['explosiveness'] = (team_stats.get('yards_per_pass', 0).fillna(0) * 0.5 + team_stats.get('yards_per_rush_attempt', 0).fillna(0) * 0.5)
-    team_stats['possession_seconds'] = team_stats.get('possession_time', '0:0').astype(str).apply(lambda x: int(x.split(':')[0]) * 60 + int(x.split(':')[1]))
-    team_stats.drop(columns=['possession_time'], inplace=True, errors='ignore')
+    
+    # Correctly parse possession time
+    if 'possession_time' in team_stats.columns:
+        team_stats['possession_seconds'] = team_stats['possession_time'].apply(parse_possession_time)
+        team_stats.drop(columns=['possession_time'], inplace=True)
+    else:
+        team_stats['possession_seconds'] = 0.0
+    # --- END CORRECTION ---
 
     team_stats = team_stats.drop_duplicates(subset=['game_id', 'team'])
     
