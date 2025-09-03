@@ -82,7 +82,7 @@ def main():
     eng = rest_and_travel(schedule, teams_df, venues_df)
     X = X.merge(eng, on="game_id", how="left")
 
-    med = median_lines(lines_df) # <-- TYPO FIXED HERE
+    med = median_lines(lines_df)
     X = X.merge(med, on="game_id", how="left")
 
     elo_df = pregame_probs(schedule, talent_df)
@@ -110,6 +110,17 @@ def main():
     feature_cols = [col for col in feature_cols if col in X.columns]
 
     train_df = X.dropna(subset=["home_points","away_points"]).copy()
+
+    # --- NEW: Final, robust data cleaning and type conversion ---
+    # This loop guarantees every feature column is a clean numeric type.
+    for col in feature_cols:
+        if col in train_df.columns:
+            train_df[col] = pd.to_numeric(train_df[col], errors='coerce').astype('float32')
+
+    # As a final safeguard, drop any rows that still have nulls in feature columns
+    train_df.dropna(subset=feature_cols, inplace=True)
+    # --- END NEW SECTION ---
+
     train_df.to_parquet(TRAIN_PARQUET, index=False)
 
     meta = {
