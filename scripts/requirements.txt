@@ -5,3 +5,4 @@ requests
 pyarrow
 haversine
 scipy
+shap
