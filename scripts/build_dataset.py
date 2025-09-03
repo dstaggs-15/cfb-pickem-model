@@ -19,7 +19,7 @@ LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
 LOCAL_TEAM_STATS = f"{LOCAL_DIR}/cfb_game_team_stats.csv"
 LOCAL_LINES = f"{LOCAL_DIR}/cfb_lines.csv"
 LOCAL_VENUES = f"{LOCAL_DIR}/cfbd_venues.csv"
-LOCAL_TEAMS = f"{LOCAL_DIR}/cfb_teams.csv"
+LOCAL_TEAMS = f"{LOCAL_DIR}/cfbd_teams.csv"
 LOCAL_TALENT = f"{LOCAL_DIR}/cfb_talent.csv"
 RAW_BASE = "https://raw.githubusercontent.com/moneyball-ab/cfb-data/master/csv"
 FALLBACK_SCHEDULE_URL = f"{RAW_BASE}/cfb_schedule.csv"
@@ -33,7 +33,6 @@ LAST_N = 5
 ENG_FEATURES_BASE = ["rest_diff","shortweek_diff","bye_diff","travel_diff_km","neutral_site","is_postseason"]
 LINE_FEATURES = ["spread_home","over_under"]
 
-# --- NEW: Robust helper function for parsing possession time ---
 def parse_possession_time(s):
     if not isinstance(s, str) or ':' not in s:
         return 0.0
@@ -64,26 +63,28 @@ def main():
         return ''.join(['_' + c.lower() if c.isupper() else c for c in name]).lstrip('_')
     team_stats.columns = [camel_to_snake(col) for col in team_stats.columns]
 
-    # --- CORRECTED AND VERIFIED DATA CLEANING ---
-    # Create derived features safely, checking if columns exist
+    # --- ROBUST DATA CLEANING AND FEATURE CREATION ---
+    # Safely access columns and handle cases where they might be missing from the raw data
     
-    # Calculate total plays
-    rushing_attempts = team_stats.get('rushing_attempts', 0)
-    pass_attempts = team_stats.get('pass_attempts', 0)
+    rushing_attempts = team_stats['rushing_attempts'] if 'rushing_attempts' in team_stats.columns else pd.Series(0, index=team_stats.index)
+    pass_attempts = team_stats['pass_attempts'] if 'pass_attempts' in team_stats.columns else pd.Series(0, index=team_stats.index)
+    total_yards = team_stats['total_yards'] if 'total_yards' in team_stats.columns else pd.Series(0, index=team_stats.index)
+    first_downs = team_stats['first_downs'] if 'first_downs' in team_stats.columns else pd.Series(0, index=team_stats.index)
+    yards_per_pass = team_stats['yards_per_pass'] if 'yards_per_pass' in team_stats.columns else pd.Series(0, index=team_stats.index)
+    yards_per_rush_attempt = team_stats['yards_per_rush_attempt'] if 'yards_per_rush_attempt' in team_stats.columns else pd.Series(0, index=team_stats.index)
+    
     total_plays = rushing_attempts.fillna(0) + pass_attempts.fillna(0)
     
-    # Calculate derived stats, avoiding division by zero
-    team_stats['ppa'] = (team_stats.get('total_yards', 0) / total_plays.replace(0, np.nan)).fillna(0)
-    team_stats['success_rate'] = (team_stats.get('first_downs', 0) / total_plays.replace(0, np.nan)).fillna(0)
-    team_stats['explosiveness'] = (team_stats.get('yards_per_pass', 0).fillna(0) * 0.5 + team_stats.get('yards_per_rush_attempt', 0).fillna(0) * 0.5)
+    team_stats['ppa'] = (total_yards.fillna(0) / total_plays.replace(0, np.nan)).fillna(0)
+    team_stats['success_rate'] = (first_downs.fillna(0) / total_plays.replace(0, np.nan)).fillna(0)
+    team_stats['explosiveness'] = (yards_per_pass.fillna(0) * 0.5 + yards_per_rush_attempt.fillna(0) * 0.5)
     
-    # Correctly parse possession time
     if 'possession_time' in team_stats.columns:
         team_stats['possession_seconds'] = team_stats['possession_time'].apply(parse_possession_time)
         team_stats.drop(columns=['possession_time'], inplace=True)
     else:
         team_stats['possession_seconds'] = 0.0
-    # --- END CORRECTION ---
+    # --- END ROBUST SECTION ---
 
     team_stats = team_stats.drop_duplicates(subset=['game_id', 'team'])
     
