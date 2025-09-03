@@ -1,10 +1,9 @@
-# scripts/predict.py
-
 import pandas as pd
 import numpy as np
 import json
 import joblib
 import os
+import shap  # <-- NEW: Import the shap library
 
 from .lib.io_utils import load_csv_local_or_url, save_json
 from .lib.parsing import load_aliases, parse_games_txt, ensure_schedule_columns
@@ -16,6 +15,7 @@ from .lib.elo import pregame_probs
 # Define file paths
 DERIVED = "data/derived"
 MODEL_JOBLIB = f"{DERIVED}/model.joblib"
+TRAIN_PARQUET = f"{DERIVED}/training.parquet" # <-- NEW: Need training data for SHAP
 META_JSON = "docs/data/train_meta.json"
 PREDICTIONS_JSON = "docs/data/predictions.json"
 LOCAL_DIR = "data/raw/cfbd"
@@ -33,7 +33,7 @@ ALIASES_JSON = "docs/input/aliases.json"
 MANUAL_LINES_CSV = "docs/input/lines.csv"
 
 def main():
-    print("Generating predictions ...")
+    print("Generating predictions with explanations...")
 
     model = joblib.load(MODEL_JOBLIB)
     with open(META_JSON, 'r') as f:
@@ -107,14 +107,31 @@ def main():
         if X[c].isnull().any(): X[c] = X[c].fillna(X[c].mean())
 
     X_predict = X[feats].fillna(0)
-
     probs = model.predict_proba(X_predict)[:, 1]
+
+    # --- NEW: SHAP EXPLANATION LOGIC ---
+    print("  Generating SHAP explanations...")
+    train_df = pd.read_parquet(TRAIN_PARQUET)
+    explainer = shap.TreeExplainer(model.calibrated_classifiers_[0].base_estimator_, train_df[feats])
+    shap_values = explainer.shap_values(X_predict)
+    # --- END NEW SECTION ---
 
     output = []
     for i, row in X.iterrows():
         prob = probs[i]
         pick = row['home_team'] if prob > 0.5 else row['away_team']
         spread = row.get('spread_home')
+        
+        # --- NEW: Format SHAP values for JSON output ---
+        feature_names = X_predict.columns
+        shap_row = shap_values[i]
+        
+        explanation = sorted(
+            [{'feature': name, 'value': val} for name, val in zip(feature_names, shap_row)],
+            key=lambda x: abs(x['value']),
+            reverse=True
+        )
+        # --- END NEW SECTION ---
 
         output.append({
             'home_team': row['home_team'],
@@ -122,7 +139,8 @@ def main():
             'neutral_site': bool(row['neutral_site']),
             'model_prob_home': prob,
             'pick': pick,
-            'spread_home': None if pd.isna(spread) else spread
+            'spread_home': None if pd.isna(spread) else spread,
+            'explanation': explanation[:5] # <-- NEW: Add top 5 reasons to the output
         })
 
     save_json(PREDICTIONS_JSON, output)
