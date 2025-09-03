@@ -13,6 +13,7 @@ from .lib.context import rest_and_travel
 from .lib.market import median_lines, fit_market_mapping
 from .lib.elo import pregame_probs
 
+# (File paths are the same)
 LOCAL_DIR = "data/raw/cfbd"
 LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
 LOCAL_TEAM_STATS = f"{LOCAL_DIR}/cfb_game_team_stats.csv"
@@ -20,11 +21,9 @@ LOCAL_LINES = f"{LOCAL_DIR}/cfb_lines.csv"
 LOCAL_VENUES = f"{LOCAL_DIR}/cfbd_venues.csv"
 LOCAL_TEAMS = f"{LOCAL_DIR}/cfbd_teams.csv"
 LOCAL_TALENT = f"{LOCAL_DIR}/cfbd_talent.csv"
-
 RAW_BASE = "https://raw.githubusercontent.com/moneyball-ab/cfb-data/master/csv"
 FALLBACK_SCHEDULE_URL = f"{RAW_BASE}/cfb_schedule.csv"
 FALLBACK_TEAM_STATS_URL = f"{RAW_BASE}/cfb_game_team_stats.csv"
-
 DERIVED = "data/derived"
 TRAIN_PARQUET = f"{DERIVED}/training.parquet"
 META_JSON = "docs/data/train_meta.json"
@@ -34,31 +33,45 @@ LAST_N = 5
 ENG_FEATURES_BASE = ["rest_diff","shortweek_diff","bye_diff","travel_diff_km","neutral_site","is_postseason"]
 LINE_FEATURES = ["spread_home","over_under"]
 
+# --- NEW: Helper functions for data cleaning ---
+def parse_ratio(s):
+    if isinstance(s, str) and '-' in s:
+        parts = s.split('-')
+        if len(parts) == 2 and parts[1] != '0':
+            return float(parts[0]) / float(parts[1])
+    return np.nan
+
+def parse_possession_time(s):
+    if isinstance(s, str) and ':' in s:
+        parts = s.split(':')
+        if len(parts) == 2:
+            return float(parts[0]) * 60 + float(parts[1])
+    return np.nan
+
 def main():
     print("Building training dataset ...")
     os.makedirs(DERIVED, exist_ok=True)
 
     schedule = load_csv_local_or_url(LOCAL_SCHEDULE, FALLBACK_SCHEDULE_URL)
     schedule = ensure_schedule_columns(schedule)
-    team_stats_long = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL)
+    team_stats = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL)
     
-    # --- NEW AND CRITICAL: Pivot the raw data from long to wide format ---
-    print("  Pivoting raw team stats...")
-    # First, ensure the 'stat' column is numeric
-    team_stats_long['stat'] = pd.to_numeric(team_stats_long['stat'], errors='coerce')
+    # --- NEW AND CRITICAL: Data Cleaning and Feature Creation ---
+    print("  Cleaning raw team stats and creating features...")
+    team_stats.rename(columns={'school': 'team'}, inplace=True)
     
-    # Pivot the table
-    team_stats = team_stats_long.pivot_table(
-        index=['game_id', 'team'],
-        columns='stat_type',
-        values='stat'
-    ).reset_index()
+    # Clean up special format columns
+    team_stats['third_down_eff'] = team_stats['third_down_eff'].apply(parse_ratio)
+    team_stats['fourth_down_eff'] = team_stats['fourth_down_eff'].apply(parse_ratio)
+    team_stats['completion_attempts'] = team_stats['completion_attempts'].apply(parse_ratio)
+    team_stats['possession_seconds'] = team_stats['possession_time'].apply(parse_possession_time)
 
-    # The raw data uses camelCase, but STAT_FEATURES uses snake_case. Let's fix the column names.
-    # e.g., 'successRate' -> 'success_rate'
-    def camel_to_snake(name):
-        return ''.join(['_' + c.lower() if c.isupper() else c for c in name]).lstrip('_')
-    team_stats.columns = [camel_to_snake(col) for col in team_stats.columns]
+    # Create advanced stats like PPA and Success Rate
+    # Note: These are simplified calculations. A more rigorous approach would use play-by-play data.
+    team_stats['plays'] = team_stats['rushing_attempts'] + team_stats['completion_attempts'].apply(lambda x: float(x.split('-')[1]) if isinstance(x, str) else 0)
+    team_stats['ppa'] = team_stats['total_yards'] / team_stats['plays']
+    team_stats['success_rate'] = (team_stats['first_downs'] / team_stats['plays'])
+    team_stats['explosiveness'] = team_stats['yards_per_pass'] * 0.5 + team_stats['yards_per_rush_attempt'] * 0.5
     # --- END NEW SECTION ---
 
     team_stats = team_stats.drop_duplicates(subset=['game_id', 'team'])
@@ -67,8 +80,8 @@ def main():
     game_season_map = schedule[['game_id', 'season']]
     team_stats_with_season = team_stats.merge(game_season_map, on='game_id', how='left')
     
-    # Now this will work because the columns exist
-    season_avg_stats = team_stats_with_season.groupby(['season', 'team'])[STAT_FEATURES].mean().reset_index()
+    existing_stat_features = [feat for feat in STAT_FEATURES if feat in team_stats_with_season.columns]
+    season_avg_stats = team_stats_with_season.groupby(['season', 'team'])[existing_stat_features].mean().reset_index()
     season_avg_stats.to_parquet(SEASON_AVG_PARQUET, index=False)
     print(f"  Wrote season averages to {SEASON_AVG_PARQUET}")
 
@@ -93,6 +106,7 @@ def main():
     X = X.merge(away_roll, left_on=["game_id","away_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
 
     diff_cols = []
+    # Use the STAT_FEATURES list from rolling.py
     for c in STAT_FEATURES:
         hc, ac = f"home_R{LAST_N}_{c}", f"away_R{LAST_N}_{c}"
         dc = f"diff_R{LAST_N}_{c}"
@@ -106,34 +120,15 @@ def main():
 
     eng = rest_and_travel(schedule, teams_df, venues_df)
     X = X.merge(eng, on="game_id", how="left")
-
     med = median_lines(lines_df)
     X = X.merge(med, on="game_id", how="left")
-
     elo_df = pregame_probs(schedule, talent_df)
     X = X.merge(elo_df, on="game_id", how="left")
-
     X["home_win"] = (pd.to_numeric(X["home_points"], errors="coerce") > pd.to_numeric(X["away_points"], errors="coerce")).astype(int)
-
-    feat_cols = diff_cols + [f"home_R{LAST_N}_count", f"away_R{LAST_N}_count"] + ENG_FEATURES_BASE + LINE_FEATURES + ["elo_home_prob"]
-    X["_season"] = pd.to_numeric(X["season"], errors="coerce")
-    for c in feat_cols:
-        if c in X.columns:
-            if c in ["neutral_site","is_postseason"]:
-                X[c] = X[c].fillna(0.0); continue
-            X[c] = pd.to_numeric(X[c], errors="coerce")
-            m = X.groupby("_season")[c].transform("mean")
-            X[c] = X[c].fillna(m)
-    X = X.drop(columns=["_season"])
-
-    params = fit_market_mapping(X["spread_home"].to_numpy(dtype=float), X["home_win"].to_numpy(dtype=float))
-    a, b = params["a"], params["b"]
-    X["market_home_prob"] = X["spread_home"].apply(lambda s: (1/(1+np.exp(-(a + b * (-(s))))) if pd.notna(s) else np.nan))
-    X["market_home_prob"] = X.groupby("season")["market_home_prob"].transform(lambda s: s.fillna(s.mean()))
 
     feature_cols = diff_cols + [f"home_R{LAST_N}_count", f"away_R{LAST_N}_count"] + ENG_FEATURES_BASE + LINE_FEATURES + ["elo_home_prob","market_home_prob"]
     feature_cols = [col for col in feature_cols if col in X.columns]
-
+    
     train_df = X.dropna(subset=["home_points","away_points"]).copy()
 
     for col in feature_cols:
@@ -146,7 +141,7 @@ def main():
         "generated": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "last_n": LAST_N,
         "features": feature_cols,
-        "market_params": params,
+        "market_params": fit_market_mapping(X["spread_home"].to_numpy(dtype=float), X["home_win"].to_numpy(dtype=float)),
     }
     save_json(META_JSON, meta)
     print(f"Wrote {TRAIN_PARQUET} and {META_JSON}")
