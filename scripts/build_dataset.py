@@ -33,19 +33,25 @@ LAST_N = 5
 ENG_FEATURES_BASE = ["rest_diff","shortweek_diff","bye_diff","travel_diff_km","neutral_site","is_postseason"]
 LINE_FEATURES = ["spread_home","over_under"]
 
-# --- NEW: Helper functions for data cleaning ---
+# --- Helper functions for data cleaning ---
 def parse_ratio(s):
     if isinstance(s, str) and '-' in s:
         parts = s.split('-')
-        if len(parts) == 2 and parts[1] != '0':
-            return float(parts[0]) / float(parts[1])
+        if len(parts) == 2 and parts[1] != '0' and parts[1] is not None:
+            try:
+                return float(parts[0]) / float(parts[1])
+            except (ValueError, TypeError):
+                return np.nan
     return np.nan
 
 def parse_possession_time(s):
     if isinstance(s, str) and ':' in s:
         parts = s.split(':')
         if len(parts) == 2:
-            return float(parts[0]) * 60 + float(parts[1])
+            try:
+                return float(parts[0]) * 60 + float(parts[1])
+            except (ValueError, TypeError):
+                return np.nan
     return np.nan
 
 def main():
@@ -56,23 +62,27 @@ def main():
     schedule = ensure_schedule_columns(schedule)
     team_stats = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL)
     
-    # --- NEW AND CRITICAL: Data Cleaning and Feature Creation ---
     print("  Cleaning raw team stats and creating features...")
     team_stats.rename(columns={'school': 'team'}, inplace=True)
     
-    # Clean up special format columns
-    team_stats['third_down_eff'] = team_stats['third_down_eff'].apply(parse_ratio)
-    team_stats['fourth_down_eff'] = team_stats['fourth_down_eff'].apply(parse_ratio)
-    team_stats['completion_attempts'] = team_stats['completion_attempts'].apply(parse_ratio)
+    # --- CORRECTED SECTION: Using the correct column names from the raw data ---
+    team_stats['third_down_eff'] = team_stats['third_down_efficiency'].apply(parse_ratio)
+    team_stats['fourth_down_eff'] = team_stats['fourth_down_efficiency'].apply(parse_ratio)
+    
+    # The raw data has a 'completion_attempts' column with "C-A" format. Let's parse it.
+    attempts = team_stats['completion_attempts'].str.split('-', expand=True)[1]
+    completions = team_stats['completion_attempts'].str.split('-', expand=True)[0]
+    team_stats['completion_rate'] = (pd.to_numeric(completions, errors='coerce') / pd.to_numeric(attempts, errors='coerce')).fillna(0)
+    team_stats['attempts'] = pd.to_numeric(attempts, errors='coerce')
+
     team_stats['possession_seconds'] = team_stats['possession_time'].apply(parse_possession_time)
 
-    # Create advanced stats like PPA and Success Rate
-    # Note: These are simplified calculations. A more rigorous approach would use play-by-play data.
-    team_stats['plays'] = team_stats['rushing_attempts'] + team_stats['completion_attempts'].apply(lambda x: float(x.split('-')[1]) if isinstance(x, str) else 0)
-    team_stats['ppa'] = team_stats['total_yards'] / team_stats['plays']
-    team_stats['success_rate'] = (team_stats['first_downs'] / team_stats['plays'])
-    team_stats['explosiveness'] = team_stats['yards_per_pass'] * 0.5 + team_stats['yards_per_rush_attempt'] * 0.5
-    # --- END NEW SECTION ---
+    # Simplified feature creation
+    total_plays = team_stats['rushing_attempts'] + team_stats['attempts']
+    team_stats['ppa'] = (team_stats['total_yards'] / total_plays).fillna(0)
+    team_stats['success_rate'] = (team_stats['first_downs'] / total_plays).fillna(0)
+    team_stats['explosiveness'] = (team_stats['yards_per_pass'].fillna(0) * 0.5 + team_stats['yards_per_rush_attempt'].fillna(0) * 0.5)
+    # --- END CORRECTED SECTION ---
 
     team_stats = team_stats.drop_duplicates(subset=['game_id', 'team'])
     
@@ -106,7 +116,6 @@ def main():
     X = X.merge(away_roll, left_on=["game_id","away_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
 
     diff_cols = []
-    # Use the STAT_FEATURES list from rolling.py
     for c in STAT_FEATURES:
         hc, ac = f"home_R{LAST_N}_{c}", f"away_R{LAST_N}_{c}"
         dc = f"diff_R{LAST_N}_{c}"
