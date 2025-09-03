@@ -29,6 +29,7 @@ FALLBACK_TEAM_STATS_URL = f"{RAW_BASE}/cfb_game_team_stats.csv"
 DERIVED = "data/derived"
 TRAIN_PARQUET = f"{DERIVED}/training.parquet"
 META_JSON = "docs/data/train_meta.json"
+SEASON_AVG_PARQUET = f"{DERIVED}/season_averages.parquet" # NEW: File path for season averages
 
 LAST_N = 5
 ENG_FEATURES_BASE = ["rest_diff","shortweek_diff","bye_diff","travel_diff_km","neutral_site","is_postseason"]
@@ -56,12 +57,17 @@ def main():
     teams_df = pd.read_csv(LOCAL_TEAMS) if os.path.exists(LOCAL_TEAMS) else pd.DataFrame()
     talent_df = pd.read_csv(LOCAL_TALENT) if os.path.exists(LOCAL_TALENT) else pd.DataFrame()
 
+    # --- NEW: Calculate and save season-level average stats ---
+    # This block creates the season_averages.parquet file we'll need in the next step.
+    print("  Calculating and saving season average stats...")
+    season_avg_stats = wide.groupby(['season', 'team'])[STAT_FEATURES].mean().reset_index()
+    season_avg_stats.to_parquet(SEASON_AVG_PARQUET, index=False)
+    print(f"  Wrote season averages to {SEASON_AVG_PARQUET}")
+    # --- END NEW SECTION ---
+
     home_roll, away_roll = build_sidewise_rollups(schedule, wide, LAST_N)
     
     base_cols = ["game_id","season","week","date","home_team","away_team","home_points","away_points","season_type","venue_id"]
-    for bc in base_cols:
-        if bc not in schedule.columns:
-            schedule[bc] = np.nan
     base = schedule[base_cols].copy()
 
     X = base.merge(home_roll, left_on=["game_id","home_team"], right_on=["game_id","team"], how="left").drop(columns=["team"])
@@ -111,13 +117,9 @@ def main():
 
     train_df = X.dropna(subset=["home_points","away_points"]).copy()
 
-    # --- MODIFIED SECTION: Final, robust data cleaning ---
-    # This safer loop ensures all feature columns are numeric and fills
-    # any remaining nulls with 0.0 instead of deleting rows.
     for col in feature_cols:
         if col in train_df.columns:
             train_df[col] = pd.to_numeric(train_df[col], errors='coerce').fillna(0.0).astype('float32')
-    # --- END MODIFIED SECTION ---
 
     train_df.to_parquet(TRAIN_PARQUET, index=False)
 
