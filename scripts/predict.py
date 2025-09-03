@@ -3,7 +3,7 @@ import numpy as np
 import json
 import joblib
 import os
-import shap  # <-- NEW: Import the shap library
+import shap
 
 from .lib.io_utils import load_csv_local_or_url, save_json
 from .lib.parsing import load_aliases, parse_games_txt, ensure_schedule_columns
@@ -15,7 +15,7 @@ from .lib.elo import pregame_probs
 # Define file paths
 DERIVED = "data/derived"
 MODEL_JOBLIB = f"{DERIVED}/model.joblib"
-TRAIN_PARQUET = f"{DERIVED}/training.parquet" # <-- NEW: Need training data for SHAP
+TRAIN_PARQUET = f"{DERIVED}/training.parquet"
 META_JSON = "docs/data/train_meta.json"
 PREDICTIONS_JSON = "docs/data/predictions.json"
 LOCAL_DIR = "data/raw/cfbd"
@@ -109,12 +109,13 @@ def main():
     X_predict = X[feats].fillna(0)
     probs = model.predict_proba(X_predict)[:, 1]
 
-    # --- NEW: SHAP EXPLANATION LOGIC ---
+    # --- SHAP EXPLANATION LOGIC ---
     print("  Generating SHAP explanations...")
     train_df = pd.read_parquet(TRAIN_PARQUET)
-    explainer = shap.TreeExplainer(model.calibrated_classifiers_[0].base_estimator_, train_df[feats])
+    # The line below is the only one that has been changed
+    explainer = shap.TreeExplainer(model.base_estimator, train_df[feats])
     shap_values = explainer.shap_values(X_predict)
-    # --- END NEW SECTION ---
+    # --- END SHAP SECTION ---
 
     output = []
     for i, row in X.iterrows():
@@ -122,7 +123,6 @@ def main():
         pick = row['home_team'] if prob > 0.5 else row['away_team']
         spread = row.get('spread_home')
         
-        # --- NEW: Format SHAP values for JSON output ---
         feature_names = X_predict.columns
         shap_row = shap_values[i]
         
@@ -131,7 +131,6 @@ def main():
             key=lambda x: abs(x['value']),
             reverse=True
         )
-        # --- END NEW SECTION ---
 
         output.append({
             'home_team': row['home_team'],
@@ -140,7 +139,7 @@ def main():
             'model_prob_home': prob,
             'pick': pick,
             'spread_home': None if pd.isna(spread) else spread,
-            'explanation': explanation[:5] # <-- NEW: Add top 5 reasons to the output
+            'explanation': explanation[:5]
         })
 
     save_json(PREDICTIONS_JSON, output)
