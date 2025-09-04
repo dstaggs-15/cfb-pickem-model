@@ -13,7 +13,7 @@ from .lib.context import rest_and_travel
 from .lib.market import median_lines, fit_market_mapping
 from .lib.elo import pregame_probs
 
-# --- THIS SECTION WAS INCOMPLETE IN THE PREVIOUS VERSION ---
+# File paths
 LOCAL_DIR = "data/raw/cfbd"
 LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
 LOCAL_TEAM_STATS = f"{LOCAL_DIR}/cfb_game_team_stats.csv"
@@ -21,16 +21,13 @@ LOCAL_LINES = f"{LOCAL_DIR}/cfb_lines.csv"
 LOCAL_VENUES = f"{LOCAL_DIR}/cfbd_venues.csv"
 LOCAL_TEAMS = f"{LOCAL_DIR}/cfb_teams.csv"
 LOCAL_TALENT = f"{LOCAL_DIR}/cfb_talent.csv"
-
 RAW_BASE = "https://raw.githubusercontent.com/moneyball-ab/cfb-data/master/csv"
 FALLBACK_SCHEDULE_URL = f"{RAW_BASE}/cfb_schedule.csv"
 FALLBACK_TEAM_STATS_URL = f"{RAW_BASE}/cfb_game_team_stats.csv"
-
 DERIVED = "data/derived"
 TRAIN_PARQUET = f"{DERIVED}/training.parquet"
 META_JSON = "docs/data/train_meta.json"
 SEASON_AVG_PARQUET = f"{DERIVED}/season_averages.parquet"
-# --- END CORRECTED SECTION ---
 
 LAST_N = 5
 ENG_FEATURES_BASE = ["rest_diff","shortweek_diff","bye_diff","travel_diff_km","neutral_site","is_postseason"]
@@ -132,8 +129,17 @@ def main():
     elo_df = pregame_probs(schedule, talent_df)
     X = X.merge(elo_df, on="game_id", how="left")
     X["home_win"] = (pd.to_numeric(X["home_points"], errors="coerce") > pd.to_numeric(X["away_points"], errors="coerce")).astype(int)
-    X["market_home_prob"] = fit_market_mapping(X["spread_home"].to_numpy(dtype=float), X["home_win"].to_numpy(dtype=float))["prob_func"](X["spread_home"])
+    
+    # --- CORRECTED MARKET PROBABILITY LOGIC ---
+    # Reverted to the original, working implementation
+    params = fit_market_mapping(X["spread_home"].to_numpy(dtype=float), X["home_win"].to_numpy(dtype=float))
+    if params and 'a' in params and 'b' in params:
+        a, b = params["a"], params["b"]
+        X["market_home_prob"] = X["spread_home"].apply(lambda s: (1/(1+np.exp(-(a + b * (-(s))))) if pd.notna(s) else np.nan))
+    else:
+        X["market_home_prob"] = np.nan # Default if fitting fails
     X["market_home_prob"] = X.groupby("season")["market_home_prob"].transform(lambda s: s.fillna(s.mean()))
+    # --- END CORRECTION ---
 
     count_features = [f"home_R{LAST_N}_count", f"away_R{LAST_N}_count"]
     stats_features_final = diff_cols + count_features
@@ -152,7 +158,8 @@ def main():
         "generated": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "last_n": LAST_N,
         "fundamentals_features": [f for f in fundamentals_features if f in train_df.columns],
-        "stats_features": [f for f in stats_features_final if f in train_df.columns]
+        "stats_features": [f for f in stats_features_final if f in train_df.columns],
+        "market_params": params
     }
     save_json(META_JSON, meta)
     print(f"Wrote {TRAIN_PARQUET} and {META_JSON}")
