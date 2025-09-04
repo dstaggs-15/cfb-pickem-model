@@ -1,7 +1,6 @@
 import pandas as pd
-import numpy as np
-import json
 import joblib
+import json
 import os
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.calibration import CalibratedClassifierCV
@@ -24,9 +23,9 @@ def main():
     
     X_full, y_full = train_df[features], train_df["home_win"]
 
-    # Train final model on all data with heavy regularization
     print("  Training final model on all data...")
-    base_model = HistGradientBoostingClassifier(random_state=42, l2_regularization=20.0) # Very high penalty
+    # Use a very high penalty to force the model to be balanced
+    base_model = HistGradientBoostingClassifier(random_state=42, l2_regularization=20.0)
     base_model.fit(X_full, y_full)
     
     calibrated_model = CalibratedClassifierCV(base_model, method='isotonic', cv='prefit')
