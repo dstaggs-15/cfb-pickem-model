@@ -5,15 +5,6 @@ from .context import rest_and_travel
 from .market import median_lines
 from .elo import pregame_probs
 
-def parse_possession_time(s):
-    if not isinstance(s, str) or ':' not in s:
-        return 0.0
-    try:
-        minutes, seconds = s.split(':')
-        return int(minutes) * 60 + int(seconds)
-    except (ValueError, TypeError):
-        return 0.0
-
 def create_feature_set(schedule, team_stats, venues_df, teams_df, talent_df, lines_df, games_to_predict_df=None):
     """
     Single source of truth for feature engineering.
@@ -24,6 +15,9 @@ def create_feature_set(schedule, team_stats, venues_df, teams_df, talent_df, lin
     LAST_N = 5
     
     # 1. Prepare base stats DataFrame
+    # --- FIX: Remove duplicates early to prevent pivot error ---
+    team_stats = team_stats.drop_duplicates(subset=['game_id', 'team'])
+    
     home_team_map = schedule[['game_id', 'home_team']]
     team_stats_sided = team_stats.merge(home_team_map, on='game_id', how='left')
     team_stats_sided['home_away'] = np.where(team_stats_sided['team'] == team_stats_sided['home_team'], 'home', 'away')
@@ -42,8 +36,8 @@ def create_feature_set(schedule, team_stats, venues_df, teams_df, talent_df, lin
     # 4. Create difference columns
     diff_cols = []
     for c in STAT_FEATURES:
-        hc, ac = f"home_R{LAST_N}_{c}", f"away_R{LAST_N}_{c}"
-        dc = f"diff_R{LAST_N}_{c}"
+        hc, ac = f"home_R5_{c}", f"away_R5_{c}"
+        dc = f"diff_R5_{c}"
         if hc in X.columns and ac in X.columns:
             X[dc] = X[hc] - X[ac]
             diff_cols.append(dc)
