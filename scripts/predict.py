@@ -65,7 +65,16 @@ def main():
     predict_df['season'] = schedule['season'].max()
 
     # Create features for the games to predict using the shared function
-    X, _ = create_feature_set(schedule, team_stats_long, venues_df, teams_df, talent_df, lines_df, games_to_predict_df=predict_df)
+    X, _ = create_feature_set(
+        schedule,
+        team_stats_long,
+        venues_df,
+        teams_df,
+        talent_df,
+        lines_df,
+        manual_lines_df=manual_lines_df,  # <-- This argument was missing
+        games_to_predict_df=predict_df
+    )
 
     # Add market features using saved parameters
     if market_params and 'a' in market_params and 'b' in market_params:
