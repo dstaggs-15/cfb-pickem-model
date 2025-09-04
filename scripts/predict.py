@@ -72,7 +72,7 @@ def main():
         teams_df,
         talent_df,
         lines_df,
-        manual_lines_df=manual_lines_df,  # <-- This argument was missing
+        manual_lines_df=manual_lines_df,
         games_to_predict_df=predict_df
     )
 
@@ -97,34 +97,38 @@ def main():
     if base_estimator:
         print("  Generating SHAP explanations...")
         train_df = pd.read_parquet(TRAIN_PARQUET)
-        # Ensure training data has same columns in same order for explainer
         train_df_features = train_df[features]
         explainer = shap.TreeExplainer(base_estimator, train_df_features)
         shap_values = explainer.shap_values(X[features])
     
-    output = []
-    for i, row in X.iterrows():
-        prob = probs[i]
-        pick = row['home_team'] if prob > 0.5 else row['away_team']
-        
-        explanation = []
-        if shap_values is not None:
+    # --- Vectorized Output Generation (Replaces the old for-loop) ---
+    output_df = X[['home_team', 'away_team', 'neutral_site']].copy()
+    output_df['model_prob_home'] = probs
+    output_df['pick'] = np.where(
+        output_df['model_prob_home'] > 0.5,
+        output_df['home_team'],
+        output_df['away_team']
+    )
+    output_df['neutral_site'] = output_df['neutral_site'].astype(bool)
+
+    explanations = [[] for _ in range(len(output_df))]
+    if shap_values is not None:
+        feature_names = X[features].columns
+        temp_explanations = []
+        for i in range(len(X)):
             shap_row = shap_values[i]
-            feature_names = X[features].columns
-            explanation = sorted(
+            expl = sorted(
                 [{'feature': name, 'value': val} for name, val in zip(feature_names, shap_row)],
                 key=lambda x: abs(x['value']),
                 reverse=True
             )[:5]
-
-        output.append({
-            'home_team': row['home_team'],
-            'away_team': row['away_team'],
-            'neutral_site': bool(row['neutral_site']),
-            'model_prob_home': prob,
-            'pick': pick,
-            'explanation': explanation
-        })
+            temp_explanations.append(expl)
+        explanations = temp_explanations
+        
+    output_df['explanation'] = explanations
+    
+    # Convert to the final JSON structure
+    output = output_df.to_dict(orient='records')
 
     save_json(PREDICTIONS_JSON, output)
     print(f"Successfully wrote {len(output)} predictions to {PREDICTIONS_JSON}")
