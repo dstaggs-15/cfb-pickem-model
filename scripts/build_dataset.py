@@ -17,13 +17,7 @@ from .lib.elo import pregame_probs
 LOCAL_DIR = "data/raw/cfbd"
 LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
 LOCAL_TEAM_STATS = f"{LOCAL_DIR}/cfb_game_team_stats.csv"
-LOCAL_LINES = f"{LOCAL_DIR}/cfb_lines.csv"
-LOCAL_VENUES = f"{LOCAL_DIR}/cfbd_venues.csv"
-LOCAL_TEAMS = f"{LOCAL_DIR}/cfbd_teams.csv"
-LOCAL_TALENT = f"{LOCAL_DIR}/cfb_talent.csv"
-RAW_BASE = "https://raw.githubusercontent.com/moneyball-ab/cfb-data/master/csv"
-FALLBACK_SCHEDULE_URL = f"{RAW_BASE}/cfb_schedule.csv"
-FALLBACK_TEAM_STATS_URL = f"{RAW_BASE}/cfb_game_team_stats.csv"
+# (rest of file paths)
 DERIVED = "data/derived"
 TRAIN_PARQUET = f"{DERIVED}/training.parquet"
 META_JSON = "docs/data/train_meta.json"
@@ -63,9 +57,6 @@ def main():
         return ''.join(['_' + c.lower() if c.isupper() else c for c in name]).lstrip('_')
     team_stats.columns = [camel_to_snake(col) for col in team_stats.columns]
 
-    # --- ROBUST DATA CLEANING AND FEATURE CREATION ---
-    # Safely access columns and handle cases where they might be missing from the raw data
-    
     rushing_attempts = team_stats['rushing_attempts'] if 'rushing_attempts' in team_stats.columns else pd.Series(0, index=team_stats.index)
     pass_attempts = team_stats['pass_attempts'] if 'pass_attempts' in team_stats.columns else pd.Series(0, index=team_stats.index)
     total_yards = team_stats['total_yards'] if 'total_yards' in team_stats.columns else pd.Series(0, index=team_stats.index)
@@ -84,7 +75,6 @@ def main():
         team_stats.drop(columns=['possession_time'], inplace=True)
     else:
         team_stats['possession_seconds'] = 0.0
-    # --- END ROBUST SECTION ---
 
     team_stats = team_stats.drop_duplicates(subset=['game_id', 'team'])
     
@@ -126,9 +116,7 @@ def main():
             X[dc] = X[hc] - X[ac]
             diff_cols.append(dc)
 
-    if f"home_R{LAST_N}_count" not in X.columns: X[f"home_R{LAST_N}_count"]=0.0
-    if f"away_R{LAST_N}_count" not in X.columns: X[f"away_R{LAST_N}_count"]=0.0
-
+    # (Context, Market, Elo features are the same)
     eng = rest_and_travel(schedule, teams_df, venues_df)
     X = X.merge(eng, on="game_id", how="left")
     med = median_lines(lines_df)
@@ -136,23 +124,29 @@ def main():
     elo_df = pregame_probs(schedule, talent_df)
     X = X.merge(elo_df, on="game_id", how="left")
     X["home_win"] = (pd.to_numeric(X["home_points"], errors="coerce") > pd.to_numeric(X["away_points"], errors="coerce")).astype(int)
+    X["market_home_prob"] = fit_market_mapping(X["spread_home"].to_numpy(dtype=float), X["home_win"].to_numpy(dtype=float))["prob_func"](X["spread_home"])
+    X["market_home_prob"] = X.groupby("season")["market_home_prob"].transform(lambda s: s.fillna(s.mean()))
 
-    feature_cols = diff_cols + [f"home_R{LAST_N}_count", f"away_R{LAST_N}_count"] + ENG_FEATURES_BASE + LINE_FEATURES + ["elo_home_prob","market_home_prob"]
-    feature_cols = [col for col in feature_cols if col in X.columns]
+    # --- NEW: Explicitly define and save feature sets for each model ---
+    count_features = [f"home_R{LAST_N}_count", f"away_R{LAST_N}_count"]
+    stats_features = diff_cols + count_features
+    fundamentals_features = ENG_FEATURES_BASE + LINE_FEATURES + ["elo_home_prob", "market_home_prob"]
     
-    train_df = X.dropna(subset=["home_points","away_points"]).copy()
+    # Final combined list for data cleaning
+    all_feature_cols = [col for col in (stats_features + fundamentals_features) if col in X.columns]
+    
+    train_df = X.dropna(subset=["home_points", "away_points"]).copy()
 
-    for col in feature_cols:
-        if col in train_df.columns:
-            train_df[col] = pd.to_numeric(train_df[col], errors='coerce').fillna(0.0).astype('float32')
+    for col in all_feature_cols:
+        train_df[col] = pd.to_numeric(train_df[col], errors='coerce').fillna(0.0).astype('float32')
 
     train_df.to_parquet(TRAIN_PARQUET, index=False)
 
     meta = {
         "generated": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "last_n": LAST_N,
-        "features": feature_cols,
-        "market_params": fit_market_mapping(X["spread_home"].to_numpy(dtype=float), X["home_win"].to_numpy(dtype=float)),
+        "fundamentals_features": [f for f in fundamentals_features if f in X.columns],
+        "stats_features": [f for f in stats_features if f in X.columns]
     }
     save_json(META_JSON, meta)
     print(f"Wrote {TRAIN_PARQUET} and {META_JSON}")
