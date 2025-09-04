@@ -5,67 +5,40 @@ import joblib
 import os
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.calibration import CalibratedClassifierCV
-from sklearn.metrics import roc_auc_score, brier_score_loss, accuracy_score
 
 DERIVED = "data/derived"
 TRAIN_PARQUET = f"{DERIVED}/training.parquet"
 MODEL_JOBLIB = f"{DERIVED}/model.joblib"
 META_JSON = "docs/data/train_meta.json"
-METRICS_JSON = "docs/data/train_metrics.json"
-
-def train_and_calibrate_model(df, features):
-    """Helper function to train a single calibrated model on a given feature set."""
-    if not features:
-        print("Warning: No features provided to train_and_calibrate_model. Skipping.")
-        return None
-        
-    X_full, y_full = df[features], df["home_win"]
-    
-    if X_full.empty:
-        print("Warning: DataFrame is empty. Skipping model training.")
-        return None
-
-    base_model = HistGradientBoostingClassifier(random_state=42, l2_regularization=10.0)
-    base_model.fit(X_full, y_full)
-    
-    calibrated_model = CalibratedClassifierCV(base_model, method='isotonic', cv='prefit')
-    calibrated_model.fit(X_full, y_full)
-    
-    return calibrated_model
 
 def main():
-    print("Training two-model system ...")
+    print("Training single model system...")
     os.makedirs(DERIVED, exist_ok=True)
 
     df = pd.read_parquet(TRAIN_PARQUET)
     with open(META_JSON, 'r') as f:
         meta = json.load(f)
     
+    features = meta["features"]
     train_df = df[df["home_points"].notna()].copy()
+    
+    X_full, y_full = train_df[features], train_df["home_win"]
 
-    fundamentals_features = meta["fundamentals_features"]
-    stats_features = meta["stats_features"]
-
-    print("  Training Fundamentals Model...")
-    fundamentals_model = train_and_calibrate_model(train_df, fundamentals_features)
-
-    print("  Training Stats Model...")
-    stats_model = train_and_calibrate_model(train_df, stats_features)
-
-    base_estimator_for_shap = None
-    if fundamentals_model and hasattr(fundamentals_model, 'estimator'):
-        base_estimator_for_shap = fundamentals_model.estimator
-
+    # Train final model on all data with heavy regularization
+    print("  Training final model on all data...")
+    base_model = HistGradientBoostingClassifier(random_state=42, l2_regularization=20.0) # Very high penalty
+    base_model.fit(X_full, y_full)
+    
+    calibrated_model = CalibratedClassifierCV(base_model, method='isotonic', cv='prefit')
+    calibrated_model.fit(X_full, y_full)
+    
     model_payload = {
-        'fundamentals_model': fundamentals_model,
-        'stats_model': stats_model,
-        'fundamentals_features': fundamentals_features,
-        'stats_features': stats_features,
-        'base_estimator': base_estimator_for_shap
+        'model': calibrated_model,
+        'base_estimator': base_model
     }
     
     joblib.dump(model_payload, MODEL_JOBLIB)
-    print(f"Wrote two-model payload to {MODEL_JOBLIB}")
+    print(f"Wrote model payload to {MODEL_JOBLIB}")
 
 if __name__ == "__main__":
     main()
