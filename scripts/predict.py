@@ -7,7 +7,7 @@ import shap
 
 from .lib.io_utils import load_csv_local_or_url, save_json
 from .lib.parsing import parse_games_txt, load_aliases, ensure_schedule_columns
-from .lib.features import create_feature_set # NEW: Import the shared function
+from .lib.features import create_feature_set
 
 # File paths
 DERIVED = "data/derived"
@@ -20,7 +20,6 @@ GAMES_TXT = "docs/input/games.txt"
 ALIASES_JSON = "docs/input/aliases.json"
 MANUAL_LINES_CSV = "docs/input/lines.csv"
 
-# Re-use the full file paths for consistency
 LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
 LOCAL_TEAM_STATS = f"{LOCAL_DIR}/cfb_game_team_stats.csv"
 LOCAL_LINES = f"{LOCAL_DIR}/cfb_lines.csv"
@@ -32,8 +31,9 @@ FALLBACK_SCHEDULE_URL = f"{RAW_BASE}/cfb_schedule.csv"
 FALLBACK_TEAM_STATS_URL = f"{RAW_BASE}/cfb_game_team_stats.csv"
 
 def main():
-    print("Generating predictions with single model system...")
+    print("Generating predictions...")
     
+    # Load model and metadata
     model_payload = joblib.load(MODEL_JOBLIB)
     model = model_payload['model']
     base_estimator = model_payload.get('base_estimator')
@@ -43,7 +43,7 @@ def main():
     features = meta["features"]
     market_params = meta.get("market_params", {})
 
-    # Load raw data needed for feature creation
+    # Load raw data
     schedule = load_csv_local_or_url(LOCAL_SCHEDULE, FALLBACK_SCHEDULE_URL)
     schedule = ensure_schedule_columns(schedule)
     team_stats_long = load_csv_local_or_url(LOCAL_TEAM_STATS, FALLBACK_TEAM_STATS_URL)
@@ -52,7 +52,7 @@ def main():
     talent_df = pd.read_csv(LOCAL_TALENT) if os.path.exists(LOCAL_TALENT) else pd.DataFrame()
     lines_df = pd.read_csv(LOCAL_LINES) if os.path.exists(LOCAL_LINES) else pd.DataFrame()
     manual_lines_df = pd.read_csv(MANUAL_LINES_CSV) if os.path.exists(MANUAL_LINES_CSV) else pd.DataFrame()
-
+    
     aliases = load_aliases(ALIASES_JSON)
     games_to_predict = parse_games_txt(GAMES_TXT, aliases)
 
@@ -64,17 +64,17 @@ def main():
     predict_df['game_id'] = [f"predict_{i}" for i in range(len(predict_df))]
     predict_df['season'] = schedule['season'].max()
 
-    # Create features using the single, shared function
+    # Create features for the games to predict using the shared function
     X, _ = create_feature_set(schedule, team_stats_long, venues_df, teams_df, talent_df, lines_df, games_to_predict_df=predict_df)
 
-    # Add market prob for prediction games
+    # Add market features using saved parameters
     if market_params and 'a' in market_params and 'b' in market_params:
         a, b = market_params["a"], market_params["b"]
         X["market_home_prob"] = X["spread_home"].apply(lambda s: (1/(1+np.exp(-(a + b * (-(s))))) if pd.notna(s) else np.nan))
     else:
         X["market_home_prob"] = 0.5
 
-    # Final cleaning for prediction
+    # Final cleaning
     for col in features:
         if col not in X.columns:
             X[col] = 0.0
@@ -88,7 +88,9 @@ def main():
     if base_estimator:
         print("  Generating SHAP explanations...")
         train_df = pd.read_parquet(TRAIN_PARQUET)
-        explainer = shap.TreeExplainer(base_estimator, train_df[features])
+        # Ensure training data has same columns in same order for explainer
+        train_df_features = train_df[features]
+        explainer = shap.TreeExplainer(base_estimator, train_df_features)
         shap_values = explainer.shap_values(X[features])
     
     output = []
