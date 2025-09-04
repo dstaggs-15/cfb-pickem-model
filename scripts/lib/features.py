@@ -1,9 +1,18 @@
 import pandas as pd
 import numpy as np
-from .rolling import build_sidewise_rollups, STAT_FEATURES
+from .rolling import long_stats_to_wide, build_sidewise_rollups, STAT_FEATURES
 from .context import rest_and_travel
 from .market import median_lines
 from .elo import pregame_probs
+
+def parse_possession_time(s):
+    if not isinstance(s, str) or ':' not in s:
+        return 0.0
+    try:
+        minutes, seconds = s.split(':')
+        return int(minutes) * 60 + int(seconds)
+    except (ValueError, TypeError):
+        return 0.0
 
 def create_feature_set(schedule, team_stats, venues_df, teams_df, talent_df, lines_df, games_to_predict_df=None):
     """
@@ -16,11 +25,11 @@ def create_feature_set(schedule, team_stats, venues_df, teams_df, talent_df, lin
     
     # 1. Prepare base stats DataFrame
     home_team_map = schedule[['game_id', 'home_team']]
-    team_stats = team_stats.merge(home_team_map, on='game_id', how='left')
-    team_stats['home_away'] = np.where(team_stats['team'] == team_stats['home_team'], 'home', 'away')
-    team_stats = team_stats.drop(columns=['home_team'])
+    team_stats_sided = team_stats.merge(home_team_map, on='game_id', how='left')
+    team_stats_sided['home_away'] = np.where(team_stats_sided['team'] == team_stats_sided['home_team'], 'home', 'away')
+    team_stats_sided = team_stats_sided.drop(columns=['home_team'])
     
-    wide_stats = long_stats_to_wide(team_stats)
+    wide_stats = long_stats_to_wide(team_stats_sided)
 
     # 2. Build rolling features
     home_roll, away_roll = build_sidewise_rollups(schedule, wide_stats, LAST_N, games_to_predict_df)
@@ -49,7 +58,6 @@ def create_feature_set(schedule, team_stats, venues_df, teams_df, talent_df, lin
     # 6. Define final feature list
     count_features = [f"home_R{LAST_N}_count", f"away_R{LAST_N}_count"]
     ENG_FEATURES_BASE = ["rest_diff", "travel_away_km", "neutral_site", "is_postseason"]
-    LINE_FEATURES = ["spread_home", "over_under"] # These will be added later
     
     feature_list = diff_cols + count_features + ENG_FEATURES_BASE + ["elo_home_prob"]
     
