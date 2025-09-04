@@ -27,19 +27,17 @@ def create_feature_set(
     Parameters
     ----------
     schedule : DataFrame
-        Full schedule with at least: game_id, season, week, home_team, away_team,
-        home_points, away_points, neutral_site, is_postseason (if available).
+        Must include: game_id, season, home_team, away_team (and ideally home_points, away_points).
     team_stats : DataFrame
-        Per-team per-game long/wide stats, must include: game_id, team, and stat columns.
+        One row per (game_id, team) with stat columns.
     venues_df, teams_df, talent_df : DataFrame
-        Contextual data used by rest_and_travel / pregame_probs.
+        Contextual data for rest/travel and ELO.
     lines_df : DataFrame
         Historical market lines (used by median_lines()).
     manual_lines_df : DataFrame, optional
-        For prediction mode, manual lines keyed by home_team/away_team (with 'spread' column).
+        For prediction mode, manual lines keyed by home_team/away_team with column 'spread'.
     games_to_predict_df : DataFrame, optional
-        If provided, we generate features for these games (prediction mode).
-        Must include: game_id, home_team, away_team, season, (neutral_site if available).
+        If provided, features are generated for these games (prediction mode). Must have game_id, home_team, away_team.
     last_n : int
         Window size for rolling features.
 
@@ -48,14 +46,13 @@ def create_feature_set(
     X : DataFrame
         Feature matrix joined to the base (schedule or games_to_predict_df).
     feature_list : list[str]
-        Names of core engineered features (does not include market features).
+        Names of engineered features (excluding market features, which are appended downstream).
     """
     print("  Creating feature set...")
 
-    # 1) Ensure (game_id, team) uniqueness, then side and go wide
+    # 1) Ensure uniqueness, then side and go wide
     team_stats = team_stats.drop_duplicates(subset=['game_id', 'team'])
 
-    # Map home team for each game, then mark home/away for each row
     home_team_map = schedule[['game_id', 'home_team']]
     team_stats_sided = team_stats.merge(
         home_team_map, on='game_id', how='left', validate='many_to_one'
@@ -65,33 +62,30 @@ def create_feature_set(
     )
     team_stats_sided = team_stats_sided.drop(columns=['home_team'])
 
-    # Wide (one row per game/team side with prefixed columns)
     wide_stats = long_stats_to_wide(team_stats_sided)
 
-    # 2) Rolling features per side (home/away)
+    # 2) Rolling features (pass prediction set POSITIONALLY as 4th arg)
     home_roll, away_roll = build_sidewise_rollups(
-        schedule=schedule,
-        wide_stats=wide_stats,
-        last_n=last_n,
-        games_to_predict_df=games_to_predict_df,
+        schedule,          # positional 1
+        wide_stats,        # positional 2
+        last_n,            # positional 3
+        games_to_predict_df  # positional 4 (no keyword)
     )
 
-    # Normalize rollup keys to match merge keys
+    # Normalize rollup keys for safe merges
     if 'team' in home_roll.columns and 'home_team' not in home_roll.columns:
         home_roll = home_roll.rename(columns={'team': 'home_team'})
     if 'team' in away_roll.columns and 'away_team' not in away_roll.columns:
         away_roll = away_roll.rename(columns={'team': 'away_team'})
 
-    # 3) Choose base DF: training (schedule) or prediction (games list)
+    # 3) Base DF: training vs prediction
     base_df = schedule if games_to_predict_df is None else games_to_predict_df
 
-    # Sanity check required keys in base_df
     required = {'game_id', 'home_team', 'away_team'}
     missing = required - set(base_df.columns)
     if missing:
         raise ValueError(f"Base dataframe missing columns: {missing}")
 
-    # Join rollups
     X = base_df.merge(
         home_roll, on=['game_id', 'home_team'], how='left', validate='one_to_one'
     )
@@ -99,7 +93,7 @@ def create_feature_set(
         away_roll, on=['game_id', 'away_team'], how='left', validate='one_to_one'
     )
 
-    # 4) Diffs using last_n consistently
+    # 4) Stat diffs using last_n consistently
     diff_cols: List[str] = []
     for c in STAT_FEATURES:
         hc = f"home_R{last_n}_{c}"
@@ -109,7 +103,7 @@ def create_feature_set(
             X[dc] = X[hc] - X[ac]
             diff_cols.append(dc)
 
-    # 5) Context: rest/travel + ELO
+    # 5) Context features
     eng = rest_and_travel(schedule, teams_df, venues_df, games_to_predict_df)
     X = X.merge(eng, on="game_id", how="left", validate='one_to_one')
 
@@ -117,8 +111,6 @@ def create_feature_set(
     X = X.merge(elo_df, on="game_id", how="left", validate='one_to_one')
 
     # 6) Market lines
-    #    Prediction mode: prefer manual lines keyed by team names.
-    #    Training mode: use median_lines (may be keyed by game_id or teams).
     if games_to_predict_df is not None and manual_lines_df is not None and not manual_lines_df.empty:
         mlines = manual_lines_df.rename(columns={'spread': 'spread_home'}).copy()
         need = {'home_team', 'away_team', 'spread_home'}
@@ -140,7 +132,7 @@ def create_feature_set(
                 med, on=['home_team', 'away_team'], how='left', validate='many_to_one'
             )
 
-    # 7) Feature list (not including market features; those get appended downstream)
+    # 7) Core feature list (market features appended later)
     count_features = [f"home_R{last_n}_count", f"away_R{last_n}_count"]
     ENG_FEATURES_BASE = ["rest_diff", "travel_away_km", "neutral_site", "is_postseason"]
 
