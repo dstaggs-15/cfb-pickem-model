@@ -21,30 +21,6 @@ def create_feature_set(
 ) -> Tuple[pd.DataFrame, List[str]]:
     """
     Single source of truth for feature engineering.
-
-    Parameters
-    ----------
-    schedule : DataFrame
-        Must include: game_id, season, home_team, away_team (and ideally home_points, away_points).
-    team_stats : DataFrame
-        One row per (game_id, team) with stat columns.
-    venues_df, teams_df, talent_df : DataFrame
-        Contextual data for rest/travel and ELO.
-    lines_df : DataFrame
-        Historical market lines (used by median_lines()).
-    manual_lines_df : DataFrame, optional
-        For prediction mode, manual lines keyed by home_team/away_team with column 'spread'.
-    games_to_predict_df : DataFrame, optional
-        If provided, features are generated for these games (prediction mode). Must have game_id, home_team, away_team.
-    last_n : int
-        Window size for rolling features.
-
-    Returns
-    -------
-    X : DataFrame
-        Feature matrix joined to the base (schedule or games_to_predict_df).
-    feature_list : list[str]
-        Names of engineered features (excluding market features, which are appended downstream).
     """
     print("  Creating feature set...")
 
@@ -62,12 +38,12 @@ def create_feature_set(
 
     wide_stats = long_stats_to_wide(team_stats_sided)
 
-    # 2) Rolling features (pass prediction set POSITIONALLY as 4th arg)
+    # 2) Rolling features
     home_roll, away_roll = build_sidewise_rollups(
-        schedule,            # positional 1
-        wide_stats,          # positional 2
-        last_n,              # positional 3
-        games_to_predict_df  # positional 4 (no keyword)
+        schedule,
+        wide_stats,
+        last_n,
+        games_to_predict_df
     )
 
     # Normalize rollup keys for safe merges
@@ -79,7 +55,6 @@ def create_feature_set(
     # 3) Base DF: training vs prediction
     base_df = schedule if games_to_predict_df is None else games_to_predict_df
     
-    # Validate required columns exist before merging [cite: 9, 114]
     required = {'game_id', 'home_team', 'away_team'}
     missing = required - set(base_df.columns)
     if missing:
@@ -92,7 +67,7 @@ def create_feature_set(
         away_roll, on=['game_id', 'away_team'], how='left', validate='one_to_one'
     )
 
-    # 4) Stat diffs using last_n consistently [cite: 106]
+    # 4) Stat diffs
     diff_cols: List[str] = []
     for c in STAT_FEATURES:
         hc = f"home_R{last_n}_{c}"
@@ -102,16 +77,15 @@ def create_feature_set(
             X[dc] = X[hc] - X[ac]
             diff_cols.append(dc)
 
-    # 5) Context features [cite: 36]
+    # 5) Context features
     eng = rest_and_travel(schedule, teams_df, venues_df, games_to_predict_df)
     X = X.merge(eng, on="game_id", how="left", validate='one_to_one')
 
     elo_df = pregame_probs(schedule, talent_df, games_to_predict_df)
     X = X.merge(elo_df, on="game_id", how="left", validate='one_to_one')
 
-    # 6) Market lines [cite: 37]
+    # 6) Market lines
     if games_to_predict_df is not None and manual_lines_df is not None and not manual_lines_df.empty:
-        # Create a copy to avoid side-effects [cite: 108]
         mlines = manual_lines_df.rename(columns={'spread': 'spread_home'}).copy()
         need = {'home_team', 'away_team', 'spread_home'}
         miss = need - set(mlines.columns)
@@ -132,10 +106,18 @@ def create_feature_set(
                 med, on=['home_team', 'away_team'], how='left', validate='many_to_one'
             )
 
-    # 7) Core feature list (market features appended later)
+    # 7) Core feature list
     count_features = [f"home_R{last_n}_count", f"away_R{last_n}_count"]
     ENG_FEATURES_BASE = ["rest_diff", "travel_away_km", "neutral_site", "is_postseason"]
-
     feature_list = diff_cols + count_features + ENG_FEATURES_BASE + ["elo_home_prob"]
+
+    # --- SAFEGUARD ---
+    # Ensure identifier columns from the original base_df are always present in the final output.
+    # This prevents errors in downstream scripts if a merge unexpectedly drops them.
+    id_cols = ['home_team', 'away_team', 'neutral_site']
+    for col in id_cols:
+        if col not in X.columns:
+            # Add the column back by mapping it from the original base_df via game_id
+            X[col] = X['game_id'].map(base_df.set_index('game_id')[col])
 
     return X, feature_list
