@@ -13,15 +13,24 @@ from .lib.context import rest_and_travel
 from .lib.market import median_lines, fit_market_mapping
 from .lib.elo import pregame_probs
 
-# File paths
+# --- THIS SECTION WAS INCOMPLETE IN THE PREVIOUS VERSION ---
 LOCAL_DIR = "data/raw/cfbd"
 LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
 LOCAL_TEAM_STATS = f"{LOCAL_DIR}/cfb_game_team_stats.csv"
-# (rest of file paths)
+LOCAL_LINES = f"{LOCAL_DIR}/cfb_lines.csv"
+LOCAL_VENUES = f"{LOCAL_DIR}/cfbd_venues.csv"
+LOCAL_TEAMS = f"{LOCAL_DIR}/cfb_teams.csv"
+LOCAL_TALENT = f"{LOCAL_DIR}/cfb_talent.csv"
+
+RAW_BASE = "https://raw.githubusercontent.com/moneyball-ab/cfb-data/master/csv"
+FALLBACK_SCHEDULE_URL = f"{RAW_BASE}/cfb_schedule.csv"
+FALLBACK_TEAM_STATS_URL = f"{RAW_BASE}/cfb_game_team_stats.csv"
+
 DERIVED = "data/derived"
 TRAIN_PARQUET = f"{DERIVED}/training.parquet"
 META_JSON = "docs/data/train_meta.json"
 SEASON_AVG_PARQUET = f"{DERIVED}/season_averages.parquet"
+# --- END CORRECTED SECTION ---
 
 LAST_N = 5
 ENG_FEATURES_BASE = ["rest_diff","shortweek_diff","bye_diff","travel_diff_km","neutral_site","is_postseason"]
@@ -116,7 +125,6 @@ def main():
             X[dc] = X[hc] - X[ac]
             diff_cols.append(dc)
 
-    # (Context, Market, Elo features are the same)
     eng = rest_and_travel(schedule, teams_df, venues_df)
     X = X.merge(eng, on="game_id", how="left")
     med = median_lines(lines_df)
@@ -127,13 +135,11 @@ def main():
     X["market_home_prob"] = fit_market_mapping(X["spread_home"].to_numpy(dtype=float), X["home_win"].to_numpy(dtype=float))["prob_func"](X["spread_home"])
     X["market_home_prob"] = X.groupby("season")["market_home_prob"].transform(lambda s: s.fillna(s.mean()))
 
-    # --- NEW: Explicitly define and save feature sets for each model ---
     count_features = [f"home_R{LAST_N}_count", f"away_R{LAST_N}_count"]
-    stats_features = diff_cols + count_features
+    stats_features_final = diff_cols + count_features
     fundamentals_features = ENG_FEATURES_BASE + LINE_FEATURES + ["elo_home_prob", "market_home_prob"]
     
-    # Final combined list for data cleaning
-    all_feature_cols = [col for col in (stats_features + fundamentals_features) if col in X.columns]
+    all_feature_cols = [col for col in (stats_features_final + fundamentals_features) if col in X.columns]
     
     train_df = X.dropna(subset=["home_points", "away_points"]).copy()
 
@@ -145,8 +151,8 @@ def main():
     meta = {
         "generated": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "last_n": LAST_N,
-        "fundamentals_features": [f for f in fundamentals_features if f in X.columns],
-        "stats_features": [f for f in stats_features if f in X.columns]
+        "fundamentals_features": [f for f in fundamentals_features if f in train_df.columns],
+        "stats_features": [f for f in stats_features_final if f in train_df.columns]
     }
     save_json(META_JSON, meta)
     print(f"Wrote {TRAIN_PARQUET} and {META_JSON}")
