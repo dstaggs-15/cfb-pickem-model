@@ -29,9 +29,10 @@ def _get_rollups(df, last_n, season_averages_df):
     """
     Helper to compute rolling stats, with season-average carry-forward logic.
     """
-    df = df.sort_values(by=["team", "date"]).reset_index(drop=True)
+    df = df.sort_values(by=["date"]).reset_index(drop=True)
     
-    def team_rollup(team_df):
+    # This function is now applied to each team's data via an explicit loop
+    def team_rollup(team_df, team_name):
         seasons = team_df['season'].unique()
         all_season_rollups = []
         
@@ -42,7 +43,7 @@ def _get_rollups(df, last_n, season_averages_df):
             prior_season = season - 1
             
             prior_season_avg = season_averages_df[
-                (season_averages_df['team'] == team_df['team'].iloc[0]) &
+                (season_averages_df['team'] == team_name) &
                 (season_averages_df['season'] == prior_season)
             ]
 
@@ -67,13 +68,27 @@ def _get_rollups(df, last_n, season_averages_df):
             counts[counts > last_n] = last_n
             final_rolling_stats[f"R{last_n}_count"] = counts
             
-            season_rollup = pd.concat([season_df[['game_id', 'team']].reset_index(drop=True), final_rolling_stats.reset_index(drop=True)], axis=1)
+            # Add back the team name to the final dataframe for this team
+            season_rollup = pd.concat([season_df[['game_id']].reset_index(drop=True), final_rolling_stats.reset_index(drop=True)], axis=1)
+            season_rollup['team'] = team_name
             all_season_rollups.append(season_rollup)
         
+        if not all_season_rollups:
+            return pd.DataFrame()
         return pd.concat(all_season_rollups, ignore_index=True)
 
-    # --- CORRECTED: Added include_groups=False to silence the warning ---
-    final_rollups = df.groupby('team', group_keys=False).apply(team_rollup, include_groups=False)
+    # --- NEW ROBUST LOOP ---
+    # Instead of a tricky .apply(), we explicitly loop through each team.
+    # This is safer and avoids the KeyError.
+    all_teams_rollups = []
+    for team_name, team_df in df.groupby('team'):
+        team_rollups = team_rollup(team_df, team_name)
+        all_teams_rollups.append(team_rollups)
+    
+    if not all_teams_rollups:
+        return pd.DataFrame() # Return empty if no data
+    final_rollups = pd.concat(all_teams_rollups, ignore_index=True)
+    # --- END NEW LOOP ---
     
     return final_rollups
 
@@ -107,7 +122,7 @@ def build_sidewise_rollups(schedule, wide_stats, last_n, predict_df=None):
         away_df = pd.concat([away_df, away_predict])
 
     home_rollups = _get_rollups(home_df.dropna(subset=['team']), last_n, season_averages_df)
-    away_rollups = a_get_rollups(away_df.dropna(subset=['team']), last_n, season_averages_df)
+    away_rollups = _get_rollups(away_df.dropna(subset=['team']), last_n, season_averages_df)
 
     if predict_df is not None:
         game_ids_to_predict = predict_df["game_id"].unique()
