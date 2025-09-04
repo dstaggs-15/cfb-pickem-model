@@ -5,7 +5,6 @@ import os
 DERIVED = "data/derived"
 SEASON_AVG_PARQUET = f"{DERIVED}/season_averages.parquet"
 
-# --- CORRECTED: This list now matches the actual categories in your data after pivoting and cleaning ---
 STAT_FEATURES = [
     'ppa',
     'success_rate',
@@ -36,7 +35,6 @@ def _get_rollups(df, last_n, season_averages_df):
         seasons = team_df['season'].unique()
         all_season_rollups = []
         
-        # Ensure the columns we want to roll up actually exist in the dataframe
         existing_stat_features = [feat for feat in STAT_FEATURES if feat in team_df.columns]
 
         for season in seasons:
@@ -74,7 +72,8 @@ def _get_rollups(df, last_n, season_averages_df):
         
         return pd.concat(all_season_rollups, ignore_index=True)
 
-    final_rollups = df.groupby('team', group_keys=False).apply(team_rollup)
+    # --- CORRECTED: Added include_groups=False to silence the warning ---
+    final_rollups = df.groupby('team', group_keys=False).apply(team_rollup, include_groups=False)
     
     return final_rollups
 
@@ -108,7 +107,7 @@ def build_sidewise_rollups(schedule, wide_stats, last_n, predict_df=None):
         away_df = pd.concat([away_df, away_predict])
 
     home_rollups = _get_rollups(home_df.dropna(subset=['team']), last_n, season_averages_df)
-    away_rollups = _get_rollups(away_df.dropna(subset=['team']), last_n, season_averages_df)
+    away_rollups = a_get_rollups(away_df.dropna(subset=['team']), last_n, season_averages_df)
 
     if predict_df is not None:
         game_ids_to_predict = predict_df["game_id"].unique()
