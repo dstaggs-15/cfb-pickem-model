@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadData = async () => {
         try {
             const [predictionsResponse, colorsResponse] = await Promise.all([
+                // Add a cache-busting query parameter to ensure we get the latest file
                 fetch('data/predictions.json?cache_bust=' + new Date().getTime()),
                 fetch('data/team_colors.json').catch(() => ({ ok: false }))
             ]);
@@ -62,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'game-card';
 
+            // Correctly displays '@' for home/away games and '(N)' for neutral
             const matchupSeparator = game.neutral_site ? '(N)' : '@';
             
             card.innerHTML = `
@@ -88,7 +90,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 detailsDiv.style.display = isHidden ? 'block' : 'none';
 
                 if (isHidden && detailsDiv.innerHTML === '') {
-                    renderExplanation(detailsDiv, game.explanation, homeColor, awayColor);
+                    // Pass all necessary info to the explanation renderer
+                    renderExplanation(detailsDiv, game.explanation, homeColor, awayColor, game.home_team, game.away_team);
                 }
             });
 
@@ -96,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    const renderExplanation = (element, explanation, homeColor, awayColor) => {
+    const renderExplanation = (element, explanation, homeColor, awayColor, homeTeam, awayTeam) => {
         if (!explanation || explanation.length === 0) {
             element.innerHTML = '<div class="explanation-row">No explanation data available.</div>';
             return;
@@ -104,24 +107,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let html = '<h4>Top Factors</h4>';
         
-        // Find the maximum absolute impact value among the top factors for consistent scaling
+        // Find the maximum absolute impact value to determine relative strength
         const maxImpact = explanation.reduce((max, item) => Math.max(max, Math.abs(item.value)), 0);
 
         explanation.forEach(item => {
-            // Scale bar width relative to the max impact, with a minimum visual presence
-            const scaledWidth = maxImpact > 0 ? (Math.abs(item.value) / maxImpact) * 100 : 0;
-            const barWidth = Math.max(scaledWidth, 5); // Ensure a minimum width of 5% for visibility
-            
-            const isPositive = item.value > 0; // Positive value means it supports the home team (or picked team)
+            const absValue = Math.abs(item.value);
+            const isPositive = item.value > 0; // Positive SHAP value helps the home team
+            const favoredTeam = isPositive ? homeTeam : awayTeam;
             const color = isPositive ? homeColor : awayColor;
+
+            // Determine human-readable impact strength
+            let impactLabel = '';
+            if (maxImpact > 0) {
+                const relativeImpact = absValue / maxImpact;
+                if (relativeImpact > 0.66) {
+                    impactLabel = 'Strongly';
+                } else if (relativeImpact > 0.33) {
+                    impactLabel = 'Moderately';
+                } else {
+                    impactLabel = 'Slightly';
+                }
+            }
             
             html += `
                 <div class="explanation-row">
                     <span class="feature-name">${formatFeatureName(item.feature)}</span>
-                    <div class="feature-bar-container">
-                        <div class="feature-bar ${isPositive ? 'positive' : 'negative'}" style="width: ${barWidth}%; background-color: ${color};"></div>
-                    </div>
-                    <span class="feature-value">${item.value.toFixed(3)}</span>
+                    <span class="feature-impact" style="color: ${color};">
+                        ${impactLabel} favors ${favoredTeam}
+                    </span>
                 </div>
             `;
         });
