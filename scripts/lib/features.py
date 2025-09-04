@@ -1,5 +1,3 @@
-# lib/features.py
-
 import numpy as np
 import pandas as pd
 from typing import Optional, Tuple, List
@@ -66,9 +64,9 @@ def create_feature_set(
 
     # 2) Rolling features (pass prediction set POSITIONALLY as 4th arg)
     home_roll, away_roll = build_sidewise_rollups(
-        schedule,          # positional 1
-        wide_stats,        # positional 2
-        last_n,            # positional 3
+        schedule,            # positional 1
+        wide_stats,          # positional 2
+        last_n,              # positional 3
         games_to_predict_df  # positional 4 (no keyword)
     )
 
@@ -80,7 +78,8 @@ def create_feature_set(
 
     # 3) Base DF: training vs prediction
     base_df = schedule if games_to_predict_df is None else games_to_predict_df
-
+    
+    # Validate required columns exist before merging [cite: 9, 114]
     required = {'game_id', 'home_team', 'away_team'}
     missing = required - set(base_df.columns)
     if missing:
@@ -93,7 +92,7 @@ def create_feature_set(
         away_roll, on=['game_id', 'away_team'], how='left', validate='one_to_one'
     )
 
-    # 4) Stat diffs using last_n consistently
+    # 4) Stat diffs using last_n consistently [cite: 106]
     diff_cols: List[str] = []
     for c in STAT_FEATURES:
         hc = f"home_R{last_n}_{c}"
@@ -103,15 +102,16 @@ def create_feature_set(
             X[dc] = X[hc] - X[ac]
             diff_cols.append(dc)
 
-    # 5) Context features
+    # 5) Context features [cite: 36]
     eng = rest_and_travel(schedule, teams_df, venues_df, games_to_predict_df)
     X = X.merge(eng, on="game_id", how="left", validate='one_to_one')
 
     elo_df = pregame_probs(schedule, talent_df, games_to_predict_df)
     X = X.merge(elo_df, on="game_id", how="left", validate='one_to_one')
 
-    # 6) Market lines
+    # 6) Market lines [cite: 37]
     if games_to_predict_df is not None and manual_lines_df is not None and not manual_lines_df.empty:
+        # Create a copy to avoid side-effects [cite: 108]
         mlines = manual_lines_df.rename(columns={'spread': 'spread_home'}).copy()
         need = {'home_team', 'away_team', 'spread_home'}
         miss = need - set(mlines.columns)
