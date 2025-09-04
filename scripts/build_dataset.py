@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-import json, datetime as dt
+import json
+import datetime as dt
 import os
 import numpy as np
 import pandas as pd
@@ -64,9 +65,9 @@ def main():
     # Safe Series defaults
     idx = team_stats.index
     rushing_attempts = team_stats['rushing_attempts'] if 'rushing_attempts' in team_stats.columns else pd.Series(0.0, index=idx)
-    pass_attempts   = team_stats['pass_attempts']   if 'pass_attempts'   in team_stats.columns else pd.Series(0.0, index=idx)
-    total_yards     = team_stats['total_yards']     if 'total_yards'     in team_stats.columns else pd.Series(0.0, index=idx)
-    first_downs     = team_stats['first_downs']     if 'first_downs'     in team_stats.columns else pd.Series(0.0, index=idx)
+    pass_attempts    = team_stats['pass_attempts']    if 'pass_attempts'    in team_stats.columns else pd.Series(0.0, index=idx)
+    total_yards      = team_stats['total_yards']      if 'total_yards'      in team_stats.columns else pd.Series(0.0, index=idx)
+    first_downs      = team_stats['first_downs']      if 'first_downs'      in team_stats.columns else pd.Series(0.0, index=idx)
 
     total_plays = rushing_attempts.fillna(0) + pass_attempts.fillna(0)
     total_plays = total_plays.astype(float)
@@ -100,8 +101,8 @@ def main():
         teams_df=teams_df,
         talent_df=talent_df,
         lines_df=lines_df,
-        manual_lines_df=manual_lines_df,        # <- required by your features function
-        games_to_predict_df=None                # training mode: None
+        manual_lines_df=manual_lines_df,      # <- required by your features function
+        games_to_predict_df=None              # training mode: None
     )
 
     # --- Labels ---
