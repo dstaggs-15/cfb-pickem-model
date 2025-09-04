@@ -16,13 +16,21 @@ METRICS_JSON = "docs/data/train_metrics.json"
 
 def train_and_calibrate_model(df, features):
     """Helper function to train a single calibrated model on a given feature set."""
+    # Ensure there are features to train on
+    if not features:
+        print("Warning: No features provided to train_and_calibrate_model. Skipping.")
+        return None
+        
     X_full, y_full = df[features], df["home_win"]
     
-    # Use a mild regularization
+    # Return if the dataframe is empty
+    if X_full.empty:
+        print("Warning: DataFrame is empty. Skipping model training.")
+        return None
+
     base_model = HistGradientBoostingClassifier(random_state=42, l2_regularization=2.0)
     base_model.fit(X_full, y_full)
     
-    # We will calibrate this on the full dataset as well for simplicity in this new structure
     calibrated_model = CalibratedClassifierCV(base_model, method='isotonic', cv='prefit')
     calibrated_model.fit(X_full, y_full)
     
@@ -36,14 +44,11 @@ def main():
     with open(META_JSON, 'r') as f:
         meta = json.load(f)
     
-    all_features = meta["features"]
-    
     train_df = df[df["home_points"].notna()].copy()
 
-    # --- NEW TWO-MODEL LOGIC ---
-    # Define the feature sets for each specialized model
-    fundamentals_features = [f for f in all_features if 'diff_R5' not in f and 'count' not in f]
-    stats_features = [f for f in all_features if 'diff_R5' in f]
+    # --- NEW: Load feature lists directly from meta file ---
+    fundamentals_features = meta["fundamentals_features"]
+    stats_features = meta["stats_features"]
 
     print("  Training Fundamentals Model...")
     fundamentals_model = train_and_calibrate_model(train_df, fundamentals_features)
@@ -51,7 +56,6 @@ def main():
     print("  Training Stats Model...")
     stats_model = train_and_calibrate_model(train_df, stats_features)
 
-    # Save both models in a single payload
     model_payload = {
         'fundamentals_model': fundamentals_model,
         'stats_model': stats_model,
