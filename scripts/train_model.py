@@ -52,8 +52,6 @@ def main():
     print("  Training Stats Model...")
     stats_model = train_and_calibrate_model(train_df, stats_features)
 
-    # --- THIS SECTION IS NOW CORRECT ---
-    # It correctly retrieves the base_estimator from the fundamentals_model to save.
     base_estimator_for_shap = None
     if fundamentals_model and hasattr(fundamentals_model, 'estimator'):
         base_estimator_for_shap = fundamentals_model.estimator
@@ -63,9 +61,8 @@ def main():
         'stats_model': stats_model,
         'fundamentals_features': fundamentals_features,
         'stats_features': stats_features,
-        'base_estimator': base_estimator_for_shap # Correctly save the base estimator
+        'base_estimator': base_estimator_for_shap
     }
-    # --- END CORRECTION ---
     
     joblib.dump(model_payload, MODEL_JOBLIB)
     print(f"Wrote two-model payload to {MODEL_JOBLIB}")
