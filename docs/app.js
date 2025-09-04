@@ -11,12 +11,29 @@ document.addEventListener('DOMContentLoaded', () => {
         predictionsContainer.innerHTML = `<div class="status-message">${message}</div>`;
     };
 
+    /**
+     * Translates raw feature names into clean, human-readable labels.
+     */
     const formatFeatureName = (feature) => {
+        // Specific overrides for clarity
+        const nameMap = {
+            'elo_home_prob': 'Elo Win Probability',
+            'is_postseason': 'Postseason Game',
+            'neutral_site': 'Neutral Site Game',
+            'rest_diff': 'Rest Advantage',
+            'spread_home': 'Betting Spread',
+            'travel_away_km': 'Away Team Travel'
+        };
+        if (nameMap[feature]) {
+            return nameMap[feature];
+        }
+
+        // Generic formatting for statistical differentials
         return feature
             .replace(/_/g, ' ')
             .replace('R5', 'Last 5')
+            .replace('diff', 'Advantage')
             .replace('ppa', 'PPA')
-            .replace('diff', 'Diff')
             .split(' ')
             .map(word => word.charAt(0).toUpperCase() + word.slice(1))
             .join(' ');
@@ -25,7 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadData = async () => {
         try {
             const [predictionsResponse, colorsResponse] = await Promise.all([
-                // Add a cache-busting query parameter to ensure we get the latest file
                 fetch('data/predictions.json?cache_bust=' + new Date().getTime()),
                 fetch('data/team_colors.json').catch(() => ({ ok: false }))
             ]);
@@ -63,8 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'game-card';
 
-            // Correctly displays '@' for home/away games and '(N)' for neutral
-            const matchupSeparator = game.neutral_site ? '(N)' : '@';
+            const matchupSeparator = game.neutral_site ? 'vs' : '@';
             
             card.innerHTML = `
                 <div class="teams">
@@ -90,7 +105,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 detailsDiv.style.display = isHidden ? 'block' : 'none';
 
                 if (isHidden && detailsDiv.innerHTML === '') {
-                    // Pass all necessary info to the explanation renderer
                     renderExplanation(detailsDiv, game.explanation, homeColor, awayColor, game.home_team, game.away_team);
                 }
             });
@@ -98,7 +112,10 @@ document.addEventListener('DOMContentLoaded', () => {
             predictionsContainer.appendChild(card);
         });
     };
-
+    
+    /**
+     * Renders the new, more intuitive explanation with bars and percentages.
+     */
     const renderExplanation = (element, explanation, homeColor, awayColor, homeTeam, awayTeam) => {
         if (!explanation || explanation.length === 0) {
             element.innerHTML = '<div class="explanation-row">No explanation data available.</div>';
@@ -107,34 +124,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let html = '<h4>Top Factors</h4>';
         
-        // Find the maximum absolute impact value to determine relative strength
+        // Find the maximum absolute impact value to create a relative scale (0-100%)
         const maxImpact = explanation.reduce((max, item) => Math.max(max, Math.abs(item.value)), 0);
 
         explanation.forEach(item => {
-            const absValue = Math.abs(item.value);
             const isPositive = item.value > 0; // Positive SHAP value helps the home team
             const favoredTeam = isPositive ? homeTeam : awayTeam;
             const color = isPositive ? homeColor : awayColor;
+            
+            // Calculate the factor's strength relative to the strongest factor
+            const relativeImpactPercent = maxImpact > 0 ? (Math.abs(item.value) / maxImpact) * 100 : 0;
 
-            // Determine human-readable impact strength
-            let impactLabel = '';
-            if (maxImpact > 0) {
-                const relativeImpact = absValue / maxImpact;
-                if (relativeImpact > 0.66) {
-                    impactLabel = 'Strongly';
-                } else if (relativeImpact > 0.33) {
-                    impactLabel = 'Moderately';
-                } else {
-                    impactLabel = 'Slightly';
-                }
+            // NEW: Generate a more descriptive explanation
+            let description = '';
+            const featureName = item.feature;
+            const formattedName = formatFeatureName(featureName);
+
+            if (featureName === 'is_postseason' || featureName === 'neutral_site') {
+                description = `${formattedName} status influences prediction`;
+            } else if (featureName.includes('prob') || featureName.includes('spread')) {
+                description = `${formattedName} favors ${favoredTeam}`;
+            } else if (featureName.startsWith('diff')) {
+                description = `Recent ${formattedName.replace('Advantage ', '')} favors ${favoredTeam}`;
+            } else {
+                description = `${formattedName} favors ${favoredTeam}`;
             }
             
             html += `
                 <div class="explanation-row">
-                    <span class="feature-name">${formatFeatureName(item.feature)}</span>
-                    <span class="feature-impact" style="color: ${color};">
-                        ${impactLabel} favors ${favoredTeam}
-                    </span>
+                    <span class="feature-name">${formattedName}</span>
+                    <span class="feature-description">${description}</span>
+                </div>
+                <div class="impact-bar-row">
+                    <div class="impact-bar-container">
+                        <div class="impact-bar" style="width: ${relativeImpactPercent.toFixed(1)}%; background-color: ${color};"></div>
+                    </div>
+                    <span class="impact-percent">${relativeImpactPercent.toFixed(0)}%</span>
                 </div>
             `;
         });
