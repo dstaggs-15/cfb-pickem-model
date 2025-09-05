@@ -1,82 +1,321 @@
 [
   {
-    "home_team": "Iowa",
-    "away_team": "Iowa State",
-    "neutral_site": true,
-    "model_prob_home": 0.7272727272727273,
+    "home_team": "Iowa State",
+    "away_team": "Iowa",
+    "neutral_site": false,
+    "model_prob_home": 0.37662337662337664,
     "pick": "Iowa",
-    "spread_home": NaN
+    "explanation": [
+      {
+        "feature": "elo_home_prob",
+        "value": -0.9189733320665436
+      },
+      {
+        "feature": "neutral_site",
+        "value": -0.0374066625686828
+      },
+      {
+        "feature": "is_postseason",
+        "value": 0.0188318424182944
+      },
+      {
+        "feature": "rest_diff",
+        "value": 0.0
+      },
+      {
+        "feature": "spread_home",
+        "value": 0.0
+      }
+    ]
   },
   {
-    "home_team": "Uconn",
-    "away_team": "Syracuse",
-    "neutral_site": true,
-    "model_prob_home": 0.41025641025641024,
+    "home_team": "Syracuse",
+    "away_team": "Uconn",
+    "neutral_site": false,
+    "model_prob_home": 0.7073170731707317,
     "pick": "Syracuse",
-    "spread_home": NaN
+    "explanation": [
+      {
+        "feature": "elo_home_prob",
+        "value": 0.2637891805228537
+      },
+      {
+        "feature": "is_postseason",
+        "value": 0.02523671276983805
+      },
+      {
+        "feature": "neutral_site",
+        "value": -0.021673923324560748
+      },
+      {
+        "feature": "rest_diff",
+        "value": 0.0
+      },
+      {
+        "feature": "spread_home",
+        "value": 0.0
+      }
+    ]
   },
   {
-    "home_team": "Illinois",
-    "away_team": "Duke",
-    "neutral_site": true,
-    "model_prob_home": 0.8679245283018868,
-    "pick": "Illinois",
-    "spread_home": NaN
+    "home_team": "Duke",
+    "away_team": "Illinois",
+    "neutral_site": false,
+    "model_prob_home": 0.6148648648648649,
+    "pick": "Duke",
+    "explanation": [
+      {
+        "feature": "elo_home_prob",
+        "value": -0.07498439032344323
+      },
+      {
+        "feature": "is_postseason",
+        "value": 0.02523444193881005
+      },
+      {
+        "feature": "neutral_site",
+        "value": -0.02274750846787356
+      },
+      {
+        "feature": "rest_diff",
+        "value": 0.0
+      },
+      {
+        "feature": "spread_home",
+        "value": 0.0
+      }
+    ]
   },
   {
-    "home_team": "Baylor",
-    "away_team": "SMU",
-    "neutral_site": true,
-    "model_prob_home": 0.7272727272727273,
-    "pick": "Baylor",
-    "spread_home": NaN
+    "home_team": "SMU",
+    "away_team": "Baylor",
+    "neutral_site": false,
+    "model_prob_home": 0.6363636363636364,
+    "pick": "SMU",
+    "explanation": [
+      {
+        "feature": "elo_home_prob",
+        "value": -0.0604655632151298
+      },
+      {
+        "feature": "neutral_site",
+        "value": -0.03047457890934311
+      },
+      {
+        "feature": "is_postseason",
+        "value": 0.022997399495216085
+      },
+      {
+        "feature": "rest_diff",
+        "value": 0.0
+      },
+      {
+        "feature": "spread_home",
+        "value": 0.0
+      }
+    ]
   },
   {
-    "home_team": "Virginia",
-    "away_team": "NC State",
-    "neutral_site": true,
-    "model_prob_home": 0.6,
+    "home_team": "NC State",
+    "away_team": "Virginia",
+    "neutral_site": false,
+    "model_prob_home": 0.49206349206349215,
     "pick": "Virginia",
-    "spread_home": NaN
+    "explanation": [
+      {
+        "feature": "elo_home_prob",
+        "value": -0.5584134341190111
+      },
+      {
+        "feature": "neutral_site",
+        "value": -0.04765978321083821
+      },
+      {
+        "feature": "is_postseason",
+        "value": 0.019186617475934326
+      },
+      {
+        "feature": "rest_diff",
+        "value": 0.0
+      },
+      {
+        "feature": "spread_home",
+        "value": 0.0
+      }
+    ]
   },
   {
-    "home_team": "Kansas",
-    "away_team": "Missouri",
-    "neutral_site": true,
-    "model_prob_home": 0.10714285714285714,
+    "home_team": "Missouri",
+    "away_team": "Kansas",
+    "neutral_site": false,
+    "model_prob_home": 0.8564102564102564,
     "pick": "Missouri",
-    "spread_home": NaN
+    "explanation": [
+      {
+        "feature": "elo_home_prob",
+        "value": 0.9410585286852438
+      },
+      {
+        "feature": "is_postseason",
+        "value": 0.020435986798256634
+      },
+      {
+        "feature": "neutral_site",
+        "value": -0.011326741583179683
+      },
+      {
+        "feature": "rest_diff",
+        "value": 0.0
+      },
+      {
+        "feature": "spread_home",
+        "value": 0.0
+      }
+    ]
   },
   {
-    "home_team": "West Virginia",
-    "away_team": "Ohio",
-    "neutral_site": true,
-    "model_prob_home": 0.7272727272727273,
-    "pick": "West Virginia",
-    "spread_home": NaN
+    "home_team": "Ohio",
+    "away_team": "West Virginia",
+    "neutral_site": false,
+    "model_prob_home": 0.7073170731707317,
+    "pick": "Ohio",
+    "explanation": [
+      {
+        "feature": "elo_home_prob",
+        "value": 0.26364349595836756
+      },
+      {
+        "feature": "is_postseason",
+        "value": 0.025309555049752817
+      },
+      {
+        "feature": "neutral_site",
+        "value": -0.021601081046974287
+      },
+      {
+        "feature": "rest_diff",
+        "value": 0.0
+      },
+      {
+        "feature": "spread_home",
+        "value": 0.0
+      }
+    ]
   },
   {
-    "home_team": "Michigan",
-    "away_team": "Oklahoma",
-    "neutral_site": true,
-    "model_prob_home": 0.7272727272727273,
-    "pick": "Michigan",
-    "spread_home": NaN
+    "home_team": "Oklahoma",
+    "away_team": "Michigan",
+    "neutral_site": false,
+    "model_prob_home": 0.740506329113924,
+    "pick": "Oklahoma",
+    "explanation": [
+      {
+        "feature": "elo_home_prob",
+        "value": 0.3826728347416065
+      },
+      {
+        "feature": "is_postseason",
+        "value": 0.039635645573725925
+      },
+      {
+        "feature": "neutral_site",
+        "value": -0.01791928060934879
+      },
+      {
+        "feature": "rest_diff",
+        "value": 0.0
+      },
+      {
+        "feature": "spread_home",
+        "value": 0.0
+      }
+    ]
   },
   {
-    "home_team": "Arizona State",
-    "away_team": "Mississippi State",
-    "neutral_site": true,
-    "model_prob_home": 0.7272727272727273,
-    "pick": "Arizona State",
-    "spread_home": NaN
+    "home_team": "Mississippi State",
+    "away_team": "Arizona State",
+    "neutral_site": false,
+    "model_prob_home": 0.5992063492063492,
+    "pick": "Mississippi State",
+    "explanation": [
+      {
+        "feature": "elo_home_prob",
+        "value": -0.16342241706808636
+      },
+      {
+        "feature": "neutral_site",
+        "value": -0.021750091578578577
+      },
+      {
+        "feature": "is_postseason",
+        "value": 0.021633665020344778
+      },
+      {
+        "feature": "rest_diff",
+        "value": 0.0
+      },
+      {
+        "feature": "spread_home",
+        "value": 0.0
+      }
+    ]
   },
   {
-    "home_team": "Vanderbilt",
-    "away_team": "Virginia Tech",
-    "neutral_site": true,
-    "model_prob_home": 0.3333333333333333,
+    "home_team": "Virginia Tech",
+    "away_team": "Vanderbilt",
+    "neutral_site": false,
+    "model_prob_home": 0.8564102564102564,
     "pick": "Virginia Tech",
-    "spread_home": NaN
+    "explanation": [
+      {
+        "feature": "elo_home_prob",
+        "value": 0.9582064671329863
+      },
+      {
+        "feature": "is_postseason",
+        "value": 0.022981970633845775
+      },
+      {
+        "feature": "neutral_site",
+        "value": -0.01044359484454617
+      },
+      {
+        "feature": "rest_diff",
+        "value": 0.0
+      },
+      {
+        "feature": "spread_home",
+        "value": 0.0
+      }
+    ]
+  },
+  {
+    "home_team": "ULM",
+    "away_team": "Alabama",
+    "neutral_site": true,
+    "model_prob_home": 0.15584415584415584,
+    "pick": "Alabama",
+    "explanation": [
+      {
+        "feature": "elo_home_prob",
+        "value": -2.8981935676740975
+      },
+      {
+        "feature": "neutral_site",
+        "value": 0.6068079984863288
+      },
+      {
+        "feature": "is_postseason",
+        "value": 0.004384933643741533
+      },
+      {
+        "feature": "rest_diff",
+        "value": 0.0
+      },
+      {
+        "feature": "spread_home",
+        "value": 0.0
+      }
+    ]
   }
 ]

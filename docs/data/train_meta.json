@@ -1,22 +1,13 @@
 {
-  "generated": "2025-09-02T17:41:18Z",
-  "last_n": 5,
+  "generated": "2025-09-05T03:00:34Z",
   "features": [
-    "home_R5_count",
-    "away_R5_count",
     "rest_diff",
-    "shortweek_diff",
-    "bye_diff",
-    "travel_diff_km",
     "neutral_site",
     "is_postseason",
+    "elo_home_prob",
     "spread_home",
     "over_under",
-    "elo_home_prob",
     "market_home_prob"
   ],
-  "market_params": {
-    "a": 0.0,
-    "b": 0.15
-  }
+  "market_params": {}
 }
