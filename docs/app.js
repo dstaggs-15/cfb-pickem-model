@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const nameMap = {
             'elo_home_prob': 'Elo Win Probability',
             'is_postseason': 'Postseason Game Context',
-            'neutral_site': 'Game Venue', // --- FIX #2: Renamed for clarity ---
+            'neutral_site': 'Game Venue',
             'rest_diff': 'Rest Advantage',
             'spread_home': 'Betting Spread',
             'travel_away_km': 'Away Team Travel',
@@ -187,7 +187,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // The teamColors object is now our baked-in constant
             renderGames(games, TEAM_COLORS);
             
         } catch (error) {
@@ -252,7 +251,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let html = '<h4>Model Factors</h4>';
         
-        const maxImpact = explanation.reduce((max, item) => Math.max(max, Math.abs(item.value)), 0);
         let influentialFactors = explanation.filter(item => Math.abs(item.value) > 1e-6);
 
         if (influentialFactors.length > 5) {
@@ -266,11 +264,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const displayMaxImpact = Math.max(...influentialFactors.map(f => Math.abs(f.value)));
+
         influentialFactors.forEach(item => {
             const isPositive = item.value > 0;
             const favoredTeam = isPositive ? homeTeam : awayTeam;
             const color = isPositive ? homeColor : awayColor;
-            const displayMaxImpact = Math.max(...influentialFactors.map(f => Math.abs(f.value)));
             const relativeImpactPercent = displayMaxImpact > 0 ? (Math.abs(item.value) / displayMaxImpact) * 100 : 0;
             const formattedName = formatFeatureName(item.feature);
             
@@ -301,13 +300,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadData();
 });
-```eof
-
----
-### ## Final Cleanup
-
-With these changes, your project is now simpler and more self-contained. You can:
-1.  **Delete** the `scripts/build_team_colors.py` script.
-2.  **Remove** the step that runs this script from your `.github/workflows/main.yml` file.
-
-This will give you the clear, understandable explanations you're looking for and make the project easier to manage.
