@@ -1,21 +1,10 @@
-# .github/workflows/main.yml (FINAL PRODUCTION VERSION WITH DEBUG MODE)
+# .github/workflows/main.yml (FAST DEBUG & PRODUCTION WORKFLOW)
 
 name: Generate Weekly Football Predictions
 
 on:
   workflow_dispatch:
-    # This adds a "Debug Mode" checkbox when you manually run the workflow
-    inputs:
-      force_data_download:
-        description: 'Force a full 30-min data download? (Uncheck for fast debug)'
-        required: true
-        type: boolean
-        default: false
-  schedule:
-    - cron: '0 12 * * 2'
   push:
-    paths:
-      - 'docs/input/games.txt'
 
 jobs:
   run-prediction-pipeline:
@@ -35,38 +24,28 @@ jobs:
       - name: 3. Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: 4. Cache and Restore Raw Data
-        id: cache-raw-data
-        uses: actions/cache@v4
+      - name: 4. Download Raw Data Artifact
+        # This step downloads and unpacks the data from the other workflow.
+        uses: actions/download-artifact@v4
         with:
+          name: raw-cfbd-data
           path: data/raw/cfbd
-          key: ${{ runner.os }}-raw-cfbd-data-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-raw-cfbd-data-
 
-      - name: 5. Fetch Latest Data from API
-        # This step now runs ONLY if you check the "force download" box,
-        # or if the cache was not found.
-        if: steps.cache-raw-data.outputs.cache-hit != 'true' || github.event.inputs.force_data_download == 'true'
-        env:
-          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
-        run: python -m scripts.fetch_cfbd
-
-      - name: 6. Build Training Dataset
+      - name: 5. Build Training Dataset
         run: python -m scripts.build_dataset
 
-      - name: 7. Train Prediction Model
+      - name: 6. Train Prediction Model
         run: python -m scripts.train_model
 
-      - name: 8. Generate New Predictions
+      - name: 7. Generate New Predictions
         env:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
         run: python -m scripts.predict
 
-      - name: 9. Generate Data Snapshot for Website
+      - name: 8. Generate Data Snapshot for Website
         run: python -m scripts.generate_data_snapshot
 
-      - name: 10. Commit and Push Results
+      - name: 9. Commit and Push Results
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           branch: main
