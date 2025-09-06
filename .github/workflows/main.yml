@@ -24,12 +24,15 @@ jobs:
       - name: 3. Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: 4. Download Raw Data Artifact
-        # This step downloads and unpacks the data from the other workflow.
-        uses: actions/download-artifact@v4
+      - name: 4. Restore Raw Data from Cache
+        # This step retrieves the data downloaded by the other workflow.
+        uses: actions/cache/restore@v4
         with:
-          name: raw-cfbd-data
           path: data/raw/cfbd
+          # This key MUST match the key in the fetch-data workflow
+          key: ${{ runner.os }}-raw-cfbd-data-v2
+          restore-keys: |
+            ${{ runner.os }}-raw-cfbd-data-
 
       - name: 5. Build Training Dataset
         run: python -m scripts.build_dataset
