@@ -35,9 +35,19 @@ def main():
     team_stats = pd.read_csv(LOCAL_TEAM_STATS)
     
     # --- FIX IS HERE ---
+    # The raw schedule uses 'id' as the column name. We rename it to 'game_id'
+    # for consistency throughout the pipeline.
+    if 'id' in schedule.columns and 'game_id' not in schedule.columns:
+        schedule.rename(columns={'id': 'game_id'}, inplace=True)
+        
     # Enforce consistent data types for the 'game_id' key to prevent merge errors.
-    schedule['game_id'] = schedule['game_id'].astype(str)
-    team_stats['game_id'] = team_stats['game_id'].astype(str)
+    if 'game_id' in schedule.columns:
+        schedule['game_id'] = schedule['game_id'].astype(str)
+    if 'game_id' in team_stats.columns:
+        team_stats['game_id'] = team_stats['game_id'].astype(str)
+    if 'gameId' in team_stats.columns: # Handle alternate column name from API
+        team_stats.rename(columns={'gameId': 'game_id'}, inplace=True)
+        team_stats['game_id'] = team_stats['game_id'].astype(str)
 
     schedule = ensure_schedule_columns(schedule)
     
@@ -49,7 +59,6 @@ def main():
 
     # --- Rename columns for consistency and select key stats ---
     rename_map = {
-        'gameId': 'game_id',
         'offense.ppa': 'ppa',
         'offense.successRate': 'success_rate',
         'offense.explosiveness': 'explosiveness',
@@ -72,6 +81,7 @@ def main():
     season_avg_stats.to_parquet(SEASON_AVG_PARQUET, index=False)
 
     # --- Build full feature set ---
+    print("  Creating feature set...")
     X, feature_list = create_feature_set(
         schedule=schedule,
         team_stats=team_stats,
