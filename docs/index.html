@@ -13,16 +13,19 @@
     <div class="container">
         <header>
             <h1>CFB Pick'em Model</h1>
-            <div class="filter-container">
-                <input type="text" id="filterInput" placeholder="Filter by team name...">
-            </div>
+            <a href="data.html" class="nav-link">View Data Dashboard</a>
+            <input type="text" id="filterInput" placeholder="Filter by team name...">
         </header>
+
         <main id="predictions-container">
-            </main>
+            <div class="status-message">Loading predictions...</div>
+        </main>
+
         <footer>
             <a href="https://github.com/dstaggs-15/cfb-pickem-model" target="_blank" rel="noopener noreferrer">GitHub Repo</a>
-        </footer> 
+        </footer>
     </div>
-    <script src="app.js" defer></script>
+    <script src="app.js"></script>
 </body>
 </html>
+
