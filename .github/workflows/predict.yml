@@ -13,11 +13,8 @@ on:
 jobs:
   run-prediction-pipeline:
     runs-on: ubuntu-latest
-
-    # This block grants the necessary permissions for the commit step
     permissions:
       contents: write
-
     steps:
       - name: 1. Checkout Repository
         uses: actions/checkout@v4
@@ -52,6 +49,7 @@ jobs:
       - name: 8. Commit and Push Predictions
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
+          branch: main # This ensures the commit goes to the main branch
           commit_message: "📊 Update weekly predictions"
           file_pattern: "docs/data/predictions.json"
           commit_user_name: "GitHub Actions Bot"
