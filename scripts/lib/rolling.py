@@ -6,22 +6,18 @@ import datetime as dt
 DERIVED = "data/derived"
 SEASON_AVG_PARQUET = f"{DERIVED}/season_averages.parquet"
 
-STAT_FEATURES = [
-    'ppa',
-    'success_rate',
-    'explosiveness',
-    'rushing_yards',
-    'net_passing_yards',
-    'turnovers',
-    'possession_seconds'
-]
-
 def long_stats_to_wide(team_stats):
     """Pivots the home/away team stats to a single row per game."""
-    pivoted = team_stats.pivot(
+    
+    # --- FIX IS HERE ---
+    # Use pivot_table instead of pivot. It is more robust and handles
+    # potential duplicate entries in the raw data by averaging them.
+    # This prevents the "Index contains duplicate entries" error for good.
+    pivoted = team_stats.pivot_table(
         index="game_id",
         columns="home_away",
-        values=[c for c in team_stats.columns if c not in ["game_id", "home_away", "team"]]
+        values=[c for c in team_stats.columns if c not in ["game_id", "home_away", "team"]],
+        aggfunc="mean" # This is the key change that handles duplicates
     )
     pivoted.columns = [f'{col[0]}_{col[1]}' for col in pivoted.columns]
     return pivoted
@@ -30,13 +26,14 @@ def _get_rollups(df, last_n, season_averages_df):
     """
     Helper to compute rolling stats, with season-average carry-forward logic.
     """
-    # This sort is now safe because all dates are standardized
     df = df.sort_values(by=["date"]).reset_index(drop=True)
     
     def team_rollup(team_df, team_name):
         seasons = team_df['season'].unique()
         all_season_rollups = []
-        
+
+        # Define the ideal list of features we want to calculate rolling averages for
+        STAT_FEATURES = ['ppa', 'success_rate', 'explosiveness', 'rushing_ppa', 'passing_ppa', 'defense_ppa']
         existing_stat_features = [feat for feat in STAT_FEATURES if feat in team_df.columns]
 
         for season in seasons:
@@ -91,10 +88,7 @@ def _get_rollups(df, last_n, season_averages_df):
 def build_sidewise_rollups(schedule, wide_stats, last_n, predict_df=None):
     season_averages_df = pd.read_parquet(SEASON_AVG_PARQUET) if os.path.exists(SEASON_AVG_PARQUET) else pd.DataFrame()
 
-    # --- FIX IS HERE ---
-    # Convert date column to datetime objects and standardize to UTC.
-    # This handles mixed (naive and aware) timezones by making them all consistent.
-    schedule['date'] = pd.to_datetime(schedule['date']).dt.tz_convert('UTC')
+    schedule['date'] = pd.to_datetime(schedule['date'], errors='coerce').dt.tz_convert('UTC')
 
     full_df = schedule.merge(wide_stats, on="game_id", how="left")
 
@@ -111,7 +105,6 @@ def build_sidewise_rollups(schedule, wide_stats, last_n, predict_df=None):
     away_df = pd.concat([away_df, away_stats], axis=1)
 
     if predict_df is not None:
-        # For prediction, ensure the new date is also timezone-aware to match
         predict_df['date'] = pd.to_datetime(dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=365))
         if 'season' not in predict_df.columns:
             predict_df['season'] = schedule['season'].max()
@@ -125,7 +118,7 @@ def build_sidewise_rollups(schedule, wide_stats, last_n, predict_df=None):
     home_rollups = _get_rollups(home_df.dropna(subset=['team']), last_n, season_averages_df)
     away_rollups = _get_rollups(away_df.dropna(subset=['team']), last_n, season_averages_df)
 
-    if predict_df is not None:
+    if predict_df is not a None:
         game_ids_to_predict = predict_df["game_id"].unique()
         home_rollups = home_rollups[home_rollups["game_id"].isin(game_ids_to_predict)]
         away_rollups = away_rollups[away_rollups["game_id"].isin(game_ids_to_predict)]
