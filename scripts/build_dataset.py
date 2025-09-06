@@ -31,7 +31,8 @@ def main():
     os.makedirs(os.path.dirname(META_JSON), exist_ok=True)
 
     # --- Load raw data ---
-    schedule = pd.read_csv(LOCAL_SCHEDULE)
+    # The DtypeWarning is informational and can be ignored for this project's purposes.
+    schedule = pd.read_csv(LOCAL_SCHEDULE, low_memory=False)
     schedule = ensure_schedule_columns(schedule)
     
     # This file now contains advanced stats directly
@@ -56,12 +57,21 @@ def main():
     }
     team_stats.rename(columns=rename_map, inplace=True)
     
-    # These are the features we will calculate rolling averages for
+    # Define the ideal list of features we want to calculate rolling averages for
     STAT_FEATURES = ['ppa', 'success_rate', 'explosiveness', 'rushing_ppa', 'passing_ppa', 'defense_ppa']
     
+    # --- FIX IS HERE ---
+    # Filter STAT_FEATURES to only include columns that actually exist in the dataframe.
+    # This makes the script robust to missing columns in the source data.
+    existing_stat_features = [col for col in STAT_FEATURES if col in team_stats.columns]
+    if len(existing_stat_features) < len(STAT_FEATURES):
+        missing = set(STAT_FEATURES) - set(existing_stat_features)
+        print(f"  Warning: The following stat features were not found and will be skipped: {missing}")
+
     # --- Season averages (for carry-forward logic) ---
     print("  Calculating and saving season average stats...")
-    season_avg_stats = team_stats.groupby(['season', 'team'], as_index=False)[STAT_FEATURES].mean()
+    # Use the filtered list of existing features to prevent the KeyError
+    season_avg_stats = team_stats.groupby(['season', 'team'], as_index=False)[existing_stat_features].mean()
     season_avg_stats.to_parquet(SEASON_AVG_PARQUET, index=False)
 
     # --- Build full feature set ---
@@ -113,3 +123,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
