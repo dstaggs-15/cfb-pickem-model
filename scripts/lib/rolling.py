@@ -118,9 +118,10 @@ def build_sidewise_rollups(schedule, wide_stats, last_n, predict_df=None):
     home_rollups = _get_rollups(home_df.dropna(subset=['team']), last_n, season_averages_df)
     away_rollups = _get_rollups(away_df.dropna(subset=['team']), last_n, season_averages_df)
 
-    if predict_df is not a None:
+    if predict_df is not None:
         game_ids_to_predict = predict_df["game_id"].unique()
         home_rollups = home_rollups[home_rollups["game_id"].isin(game_ids_to_predict)]
         away_rollups = away_rollups[away_rollups["game_id"].isin(game_ids_to_predict)]
 
     return home_rollups, away_rollups
+
