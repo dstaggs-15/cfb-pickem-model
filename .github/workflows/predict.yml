@@ -1,13 +1,19 @@
-# .github/workflows/main.yml (FAST DEBUG VERSION)
+# .github/workflows/main.yml (FINAL PRODUCTION VERSION)
 
-name: 'Generate Weekly Football Predictions'
+name: Generate Weekly Football Predictions
 
 on:
-  # This line adds the "Run workflow" button back to the Actions tab
+  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-  # This trigger runs the workflow automatically on any push to test code changes
+  # Runs automatically every Tuesday at 12:00 PM UTC
+  schedule:
+    - cron: '0 12 * * 2'
+
+  # Runs automatically whenever you push a change to the input games file
   push:
+    paths:
+      - 'docs/input/games.txt'
 
 jobs:
   run-prediction-pipeline:
@@ -26,12 +32,14 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: 4. Restore Raw Data from Cache
-        # This step retrieves the data downloaded by the other workflow
         id: cache-raw-data
         uses: actions/cache@v4
         with:
           path: data/raw/cfbd
           key: ${{ runner.os }}-raw-cfbd-data-v1
+
+      # Note: We no longer need the 'fetch_data' step here because we have a separate
+      # manual workflow for that. This main workflow just uses the cache.
 
       - name: 5. Build Training Dataset
         run: python -m scripts.build_dataset
@@ -43,3 +51,13 @@ jobs:
         env:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
         run: python -m scripts.predict
+
+      - name: 8. Commit and Push Predictions
+        # This step is now active and will save the results to your repo.
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "📊 Update weekly predictions"
+          file_pattern: "docs/data/predictions.json"
+          commit_user_name: "GitHub Actions Bot"
+          commit_user_email: "github-actions@github.com"
+          commit_author: "GitHub Actions Bot <github-actions@github.com>"
