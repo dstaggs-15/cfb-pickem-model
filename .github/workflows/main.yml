@@ -33,10 +33,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: data/raw/cfbd
-          key: ${{ runner.os }}-raw-cfbd-data-v1
+          # --- FIX IS HERE ---
+          # This new key is more robust. It will create a fresh cache now,
+          # and automatically invalidate if you ever change requirements.txt.
+          key: ${{ runner.os }}-raw-cfbd-data-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-raw-cfbd-data-
 
       - name: 5. Fetch Latest Data from API (if cache missed)
-        # This step now ONLY runs if the cache was not found in the previous step.
         if: steps.cache-raw-data.outputs.cache-hit != 'true'
         env:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
