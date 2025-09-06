@@ -3,14 +3,9 @@
 name: Generate Weekly Football Predictions
 
 on:
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-
-  # Runs automatically every Tuesday at 12:00 PM UTC
   schedule:
     - cron: '0 12 * * 2'
-
-  # Runs automatically whenever you push a change to the input games file
   push:
     paths:
       - 'docs/input/games.txt'
@@ -18,11 +13,8 @@ on:
 jobs:
   run-prediction-pipeline:
     runs-on: ubuntu-latest
-
-    # This block grants the necessary permissions for the commit step
     permissions:
       contents: write
-
     steps:
       - name: 1. Checkout Repository
         uses: actions/checkout@v4
@@ -36,28 +28,35 @@ jobs:
       - name: 3. Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: 4. Restore Raw Data from Cache
+      - name: 4. Cache and Restore Raw Data
         id: cache-raw-data
         uses: actions/cache@v4
         with:
           path: data/raw/cfbd
           key: ${{ runner.os }}-raw-cfbd-data-v1
 
-      - name: 5. Build Training Dataset
+      - name: 5. Fetch Latest Data from API (if cache missed)
+        # This step now ONLY runs if the cache was not found in the previous step.
+        if: steps.cache-raw-data.outputs.cache-hit != 'true'
+        env:
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+        run: python -m scripts.fetch_cfbd
+
+      - name: 6. Build Training Dataset
         run: python -m scripts.build_dataset
 
-      - name: 6. Train Prediction Model
+      - name: 7. Train Prediction Model
         run: python -m scripts.train_model
 
-      - name: 7. Generate New Predictions
+      - name: 8. Generate New Predictions
         env:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
         run: python -m scripts.predict
 
-      - name: 8. Generate Data Snapshot for Website
+      - name: 9. Generate Data Snapshot for Website
         run: python -m scripts.generate_data_snapshot
 
-      - name: 9. Commit and Push Predictions
+      - name: 10. Commit and Push Results
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           branch: main
@@ -66,3 +65,4 @@ jobs:
           commit_user_name: "GitHub Actions Bot"
           commit_user_email: "github-actions@github.com"
           commit_author: "GitHub Actions Bot <github-actions@github.com>"
+
