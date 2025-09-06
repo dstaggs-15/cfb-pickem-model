@@ -11,11 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
         predictionsContainer.innerHTML = `<div class="status-message">${message}</div>`;
     };
 
-    /**
-     * Translates raw feature names into clean, human-readable labels.
-     */
     const formatFeatureName = (feature) => {
-        // Specific overrides for clarity
         const nameMap = {
             'elo_home_prob': 'Elo Win Probability',
             'is_postseason': 'Postseason Game',
@@ -28,7 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return nameMap[feature];
         }
 
-        // Generic formatting for statistical differentials
         return feature
             .replace(/_/g, ' ')
             .replace('R5', 'Last 5')
@@ -114,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     /**
-     * Renders the new, more intuitive explanation with bars and percentages.
+     * Renders the new, meter-style explanation.
      */
     const renderExplanation = (element, explanation, homeColor, awayColor, homeTeam, awayTeam) => {
         if (!explanation || explanation.length === 0) {
@@ -124,42 +119,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let html = '<h4>Top Factors</h4>';
         
-        // Find the maximum absolute impact value to create a relative scale (0-100%)
         const maxImpact = explanation.reduce((max, item) => Math.max(max, Math.abs(item.value)), 0);
 
         explanation.forEach(item => {
-            const isPositive = item.value > 0; // Positive SHAP value helps the home team
+            const isPositive = item.value > 0;
             const favoredTeam = isPositive ? homeTeam : awayTeam;
             const color = isPositive ? homeColor : awayColor;
-            
-            // Calculate the factor's strength relative to the strongest factor
             const relativeImpactPercent = maxImpact > 0 ? (Math.abs(item.value) / maxImpact) * 100 : 0;
-
-            // NEW: Generate a more descriptive explanation
-            let description = '';
-            const featureName = item.feature;
-            const formattedName = formatFeatureName(featureName);
-
-            if (featureName === 'is_postseason' || featureName === 'neutral_site') {
-                description = `${formattedName} status influences prediction`;
-            } else if (featureName.includes('prob') || featureName.includes('spread')) {
-                description = `${formattedName} favors ${favoredTeam}`;
-            } else if (featureName.startsWith('diff')) {
-                description = `Recent ${formattedName.replace('Advantage ', '')} favors ${favoredTeam}`;
-            } else {
-                description = `${formattedName} favors ${favoredTeam}`;
-            }
+            const formattedName = formatFeatureName(item.feature);
             
             html += `
-                <div class="explanation-row">
-                    <span class="feature-name">${formattedName}</span>
-                    <span class="feature-description">${description}</span>
-                </div>
-                <div class="impact-bar-row">
-                    <div class="impact-bar-container">
-                        <div class="impact-bar" style="width: ${relativeImpactPercent.toFixed(1)}%; background-color: ${color};"></div>
+                <div class="factor-row">
+                    <div class="factor-label">
+                        <span class="factor-name">${formattedName}</span>
+                        <span class="factor-impact-text" style="color: ${color};">Favors ${favoredTeam}</span>
                     </div>
-                    <span class="impact-percent">${relativeImpactPercent.toFixed(0)}%</span>
+                    <div class="factor-meter">
+                        <div class="meter-bar" style="width: ${relativeImpactPercent.toFixed(1)}%; background-color: ${color};">
+                            ${relativeImpactPercent.toFixed(0)}%
+                        </div>
+                    </div>
                 </div>
             `;
         });
