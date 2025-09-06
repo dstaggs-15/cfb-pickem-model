@@ -34,19 +34,15 @@ def main():
     schedule = pd.read_csv(LOCAL_SCHEDULE, low_memory=False)
     team_stats = pd.read_csv(LOCAL_TEAM_STATS)
     
-    # --- FIX IS HERE ---
-    # The raw schedule uses 'id' as the column name. We rename it to 'game_id'
-    # for consistency throughout the pipeline.
+    # Standardize game_id column name and type
     if 'id' in schedule.columns and 'game_id' not in schedule.columns:
         schedule.rename(columns={'id': 'game_id'}, inplace=True)
-        
-    # Enforce consistent data types for the 'game_id' key to prevent merge errors.
     if 'game_id' in schedule.columns:
         schedule['game_id'] = schedule['game_id'].astype(str)
-    if 'game_id' in team_stats.columns:
-        team_stats['game_id'] = team_stats['game_id'].astype(str)
-    if 'gameId' in team_stats.columns: # Handle alternate column name from API
+    
+    if 'gameId' in team_stats.columns:
         team_stats.rename(columns={'gameId': 'game_id'}, inplace=True)
+    if 'game_id' in team_stats.columns:
         team_stats['game_id'] = team_stats['game_id'].astype(str)
 
     schedule = ensure_schedule_columns(schedule)
@@ -57,40 +53,36 @@ def main():
     talent_df = pd.read_csv(LOCAL_TALENT) if os.path.exists(LOCAL_TALENT) else pd.DataFrame()
     manual_lines_df = pd.read_csv(MANUAL_LINES_CSV) if os.path.exists(MANUAL_LINES_CSV) else pd.DataFrame()
 
-    # --- Rename columns for consistency and select key stats ---
+    # --- Rename columns and define stats of interest ---
     rename_map = {
-        'offense.ppa': 'ppa',
-        'offense.successRate': 'success_rate',
-        'offense.explosiveness': 'explosiveness',
-        'offense.rushingPPA': 'rushing_ppa',
-        'offense.passingPPA': 'passing_ppa',
-        'defense.ppa': 'defense_ppa',
+        'offense.ppa': 'ppa', 'offense.successRate': 'success_rate', 'offense.explosiveness': 'explosiveness',
+        'offense.rushingPPA': 'rushing_ppa', 'offense.passingPPA': 'passing_ppa', 'defense.ppa': 'defense_ppa',
     }
     team_stats.rename(columns=rename_map, inplace=True)
     
     STAT_FEATURES = ['ppa', 'success_rate', 'explosiveness', 'rushing_ppa', 'passing_ppa', 'defense_ppa']
     
-    existing_stat_features = [col for col in STAT_FEATURES if col in team_stats.columns]
-    if len(existing_stat_features) < len(STAT_FEATURES):
-        missing = set(STAT_FEATURES) - set(existing_stat_features)
-        print(f"  Warning: The following stat features were not found and will be skipped: {missing}")
+    # --- FIX IS HERE ---
+    # Force all stat columns to be numeric. Any non-numeric values (like 'TempleArizona State')
+    # will be converted to NaN (Not a Number), which pandas can handle safely.
+    for col in STAT_FEATURES:
+        if col in team_stats.columns:
+            team_stats[col] = pd.to_numeric(team_stats[col], errors='coerce')
 
+    existing_stat_features = [col for col in STAT_FEATURES if col in team_stats.columns]
+    
     # --- Season averages (for carry-forward logic) ---
     print("  Calculating and saving season average stats...")
+    # This calculation is now safe because all columns are guaranteed to be numeric.
     season_avg_stats = team_stats.groupby(['season', 'team'], as_index=False)[existing_stat_features].mean()
     season_avg_stats.to_parquet(SEASON_AVG_PARQUET, index=False)
 
     # --- Build full feature set ---
     print("  Creating feature set...")
     X, feature_list = create_feature_set(
-        schedule=schedule,
-        team_stats=team_stats,
-        venues_df=venues_df,
-        teams_df=teams_df,
-        talent_df=talent_df,
-        lines_df=lines_df,
-        manual_lines_df=manual_lines_df,
-        games_to_predict_df=None
+        schedule=schedule, team_stats=team_stats, venues_df=venues_df,
+        teams_df=teams_df, talent_df=talent_df, lines_df=lines_df,
+        manual_lines_df=manual_lines_df, games_to_predict_df=None
     )
 
     # --- Labels & Market Mapping ---
