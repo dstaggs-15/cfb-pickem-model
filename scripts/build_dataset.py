@@ -31,12 +31,15 @@ def main():
     os.makedirs(os.path.dirname(META_JSON), exist_ok=True)
 
     # --- Load raw data ---
-    # The DtypeWarning is informational and can be ignored for this project's purposes.
     schedule = pd.read_csv(LOCAL_SCHEDULE, low_memory=False)
-    schedule = ensure_schedule_columns(schedule)
-    
-    # This file now contains advanced stats directly
     team_stats = pd.read_csv(LOCAL_TEAM_STATS)
+    
+    # --- FIX IS HERE ---
+    # Enforce consistent data types for the 'game_id' key to prevent merge errors.
+    schedule['game_id'] = schedule['game_id'].astype(str)
+    team_stats['game_id'] = team_stats['game_id'].astype(str)
+
+    schedule = ensure_schedule_columns(schedule)
     
     lines_df = pd.read_csv(LOCAL_LINES) if os.path.exists(LOCAL_LINES) else pd.DataFrame()
     venues_df = pd.read_csv(LOCAL_VENUES) if os.path.exists(LOCAL_VENUES) else pd.DataFrame()
@@ -45,7 +48,6 @@ def main():
     manual_lines_df = pd.read_csv(MANUAL_LINES_CSV) if os.path.exists(MANUAL_LINES_CSV) else pd.DataFrame()
 
     # --- Rename columns for consistency and select key stats ---
-    # The new data source has a different schema, so we adapt it here.
     rename_map = {
         'gameId': 'game_id',
         'offense.ppa': 'ppa',
@@ -57,12 +59,8 @@ def main():
     }
     team_stats.rename(columns=rename_map, inplace=True)
     
-    # Define the ideal list of features we want to calculate rolling averages for
     STAT_FEATURES = ['ppa', 'success_rate', 'explosiveness', 'rushing_ppa', 'passing_ppa', 'defense_ppa']
     
-    # --- FIX IS HERE ---
-    # Filter STAT_FEATURES to only include columns that actually exist in the dataframe.
-    # This makes the script robust to missing columns in the source data.
     existing_stat_features = [col for col in STAT_FEATURES if col in team_stats.columns]
     if len(existing_stat_features) < len(STAT_FEATURES):
         missing = set(STAT_FEATURES) - set(existing_stat_features)
@@ -70,7 +68,6 @@ def main():
 
     # --- Season averages (for carry-forward logic) ---
     print("  Calculating and saving season average stats...")
-    # Use the filtered list of existing features to prevent the KeyError
     season_avg_stats = team_stats.groupby(['season', 'team'], as_index=False)[existing_stat_features].mean()
     season_avg_stats.to_parquet(SEASON_AVG_PARQUET, index=False)
 
