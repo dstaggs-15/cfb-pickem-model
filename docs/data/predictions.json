@@ -25,6 +25,14 @@
       {
         "feature": "spread_home",
         "value": 0.0
+      },
+      {
+        "feature": "over_under",
+        "value": 0.0
+      },
+      {
+        "feature": "market_home_prob",
+        "value": 0.0
       }
     ]
   },
@@ -53,6 +61,14 @@
       },
       {
         "feature": "spread_home",
+        "value": 0.0
+      },
+      {
+        "feature": "over_under",
+        "value": 0.0
+      },
+      {
+        "feature": "market_home_prob",
         "value": 0.0
       }
     ]
@@ -83,6 +99,14 @@
       {
         "feature": "spread_home",
         "value": 0.0
+      },
+      {
+        "feature": "over_under",
+        "value": 0.0
+      },
+      {
+        "feature": "market_home_prob",
+        "value": 0.0
       }
     ]
   },
@@ -111,6 +135,14 @@
       },
       {
         "feature": "spread_home",
+        "value": 0.0
+      },
+      {
+        "feature": "over_under",
+        "value": 0.0
+      },
+      {
+        "feature": "market_home_prob",
         "value": 0.0
       }
     ]
@@ -141,6 +173,14 @@
       {
         "feature": "spread_home",
         "value": 0.0
+      },
+      {
+        "feature": "over_under",
+        "value": 0.0
+      },
+      {
+        "feature": "market_home_prob",
+        "value": 0.0
       }
     ]
   },
@@ -169,6 +209,14 @@
       },
       {
         "feature": "spread_home",
+        "value": 0.0
+      },
+      {
+        "feature": "over_under",
+        "value": 0.0
+      },
+      {
+        "feature": "market_home_prob",
         "value": 0.0
       }
     ]
@@ -199,6 +247,14 @@
       {
         "feature": "spread_home",
         "value": 0.0
+      },
+      {
+        "feature": "over_under",
+        "value": 0.0
+      },
+      {
+        "feature": "market_home_prob",
+        "value": 0.0
       }
     ]
   },
@@ -227,6 +283,14 @@
       },
       {
         "feature": "spread_home",
+        "value": 0.0
+      },
+      {
+        "feature": "over_under",
+        "value": 0.0
+      },
+      {
+        "feature": "market_home_prob",
         "value": 0.0
       }
     ]
@@ -257,6 +321,14 @@
       {
         "feature": "spread_home",
         "value": 0.0
+      },
+      {
+        "feature": "over_under",
+        "value": 0.0
+      },
+      {
+        "feature": "market_home_prob",
+        "value": 0.0
       }
     ]
   },
@@ -286,6 +358,14 @@
       {
         "feature": "spread_home",
         "value": 0.0
+      },
+      {
+        "feature": "over_under",
+        "value": 0.0
+      },
+      {
+        "feature": "market_home_prob",
+        "value": 0.0
       }
     ]
   },
@@ -314,6 +394,14 @@
       },
       {
         "feature": "spread_home",
+        "value": 0.0
+      },
+      {
+        "feature": "over_under",
+        "value": 0.0
+      },
+      {
+        "feature": "market_home_prob",
         "value": 0.0
       }
     ]
