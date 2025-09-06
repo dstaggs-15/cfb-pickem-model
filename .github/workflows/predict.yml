@@ -3,9 +3,14 @@
 name: Generate Weekly Football Predictions
 
 on:
+  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+
+  # Runs automatically every Tuesday at 12:00 PM UTC
   schedule:
     - cron: '0 12 * * 2'
+
+  # Runs automatically whenever you push a change to the input games file
   push:
     paths:
       - 'docs/input/games.txt'
@@ -13,8 +18,11 @@ on:
 jobs:
   run-prediction-pipeline:
     runs-on: ubuntu-latest
+
+    # This block grants the necessary permissions for the commit step
     permissions:
       contents: write
+
     steps:
       - name: 1. Checkout Repository
         uses: actions/checkout@v4
@@ -46,12 +54,15 @@ jobs:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
         run: python -m scripts.predict
 
-      - name: 8. Commit and Push Predictions
+      - name: 8. Generate Data Snapshot for Website
+        run: python -m scripts.generate_data_snapshot
+
+      - name: 9. Commit and Push Predictions
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          branch: main # This ensures the commit goes to the main branch
-          commit_message: "📊 Update weekly predictions"
-          file_pattern: "docs/data/predictions.json"
+          branch: main
+          commit_message: "📊 Update weekly predictions & data snapshot"
+          file_pattern: "docs/data/predictions.json docs/data/data_snapshot.json"
           commit_user_name: "GitHub Actions Bot"
           commit_user_email: "github-actions@github.com"
           commit_author: "GitHub Actions Bot <github-actions@github.com>"
