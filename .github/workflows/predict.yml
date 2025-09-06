@@ -3,7 +3,10 @@
 name: 'Generate Weekly Football Predictions'
 
 on:
-  # Run on any push to test your code changes quickly
+  # This line adds the "Run workflow" button back to the Actions tab
+  workflow_dispatch:
+
+  # This trigger runs the workflow automatically on any push to test code changes
   push:
 
 jobs:
