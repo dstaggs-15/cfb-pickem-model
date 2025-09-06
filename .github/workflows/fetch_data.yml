@@ -1,11 +1,11 @@
-name: 'Manual Fetch and Save Data'
+name: 'Manual Fetch and Cache Data'
 
 on:
-  # This makes it a manually triggered workflow
+  # This makes it a manually triggered workflow that you can run from the Actions tab
   workflow_dispatch:
 
 jobs:
-  fetch-and-save:
+  fetch-and-cache:
     runs-on: ubuntu-latest
     steps:
       - name: 1. Checkout Repository
@@ -25,9 +25,11 @@ jobs:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
         run: python -m scripts.fetch_cfbd
 
-      - name: 5. Save Data as an Artifact
-        # This step packages the downloaded data for other workflows to use.
-        uses: actions/upload-artifact@v4
+      - name: 5. Save Data to Cache
+        # This step saves the downloaded data folder for the other workflow to use.
+        uses: actions/cache/save@v4
         with:
-          name: raw-cfbd-data
           path: data/raw/cfbd
+          # We're using 'v2' as the key version to ensure a fresh start.
+          key: ${{ runner.os }}-raw-cfbd-data-v2
+
