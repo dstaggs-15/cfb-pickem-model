@@ -64,7 +64,6 @@ def main():
     predict_df['game_id'] = [f"predict_{i}" for i in range(len(predict_df))]
     predict_df['season'] = schedule['season'].max()
 
-    # Create features for the games to predict using the shared function
     X, _ = create_feature_set(
         schedule,
         team_stats_long,
@@ -76,23 +75,19 @@ def main():
         games_to_predict_df=predict_df
     )
 
-    # Add market features using saved parameters
     if market_params and 'a' in market_params and 'b' in market_params:
         a, b = market_params["a"], market_params["b"]
         X["market_home_prob"] = X["spread_home"].apply(lambda s: (1/(1+np.exp(-(a + b * (-(s))))) if pd.notna(s) else np.nan))
     else:
         X["market_home_prob"] = 0.5
 
-    # Final cleaning
     for col in features:
         if col not in X.columns:
             X[col] = 0.0
         X[col] = pd.to_numeric(X[col], errors='coerce').fillna(0.0)
     
-    # Predict
     probs = model.predict_proba(X[features])[:, 1]
 
-    # SHAP Explanations
     shap_values = None
     if base_estimator:
         print("  Generating SHAP explanations...")
@@ -101,34 +96,35 @@ def main():
         explainer = shap.TreeExplainer(base_estimator, train_df_features)
         shap_values = explainer.shap_values(X[features])
     
-    # --- Vectorized Output Generation (Replaces the old for-loop) ---
-    output_df = X[['home_team', 'away_team', 'neutral_site']].copy()
-    output_df['model_prob_home'] = probs
-    output_df['pick'] = np.where(
-        output_df['model_prob_home'] > 0.5,
-        output_df['home_team'],
-        output_df['away_team']
-    )
-    output_df['neutral_site'] = output_df['neutral_site'].astype(bool)
-
-    explanations = [[] for _ in range(len(output_df))]
-    if shap_values is not None:
-        feature_names = X[features].columns
-        temp_explanations = []
-        for i in range(len(X)):
+    output = []
+    for i in range(len(X)):
+        prob = probs[i]
+        home_team = X['home_team'].iloc[i]
+        away_team = X['away_team'].iloc[i]
+        neutral_site = bool(X['neutral_site'].iloc[i])
+        pick = home_team if prob > 0.5 else away_team
+        
+        explanation = []
+        if shap_values is not None:
             shap_row = shap_values[i]
-            expl = sorted(
+            feature_names = X[features].columns
+            # --- FIX IS HERE ---
+            # The '[:5]' limit at the end of this block has been removed
+            # to include ALL factors in the explanation.
+            explanation = sorted(
                 [{'feature': name, 'value': val} for name, val in zip(feature_names, shap_row)],
                 key=lambda x: abs(x['value']),
                 reverse=True
-            )[:5]
-            temp_explanations.append(expl)
-        explanations = temp_explanations
-        
-    output_df['explanation'] = explanations
-    
-    # Convert to the final JSON structure
-    output = output_df.to_dict(orient='records')
+            )
+
+        output.append({
+            'home_team': home_team,
+            'away_team': away_team,
+            'neutral_site': neutral_site,
+            'model_prob_home': prob,
+            'pick': pick,
+            'explanation': explanation
+        })
 
     save_json(PREDICTIONS_JSON, output)
     print(f"Successfully wrote {len(output)} predictions to {PREDICTIONS_JSON}")
