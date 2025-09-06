@@ -3,14 +3,9 @@
 name: Generate Weekly Football Predictions
 
 on:
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-
-  # Runs automatically every Tuesday at 12:00 PM UTC
   schedule:
     - cron: '0 12 * * 2'
-
-  # Runs automatically whenever you push a change to the input games file
   push:
     paths:
       - 'docs/input/games.txt'
@@ -18,6 +13,11 @@ on:
 jobs:
   run-prediction-pipeline:
     runs-on: ubuntu-latest
+
+    # This block grants the necessary permissions for the commit step
+    permissions:
+      contents: write
+
     steps:
       - name: 1. Checkout Repository
         uses: actions/checkout@v4
@@ -38,9 +38,6 @@ jobs:
           path: data/raw/cfbd
           key: ${{ runner.os }}-raw-cfbd-data-v1
 
-      # Note: We no longer need the 'fetch_data' step here because we have a separate
-      # manual workflow for that. This main workflow just uses the cache.
-
       - name: 5. Build Training Dataset
         run: python -m scripts.build_dataset
 
@@ -53,7 +50,6 @@ jobs:
         run: python -m scripts.predict
 
       - name: 8. Commit and Push Predictions
-        # This step is now active and will save the results to your repo.
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "📊 Update weekly predictions"
