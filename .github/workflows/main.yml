@@ -1,9 +1,16 @@
-# .github/workflows/main.yml (FINAL PRODUCTION VERSION)
+# .github/workflows/main.yml (FINAL PRODUCTION VERSION WITH DEBUG MODE)
 
 name: Generate Weekly Football Predictions
 
 on:
   workflow_dispatch:
+    # This adds a "Debug Mode" checkbox when you manually run the workflow
+    inputs:
+      force_data_download:
+        description: 'Force a full 30-min data download? (Uncheck for fast debug)'
+        required: true
+        type: boolean
+        default: false
   schedule:
     - cron: '0 12 * * 2'
   push:
@@ -33,15 +40,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: data/raw/cfbd
-          # --- FIX IS HERE ---
-          # This new key is more robust. It will create a fresh cache now,
-          # and automatically invalidate if you ever change requirements.txt.
           key: ${{ runner.os }}-raw-cfbd-data-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-raw-cfbd-data-
 
-      - name: 5. Fetch Latest Data from API (if cache missed)
-        if: steps.cache-raw-data.outputs.cache-hit != 'true'
+      - name: 5. Fetch Latest Data from API
+        # This step now runs ONLY if you check the "force download" box,
+        # or if the cache was not found.
+        if: steps.cache-raw-data.outputs.cache-hit != 'true' || github.event.inputs.force_data_download == 'true'
         env:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
         run: python -m scripts.fetch_cfbd
