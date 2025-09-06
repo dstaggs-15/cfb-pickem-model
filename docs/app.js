@@ -3,8 +3,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterInput = document.getElementById('filterInput');
     
     const defaultColors = {
-        primary: '#cccccc',
-        secondary: '#888888'
+        primary: '#555555',
+        secondary: '#333333'
     };
 
     const displayStatusMessage = (message) => {
@@ -73,33 +73,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const card = document.createElement('div');
             card.className = 'game-card';
+            card.dataset.teamNames = `${game.home_team.toLowerCase()} ${game.away_team.toLowerCase()}`;
 
             const matchupSeparator = game.neutral_site ? 'vs' : '@';
             
             card.innerHTML = `
-                <div class="teams">
-                    <span class="team-name away">${game.away_team}</span>
-                    <span class="vs">${matchupSeparator}</span>
-                    <span class="team-name home">${game.home_team}</span>
+                <div class="game-summary">
+                    <div class="teams">
+                        <span class="team-name away">${game.away_team}</span>
+                        <span class="vs">${matchupSeparator}</span>
+                        <span class="team-name home">${game.home_team}</span>
+                    </div>
+                    <div class="probability-bar-container">
+                        <div class="probability-bar" style="background-color: ${awayColor}; width: ${awayProbPercent}%;">${awayProbPercent}%</div>
+                        <div class="probability-bar" style="background-color: ${homeColor}; width: ${homeProbPercent}%;">${homeProbPercent}%</div>
+                    </div>
+                    <div class="pick-container">
+                        <span class="pick-label">PICK:</span>
+                        <span class="pick-team">${game.pick}</span>
+                    </div>
                 </div>
-                <div class="probability-bar-container">
-                    <div class="probability-bar" style="background-color: ${awayColor}; width: ${awayProbPercent}%;">${awayProbPercent}%</div>
-                    <div class="probability-bar" style="background-color: ${homeColor}; width: ${homeProbPercent}%;">${homeProbPercent}%</div>
-                </div>
-                <div class="pick-container">
-                    <span class="pick-label">PICK:</span>
-                    <span class="pick-team">${game.pick}</span>
-                </div>
-                <div class="explanation-details" style="display: none;"></div>
+                <div class="explanation-details"></div>
             `;
             
             card.addEventListener('click', () => {
+                card.classList.toggle('expanded');
                 const detailsDiv = card.querySelector('.explanation-details');
-                const isHidden = detailsDiv.style.display === 'none';
                 
-                detailsDiv.style.display = isHidden ? 'block' : 'none';
-
-                if (isHidden && detailsDiv.innerHTML === '') {
+                // Load explanation content only on the first click
+                if (card.classList.contains('expanded') && detailsDiv.innerHTML === '') {
                     renderExplanation(detailsDiv, game.explanation, homeColor, awayColor, game.home_team, game.away_team);
                 }
             });
@@ -108,9 +110,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
     
-    /**
-     * Renders the new, meter-style explanation.
-     */
     const renderExplanation = (element, explanation, homeColor, awayColor, homeTeam, awayTeam) => {
         if (!explanation || explanation.length === 0) {
             element.innerHTML = '<div class="explanation-row">No explanation data available.</div>';
@@ -148,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
     filterInput.addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase();
         document.querySelectorAll('.game-card').forEach(card => {
-            const cardText = card.textContent.toLowerCase();
+            const cardText = card.dataset.teamNames;
             card.classList.toggle('hidden', !cardText.includes(searchTerm));
         });
     });
