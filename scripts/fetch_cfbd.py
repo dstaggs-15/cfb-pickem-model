@@ -1,249 +1,237 @@
 #!/usr/bin/env python3
-# scripts/fetch_cfbd.py
+# scripts/fetch_cfbd_api.py
 #
-# Robust CFBD fetcher with fallbacks:
-# - Supports env/CLI: START_SEASON, END_SEASON, INCLUDE_CURRENT
-# - Tries multiple candidate URLs for each file (monolithic and per-season patterns)
-# - Merges season files when needed
-# - Normalizes schedule columns expected downstream
+# Fetch required raw data from the CollegeFootballData API and write CSVs under data/raw/cfbd/.
+# Reads seasons from env or CLI flags and stitches all seasons into single CSVs.
 #
-# Usage examples:
-#   python -m scripts.fetch_cfbd
-#   START_SEASON=2014 END_SEASON=2025 INCLUDE_CURRENT=true python -m scripts.fetch_cfbd
-#   python -m scripts.fetch_cfbd --start 2014 --end 2025 --include-current
+# ENV:
+#   CFBD_API_KEY          (required)
+#   START_SEASON, END_SEASON (ints, default 2014..current)
+#   INCLUDE_CURRENT       ("true"/"false", default true)
+#
+# Usage:
+#   CFBD_API_KEY=... python -m scripts.fetch_cfbd_api
+#   START_SEASON=2014 END_SEASON=2025 INCLUDE_CURRENT=true python -m scripts.fetch_cfbd_api
+#   python -m scripts.fetch_cfbd_api --start 2014 --end 2025 --include-current
 
 import os
 import sys
 import argparse
-import time
-from typing import Dict, List, Tuple
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
+import time
+import json
+import requests
 import pandas as pd
 
 DEST_DIR = "data/raw/cfbd"
+API_BASE = "https://api.collegefootballdata.com"
 
-RAW_BASE = "https://raw.githubusercontent.com/moneyball-ab/cfb-data/master/csv"
-# We’ll try these in order; the first that works “wins”.
-# For “seasonized” patterns, we put a {season} placeholder and stitch them together.
-CANDIDATES: Dict[str, List[str]] = {
-    # SCHEDULE
-    "cfb_schedule.csv": [
-        f"{RAW_BASE}/cfb_schedule.csv",
-        f"{RAW_BASE}/schedule.csv",
-        f"{RAW_BASE}/schedule/{{season}}.csv",
-        f"{RAW_BASE}/cfb_schedule_{{season}}.csv",
-    ],
+# -------- helpers --------
 
-    # LINES (many repos don’t expose a flat cfb_lines.csv at root)
-    "cfb_lines.csv": [
-        f"{RAW_BASE}/cfb_lines.csv",
-        f"{RAW_BASE}/cfb_lines_history.csv",
-        f"{RAW_BASE}/lines.csv",
-        f"{RAW_BASE}/lines/{{season}}.csv",
-        f"{RAW_BASE}/cfb_lines_{{season}}.csv",
-        f"{RAW_BASE}/betting_lines/{{season}}.csv",
-    ],
+def _bool_env(val: Optional[str], default: bool) -> bool:
+    if val is None:
+        return default
+    return str(val).strip().lower() in {"1", "true", "y", "yes"}
 
-    # TEAM STATS
-    "cfb_game_team_stats.csv": [
-        f"{RAW_BASE}/cfb_game_team_stats.csv",
-        f"{RAW_BASE}/team_stats.csv",
-        f"{RAW_BASE}/team_stats/{{season}}.csv",
-        f"{RAW_BASE}/cfb_game_team_stats_{{season}}.csv",
-    ],
+def _headers() -> Dict[str, str]:
+    key = os.environ.get("CFBD_API_KEY")
+    if not key:
+        print("[fetch_api] ERROR: CFBD_API_KEY env var is not set.", file=sys.stderr)
+        sys.exit(1)
+    return {"Authorization": f"Bearer {key}"}
 
-    # VENUES (note: 'cfbd_venues.csv' often DOESN'T exist; 'cfb_venues.csv' usually does)
-    "cfb_venues.csv": [
-        f"{RAW_BASE}/cfb_venues.csv",
-        f"{RAW_BASE}/venues.csv",
-        f"{RAW_BASE}/venues/{{season}}.csv",
-        f"{RAW_BASE}/cfbd_venues.csv",  # keep as a last-try fallback
-    ],
+def _get(path: str, params: Dict[str, Any]) -> Any:
+    url = f"{API_BASE}{path}"
+    for attempt in range(1, 5):
+        resp = requests.get(url, headers=_headers(), params=params, timeout=30)
+        if resp.status_code == 200:
+            try:
+                return resp.json()
+            except Exception:
+                # sometimes API returns empty string
+                return []
+        # CFBD has rate limits; a short backoff helps
+        time.sleep(1.0 * attempt)
+    raise RuntimeError(f"GET {url} failed status={resp.status_code} text={resp.text[:200]}")
 
-    # TEAMS
-    "cfb_teams.csv": [
-        f"{RAW_BASE}/cfb_teams.csv",
-        f"{RAW_BASE}/teams.csv",
-        f"{RAW_BASE}/teams/{{season}}.csv",
-        f"{RAW_BASE}/cfbd_teams.csv",
-    ],
+def _season_range(start: int, end: int, include_current: bool) -> List[int]:
+    this_year = datetime.now(timezone.utc).year
+    last = max(end, this_year) if include_current else end
+    return list(range(start, last + 1))
 
-    # TALENT
-    "cfb_talent.csv": [
-        f"{RAW_BASE}/cfb_talent.csv",
-        f"{RAW_BASE}/talent.csv",
-        f"{RAW_BASE}/talent/{{season}}.csv",
-        f"{RAW_BASE}/recruiting_talent/{{season}}.csv",
-    ],
-}
+def _save_df(df: pd.DataFrame, name: str) -> None:
+    os.makedirs(DEST_DIR, exist_ok=True)
+    path = os.path.join(DEST_DIR, name)
+    df.to_csv(path, index=False)
+    print(f"[fetch_api] wrote {path} (rows={len(df)}, cols={len(df.columns)})")
 
-# Files the model expects to exist for a full build
-REQUIRED_FOR_MODEL = [
-    "cfb_schedule.csv",
-    "cfb_lines.csv",
-    "cfb_game_team_stats.csv",
-    "cfb_venues.csv",
-    "cfb_teams.csv",
-    "cfb_talent.csv",
-]
+# -------- per-entity fetchers --------
 
-
-def _read_csv(url: str) -> pd.DataFrame:
-    return pd.read_csv(url)
-
-
-def _read_csv_with_retries(url: str, retries: int = 3, sleep_sec: float = 1.2) -> pd.DataFrame:
-    last_err = None
-    for attempt in range(1, retries + 1):
-        try:
-            return _read_csv(url)
-        except Exception as e:
-            last_err = e
-            print(f"[fetch] attempt {attempt} failed for {url}: {e}", file=sys.stderr)
-            time.sleep(sleep_sec)
-    raise RuntimeError(f"Failed to fetch {url} after {retries} attempts") from last_err
-
-
-def _normalize_schedule(df: pd.DataFrame) -> pd.DataFrame:
-    # Ensure columns we reference later exist
-    must_have = ["game_id", "season", "week", "home_team", "away_team", "home_points", "away_points"]
-    for c in must_have:
-        if c not in df.columns:
-            df[c] = pd.NA
-
-    # Coerce some numerics
+def fetch_schedule(seasons: List[int]) -> pd.DataFrame:
+    rows: List[Dict[str, Any]] = []
+    for y in seasons:
+        data = _get("/games", {"year": y, "division": "fbs"})
+        rows.extend(data or [])
+        # Postseason sometimes requires seasonType
+        data_post = _get("/games", {"year": y, "seasonType": "postseason", "division": "fbs"})
+        rows.extend(data_post or [])
+    df = pd.json_normalize(rows)
+    # Normalize/canonicalize columns used downstream
+    rename = {
+        "id": "game_id",
+        "home_points": "home_points",
+        "away_points": "away_points",
+        "home_team": "home_team",
+        "away_team": "away_team",
+        "neutral_site": "neutral_site",
+        "season": "season",
+        "week": "week",
+    }
+    for k, v in rename.items():
+        if v not in df.columns and k in df.columns:
+            df[v] = df[k]
     for c in ["game_id", "season", "week", "home_points", "away_points"]:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
-
     if "neutral_site" not in df.columns:
         df["neutral_site"] = 0
     return df
 
+def fetch_lines(seasons: List[int]) -> pd.DataFrame:
+    rows: List[Dict[str, Any]] = []
+    # CFBD: /lines?year=YYYY (may include multiple providers)
+    for y in seasons:
+        data = _get("/lines", {"year": y})
+        rows.extend(data or [])
+    # Flatten provider lines if nested
+    flat: List[Dict[str, Any]] = []
+    for r in rows:
+        # shape: {id, season, week, homeTeam, awayTeam, lines: [{provider,...,spread,overUnder}]}
+        base = {
+            "game_id": r.get("id"),
+            "season": r.get("season"),
+            "week": r.get("week"),
+            "home_team": r.get("homeTeam"),
+            "away_team": r.get("awayTeam"),
+        }
+        for ln in (r.get("lines") or []):
+            rec = base.copy()
+            rec["provider"] = ln.get("provider")
+            rec["spread_home"] = ln.get("spread")  # CFBD spread is from home perspective (+ = home favored)
+            rec["over_under"] = ln.get("overUnder")
+            rec["formattedSpread"] = ln.get("formattedSpread")
+            rec["openingSpread"] = ln.get("openingSpread")
+            flat.append(rec)
+    df = pd.DataFrame(flat)
+    return df
 
-def _save_csv(df: pd.DataFrame, dest_path: str) -> None:
-    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-    df.to_csv(dest_path, index=False)
+def fetch_team_game_stats(seasons: List[int]) -> pd.DataFrame:
+    rows: List[Dict[str, Any]] = []
+    # CFBD: /games/teams?year=YYYY
+    for y in seasons:
+        data = _get("/games/teams", {"year": y})
+        rows.extend(data or [])
+    # Flatten; each game has 'teams': [{school, points, stats:[{category,stat}]}, ...]
+    flat: List[Dict[str, Any]] = []
+    for g in rows:
+        game_id = g.get("id")
+        season = g.get("season")
+        week = g.get("week")
+        teams = g.get("teams") or []
+        for t in teams:
+            school = t.get("school")
+            pts = t.get("points")
+            stats = t.get("stats") or []
+            rec = {"game_id": game_id, "season": season, "week": week, "team": school, "points": pts}
+            for s in stats:
+                cat = (s.get("category") or "").strip()
+                val = s.get("stat")
+                if cat:
+                    rec[cat] = val
+            flat.append(rec)
+    df = pd.DataFrame(flat)
+    return df
 
+def fetch_venues() -> pd.DataFrame:
+    data = _get("/venues", {})
+    return pd.json_normalize(data or [])
 
-def _fetch_single_candidate(url: str, start: int, end: int, include_current: bool) -> Tuple[pd.DataFrame, str]:
-    """
-    Try to fetch either a monolithic CSV or a seasonized pattern (if '{season}' in URL).
-    Returns (df, 'mono' | 'seasonized').
-    Raises on failure.
-    """
-    if "{season}" not in url:
-        df = _read_csv_with_retries(url)
-        return df, "mono"
-
-    # Seasonized: stitch together
+def fetch_teams(seasons: List[int]) -> pd.DataFrame:
+    # Team list can vary by year; stitch
     parts = []
-    last_season = end
-    if include_current:
-        last_season = max(end, last_season)
-    for season in range(start, last_season + 1):
-        season_url = url.replace("{season}", str(season))
-        try:
-            df_season = _read_csv_with_retries(season_url)
-            if not df_season.empty:
-                parts.append(df_season)
-                print(f"[fetch]  • pulled {len(df_season)} rows from {season_url}")
-        except Exception as e:
-            # Not fatal; just continue to next pattern or season
-            print(f"[fetch]  • no data at {season_url}: {e}", file=sys.stderr)
+    for y in seasons:
+        data = _get("/teams/fbs", {"year": y})
+        parts.append(pd.json_normalize(data or []).assign(season=y))
+    return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
 
-    if not parts:
-        raise RuntimeError(f"No season files resolved for pattern {url}")
+def fetch_talent(seasons: List[int]) -> pd.DataFrame:
+    parts = []
+    for y in seasons:
+        data = _get("/talent", {"year": y})
+        parts.append(pd.json_normalize(data or []).assign(season=y))
+    return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
 
-    stitched = pd.concat(parts, ignore_index=True)
-    return stitched, "seasonized"
-
-
-def _fetch_with_candidates(name: str, candidates: List[str], start: int, end: int, include_current: bool) -> pd.DataFrame:
-    """
-    Try all URL candidates for a given logical file name, returning the first that works.
-    For seasonized patterns, we stitch multiple files together.
-    """
-    last_err = None
-    for url in candidates:
-        try:
-            print(f"[fetch] trying {name} <= {url}")
-            df, mode = _fetch_single_candidate(url, start, end, include_current)
-            print(f"[fetch] resolved {name} via {mode}: rows={len(df)}, cols={len(df.columns)}")
-            return df
-        except Exception as e:
-            last_err = e
-            print(f"[fetch] candidate failed for {name}: {url} => {e}", file=sys.stderr)
-    raise RuntimeError(f"All candidates failed for {name}") from last_err
-
-
-def _parse_bool_env(v: str | None, default: bool = False) -> bool:
-    if v is None:
-        return default
-    return str(v).strip().lower() in {"1", "true", "yes", "y"}
-
+# -------- main --------
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Fetch CFBD raw CSVs into data/raw/cfbd/ with fallbacks.")
+    parser = argparse.ArgumentParser(description="Fetch raw CFBD data via API and write CSVs.")
     parser.add_argument("--start", type=int, default=int(os.environ.get("START_SEASON", "2014")))
-    parser.add_argument("--end", type=int, default=int(os.environ.get("END_SEASON", "2025")))
-    parser.add_argument("--include-current", action="store_true", default=_parse_bool_env(os.environ.get("INCLUDE_CURRENT"), True))
+    parser.add_argument("--end", type=int, default=int(os.environ.get("END_SEASON", str(datetime.now().year))))
+    parser.add_argument("--include-current", action="store_true",
+                        default=_bool_env(os.environ.get("INCLUDE_CURRENT"), True))
     args = parser.parse_args()
 
-    start_season = args.start
-    end_season = args.end
-    include_current = args.include_current
+    seasons = _season_range(args.start, args.end, args.include_current)
+    print(f"[fetch_api] seasons={seasons}")
 
-    print(f"Fetching CFBD raw data into '{DEST_DIR}' (start={start_season}, end={end_season}, include_current={include_current})")
+    # Fetch
+    print("[fetch_api] schedule ...")
+    schedule = fetch_schedule(seasons)
 
-    os.makedirs(DEST_DIR, exist_ok=True)
+    print("[fetch_api] lines ...")
+    lines = fetch_lines(seasons)
 
-    successes, failures = [], []
+    print("[fetch_api] team game stats ...")
+    team_stats = fetch_team_game_stats(seasons)
 
-    for logical_name, url_list in CANDIDATES.items():
-        try:
-            df = _fetch_with_candidates(logical_name, url_list, start_season, end_season, include_current)
+    print("[fetch_api] venues ...")
+    venues = fetch_venues()
 
-            # Schedule normalization for downstream scripts
-            if logical_name == "cfb_schedule.csv":
-                df = _normalize_schedule(df)
+    print("[fetch_api] teams ...")
+    teams = fetch_teams(seasons)
 
-            # For venues, we want the saved filename to be cfb_venues.csv (not cfbd_*).
-            dest_name = logical_name
-            if logical_name == "cfb_venues.csv":
-                dest_name = "cfb_venues.csv"
+    print("[fetch_api] talent ...")
+    talent = fetch_talent(seasons)
 
-            dest_path = os.path.join(DEST_DIR, dest_name)
-            _save_csv(df, dest_path)
-            print(f"[fetch] wrote {dest_path} (rows={len(df)}, cols={len(df.columns)})")
-            successes.append(dest_name)
-        except Exception as e:
-            print(f"[fetch] ERROR for {logical_name}: {e}", file=sys.stderr)
-            failures.append(logical_name)
+    # Save
+    _save_df(schedule, "cfb_schedule.csv")
+    _save_df(lines, "cfb_lines.csv")
+    _save_df(team_stats, "cfb_game_team_stats.csv")
+    _save_df(venues, "cfb_venues.csv")
+    _save_df(teams, "cfb_teams.csv")
+    _save_df(talent, "cfb_talent.csv")
 
-    # Post-process: if a required logical file is missing, flag it
-    missing = []
-    name_map = {
-        # map logical names to saved filenames
-        "cfb_schedule.csv": "cfb_schedule.csv",
-        "cfb_lines.csv": "cfb_lines.csv",
-        "cfb_game_team_stats.csv": "cfb_game_team_stats.csv",
-        "cfb_venues.csv": "cfb_venues.csv",
-        "cfb_teams.csv": "cfb_teams.csv",
-        "cfb_talent.csv": "cfb_talent.csv",
+    # Minimal snapshot so you can inspect what you got
+    snapshot = {
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "seasons": {"min": min(seasons), "max": max(seasons)},
+        "rows": {
+            "cfb_schedule.csv": int(len(schedule)),
+            "cfb_lines.csv": int(len(lines)),
+            "cfb_game_team_stats.csv": int(len(team_stats)),
+            "cfb_venues.csv": int(len(venues)),
+            "cfb_teams.csv": int(len(teams)),
+            "cfb_talent.csv": int(len(talent)),
+        },
     }
-    for req in REQUIRED_FOR_MODEL:
-        saved = name_map[req]
-        if not os.path.exists(os.path.join(DEST_DIR, saved)):
-            missing.append(saved)
+    os.makedirs("docs/data", exist_ok=True)
+    with open("docs/data/fetch_snapshot.json", "w") as f:
+        json.dump(snapshot, f, indent=2)
+    print("[fetch_api] wrote docs/data/fetch_snapshot.json")
 
-    if missing:
-        print(f"[fetch] WARNING: missing files after all fallbacks: {missing}", file=sys.stderr)
-        return 1
-
-    print(f"[fetch] Done. success={len(successes)}, failed={len(failures)}")
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
