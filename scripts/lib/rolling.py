@@ -11,85 +11,87 @@ SEASON_AVG_PARQUET = f"{DERIVED}/season_averages.parquet"
 
 def long_stats_to_wide(team_stats: pd.DataFrame) -> pd.DataFrame:
     """
-    Pivot per-team (home/away) long stats into a single wide row per game.
+    Convert per-team (home/away) long stats into one wide row per game.
 
-    Expects team_stats to contain:
-      - 'game_id' (identifier)
-      - 'home_away' in {'home','away'}
-      - 'team'
-      - one or more numeric stat columns to aggregate
+    Requires columns:
+      - game_id
+      - home_away  (values like 'home'/'away'; we normalize)
+      - team
+      - numeric stat columns to aggregate (everything else must be numeric)
 
-    This function:
-      - coerces convertible object columns to numeric
-      - selects numeric-only columns for aggregation
-      - pivots to home/away columns and RETURNS 'game_id' AS A COLUMN
+    Strategy:
+      1) Normalize 'home_away'
+      2) Coerce possible numeric object cols to numeric
+      3) Groupby ['game_id','home_away'] and take mean of numeric cols
+      4) Unstack 'home_away' into _home / _away columns
     """
     if team_stats is None or team_stats.empty:
-        # Return a well-shaped empty frame with game_id so downstream logic stays sane
         return pd.DataFrame(columns=["game_id"])
 
     df = team_stats.copy()
 
-    # Basic schema sanity
+    # --- sanity
     required = {"game_id", "home_away"}
     missing = required - set(df.columns)
     if missing:
         raise ValueError(
             f"long_stats_to_wide(): missing required columns: {sorted(missing)}. "
-            f"Available columns: {list(df.columns)}"
+            f"Have: {list(df.columns)}"
         )
 
-    # Try to coerce object columns (besides ids) to numeric where possible
+    # Normalize home_away to just 'home'/'away'
+    df["home_away"] = df["home_away"].astype(str).str.lower().str.strip()
+    df["home_away"] = df["home_away"].replace(
+        {
+            "h": "home", "home_team": "home", "host": "home",
+            "a": "away", "away_team": "away", "visitor": "away"
+        }
+    )
+    df = df[df["home_away"].isin(["home", "away"])]
+
+    # Coerce object columns to numeric where possible (never ids/meta)
     id_like = {"game_id", "home_away", "team", "season", "week", "date"}
     for c in df.columns:
-        if c not in id_like and df[c].dtype == "object":
+        if c in id_like:
+            continue
+        if df[c].dtype == "object":
             tmp = pd.to_numeric(df[c], errors="coerce")
-            # Only replace if any conversions succeed; otherwise leave the column as-is
             if tmp.notna().any():
                 df[c] = tmp
 
-    # Use strictly numeric columns for agg; never average ids/meta
+    # Numeric-only stat columns for aggregation (exclude ids/meta)
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     numeric_cols = [c for c in numeric_cols if c not in {"game_id", "season", "week"}]
 
     if not numeric_cols:
-        # Fail FAST with a helpful message instead of letting a later merge blow up
-        sample = df.head(20).to_dict(orient="records")
+        # Show a helpful slice so we can identify the leak upstream
+        sample = df.head(25)[list(set(df.columns) - {"date"})].to_dict(orient="records")
         raise ValueError(
-            "long_stats_to_wide(): no numeric stat columns found to pivot. "
-            "Upstream melt/merge likely leaked strings into the stat set. "
-            f"Sample rows: {sample}"
+            "long_stats_to_wide(): no numeric stat columns to aggregate. "
+            "Upstream melt/merge likely included text columns as stats. "
+            f"Sample rows (trimmed): {sample}"
         )
 
-    # Robust pivot that ignores non-existent category combos
-    pivoted = (
-        df.pivot_table(
-            index="game_id",
-            columns="home_away",
-            values=numeric_cols,
-            aggfunc="mean",
-            observed=True,
-        )
-        .sort_index()
-        .reset_index()  # <- CRITICAL: ensure 'game_id' is a COLUMN, not index
-    )
+    # ---- robust wide transform (never loses 'game_id')
+    # mean by game_id & home_away for each numeric stat
+    grp = df.groupby(["game_id", "home_away"], dropna=False)[numeric_cols].mean()
 
-    # Flatten MultiIndex columns -> "<stat>_<home|away>"
-    pivoted.columns = [
-        f"{col[0]}_{col[1]}" if isinstance(col, tuple) else col
-        for col in pivoted.columns
-    ]
+    # Unstack to columns: <stat>_<home|away>
+    wide = grp.unstack("home_away")
+    # If unstack produced no columns (e.g., only one side present), guard it
+    if isinstance(wide.columns, pd.MultiIndex):
+        wide.columns = [f"{stat}_{side}" for stat, side in wide.columns.to_list()]
+    else:
+        # Degenerate case: no 'home'/'away' split. Make it explicit anyway.
+        wide.columns = [f"{c}_home" for c in wide.columns]
 
-    # At this point, we MUST have 'game_id' as a column
-    if "game_id" not in pivoted.columns:
-        # As an absolute last resort, pull it from an index if somehow present
-        pivoted = pivoted.reset_index()
-        if "game_id" not in pivoted.columns:
-            raise ValueError(
-                "long_stats_to_wide(): internal error — 'game_id' missing after pivot."
-            )
+    wide = wide.reset_index()  # <- guarantees 'game_id' is a column
 
-    return pivoted
+    # Final assert (belt-and-suspenders)
+    if "game_id" not in wide.columns:
+        raise ValueError("long_stats_to_wide(): 'game_id' still missing after unstack/reset_index()")
+
+    return wide
 
 
 def _get_rollups(df: pd.DataFrame, last_n: int, season_averages_df: pd.DataFrame) -> pd.DataFrame:
@@ -171,24 +173,24 @@ def build_sidewise_rollups(
 
     schedule = schedule.copy()
     if "date" in schedule.columns:
-        # Keep times consistent in UTC; if your input is tz-aware already, use tz_convert
+        # Normalize times to UTC; if tz-aware, convert; if naive, localize
         schedule["date"] = pd.to_datetime(schedule["date"], errors="coerce")
-        if schedule["date"].dt.tz is None:
+        if getattr(schedule["date"].dt, "tz", None) is None:
             schedule["date"] = schedule["date"].dt.tz_localize("UTC")
         else:
             schedule["date"] = schedule["date"].dt.tz_convert("UTC")
 
-    # --- HARD GUARANTEE: 'game_id' must be a column on wide_stats
+    # Ensure 'game_id' is a column on wide_stats
     if "game_id" not in wide_stats.columns:
         wide_stats = wide_stats.reset_index()
+
     if "game_id" not in wide_stats.columns:
-        # If still not present, then wide_stats is malformed/empty. Fail FAST with context.
         raise ValueError(
             f"build_sidewise_rollups(): 'game_id' missing on wide_stats. "
             f"wide_stats columns={list(wide_stats.columns)} shape={wide_stats.shape}"
         )
 
-    # If wide_stats is somehow empty, create a shell so merges don’t KeyError
+    # If wide_stats is empty, create a shell keyed by schedule game_ids
     if wide_stats.empty:
         wide_stats = pd.DataFrame({"game_id": schedule["game_id"].unique()})
 
