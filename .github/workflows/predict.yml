@@ -29,7 +29,7 @@ jobs:
           pip install "pandas==2.2.2" "numpy==1.26.4" "pyarrow==16.1.0" "requests>=2.31.0" "scikit-learn>=1.4.0" "joblib>=1.3.0"
           pip install -r requirements.txt || true
 
-      - name: "Guard: raw CSVs must exist in repo"
+      - name: Guard: raw CSVs must exist in repo
         run: |
           ls -lh data/raw/cfbd || true
           if [ ! -f "data/raw/cfbd/cfb_schedule.csv" ]; then
@@ -44,8 +44,7 @@ jobs:
         run: python -m scripts.train_model
 
       - name: Generate predictions
-        env:
-          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+        # If scripts.predict calls CFBD too, it'll still use the hardcoded key in code.
         run: python -m scripts.predict
 
       - name: Create website snapshot
@@ -56,5 +55,9 @@ jobs:
         with:
           branch: main
           commit_message: "📊 Update weekly predictions & data snapshot"
-          file_pattern: docs/data/predictions.json docs/data/data_snapshot.json
+          file_pattern: |
+            docs/data/predictions.json
+            docs/data/data_snapshot.json
+          commit_user_name: "GitHub Actions Bot"
+          commit_user_email: "github-actions@github.com"
           commit_author: "GitHub Actions Bot <github-actions@github.com>"
