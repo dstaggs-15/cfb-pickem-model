@@ -43,7 +43,8 @@ def _load_schedule_from_raw() -> pd.DataFrame:
         print(f"[FEATURES] WARNING: schedule raw file not found at {path}")
         return pd.DataFrame()
 
-    df = pd.read_csv(path)
+    # low_memory=False avoids mixed-type chunk warnings, reads columns consistently
+    df = pd.read_csv(path, low_memory=False)
 
     # id -> game_id
     if "id" in df.columns and "game_id" not in df.columns:
@@ -97,9 +98,9 @@ def create_feature_set(use_cache: bool = True, predict_only: bool = False):
     - loads schedule from data/raw/cfbd/cfb_schedule.csv
     - builds a shell wide_stats if no team stats are present (so we don't crash)
     - builds sidewise rollups safely
-    - RETURNS X that includes labels: home_points, away_points (for training)
+    - ALWAYS returns X with 'game_id'; includes labels if schedule present
     """
-    # 1) Load schedule from raw cache (now includes points)
+    # 1) Load schedule from raw cache (includes points)
     schedule = _load_schedule_from_raw()
     _log_small("schedule (raw normalized)", schedule)
 
@@ -173,18 +174,22 @@ def create_feature_set(use_cache: bool = True, predict_only: bool = False):
     _log_small("away_roll", away_roll)
 
     # 5) Compose final X and include labels from schedule
+    # ALWAYS ensure 'game_id' exists in the output, even if rollups are empty
     if home_roll.empty and away_roll.empty:
-        X = pd.DataFrame()
-        feature_list = []
+        if not schedule.empty and "game_id" in schedule.columns:
+            X = schedule[["game_id", "season", "week", "home_points", "away_points"]].copy()
+        else:
+            X = pd.DataFrame(columns=["game_id", "season", "week", "home_points", "away_points"])
+        feature_list = []  # no features yet
     else:
-        # Join rollups on game_id/team, then bring in labels from schedule
         X = home_roll.merge(away_roll, on=["game_id", "team"], how="outer", suffixes=("_home", "_away"))
-
-        # Merge schedule labels onto X using game_id
         if not schedule.empty:
             labels = schedule[["game_id", "season", "week", "home_points", "away_points"]].copy()
             X = X.merge(labels, on="game_id", how="left")
-
         feature_list = [c for c in X.columns if c not in {"game_id", "team", "home_points", "away_points", "season", "week"}]
+
+    # Belt-and-suspenders: guarantee 'game_id' is a column
+    if "game_id" not in X.columns and X.index.name == "game_id":
+        X = X.reset_index()
 
     return X, feature_list
