@@ -21,7 +21,7 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install dependencies (pinned core + project)
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install "pandas==2.2.2" "numpy==1.26.4" "pyarrow==16.1.0" "requests>=2.31.0"
@@ -30,7 +30,7 @@ jobs:
       - name: Ensure raw folder exists
         run: mkdir -p data/raw/cfbd && touch data/raw/cfbd/.gitkeep
 
-      - name: Fetch CFBD data (API only)
+      - name: Fetch CFBD data (games only to validate auth)
         env:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
           START_SEASON: "2014"
@@ -47,9 +47,9 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           branch: main
-          commit_message: "⬇️ CFBD raw data refresh (commit CSVs for pipeline)"
+          commit_message: "⬇️ CFBD raw data refresh (games only)"
           file_pattern: |
-            data/raw/cfbd/*.csv
+            data/raw/cfbd/cfb_schedule.csv
             data/raw/cfbd/.gitkeep
           commit_user_name: "GitHub Actions Bot"
           commit_user_email: "github-actions@github.com"
