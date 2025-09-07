@@ -1,125 +1,163 @@
-#!/usr/bin/env python3
+# scripts/lib/features.py
 
-import json, datetime as dt
-import os
-import numpy as np
 import pandas as pd
+import numpy as np
 
-from .lib.io_utils import load_csv_local_or_url, save_json
-from .lib.parsing import ensure_schedule_columns
-from .lib.features import create_feature_set
-from .lib.market import fit_market_mapping
+from .rolling import long_stats_to_wide, build_sidewise_rollups
+# import your other helpers as you already do:
+# from .parsing import ensure_schedule_columns
+# from .market import median_lines, fit_market_mapping
+# from .elo import pregame_probs
+# from .context import rest_and_travel
+# etc.
 
-# File paths
-LOCAL_DIR = "data/raw/cfbd"
-LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
-LOCAL_TEAM_STATS = f"{LOCAL_DIR}/cfb_game_team_stats.csv"
-LOCAL_LINES = f"{LOCAL_DIR}/cfb_lines.csv"
-LOCAL_VENUES = f"{LOCAL_DIR}/cfbd_venues.csv"
-LOCAL_TEAMS = f"{LOCAL_DIR}/cfbd_teams.csv"
-LOCAL_TALENT = f"{LOCAL_DIR}/cfbd_talent.csv"
+# Put the numeric stat names you actually expect to melt/pivot here.
+# Keep this list in sync with whatever your raw schema provides.
+STAT_FEATURES = [
+    # examples — replace/extend with your true numeric metrics
+    "ppa",
+    "success_rate",
+    "explosiveness",
+    "rushing_ppa",
+    "passing_ppa",
+    "defense_ppa",
+    "points_per_play",
+    "yards_per_play",
+    # add the rest of your numeric stat fields
+]
 
-DERIVED = "data/derived"
-TRAIN_PARQUET = f"{DERIVED}/training.parquet"
-META_JSON = "docs/data/train_meta.json"
-SEASON_AVG_PARQUET = f"{DERIVED}/season_averages.parquet"
-MANUAL_LINES_CSV = "docs/input/lines.csv"
+ID_VARS = ["season", "week", "game_id", "team", "home_away", "date"]
 
-def main():
-    print("Building training dataset...")
-    os.makedirs(DERIVED, exist_ok=True)
-    os.makedirs(os.path.dirname(META_JSON), exist_ok=True)
+def _is_numeric_series(s: pd.Series) -> bool:
+    if pd.api.types.is_numeric_dtype(s):
+        return True
+    coerced = pd.to_numeric(s, errors="coerce")
+    return coerced.notna().any()
 
-    # --- Load raw data ---
-    schedule = pd.read_csv(LOCAL_SCHEDULE, low_memory=False)
-    team_stats = pd.read_csv(LOCAL_TEAM_STATS)
-    
-    # Standardize game_id column name and type
-    if 'id' in schedule.columns and 'game_id' not in schedule.columns:
-        schedule.rename(columns={'id': 'game_id'}, inplace=True)
-    if 'game_id' in schedule.columns:
-        schedule['game_id'] = schedule['game_id'].astype(str)
-    
-    if 'gameId' in team_stats.columns:
-        team_stats.rename(columns={'gameId': 'game_id'}, inplace=True)
-    if 'game_id' in team_stats.columns:
-        team_stats['game_id'] = team_stats['game_id'].astype(str)
+def _log_small(name, df, rows=5):
+    try:
+        print(f"[FEATURES] {name}: shape={df.shape} cols={list(df.columns)[:20]}")
+        if not df.empty:
+            print(df.head(rows).to_string(index=False))
+    except Exception as e:
+        print(f"[FEATURES] {name}: <failed to log: {e}>")
 
-    schedule = ensure_schedule_columns(schedule)
-    
-    lines_df = pd.read_csv(LOCAL_LINES) if os.path.exists(LOCAL_LINES) else pd.DataFrame()
-    venues_df = pd.read_csv(LOCAL_VENUES) if os.path.exists(LOCAL_VENUES) else pd.DataFrame()
-    teams_df = pd.read_csv(LOCAL_TEAMS) if os.path.exists(LOCAL_TEAMS) else pd.DataFrame()
-    talent_df = pd.read_csv(LOCAL_TALENT) if os.path.exists(LOCAL_TALENT) else pd.DataFrame()
-    manual_lines_df = pd.read_csv(MANUAL_LINES_CSV) if os.path.exists(MANUAL_LINES_CSV) else pd.DataFrame()
+def _melt_numeric_only(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Melt only the numeric stat columns we expect. Never melt team names, etc.
+    """
+    # Only keep columns we know are numeric features and required ids
+    value_vars = [c for c in df.columns if c in STAT_FEATURES]
+    missing_stats = [c for c in STAT_FEATURES if c not in df.columns]
+    if missing_stats:
+        print(f"[FEATURES] WARNING: Missing expected stat columns: {missing_stats[:20]}{' ...' if len(missing_stats)>20 else ''}")
 
-    # --- Rename columns and define stats of interest ---
-    rename_map = {
-        'offense.ppa': 'ppa', 'offense.successRate': 'success_rate', 'offense.explosiveness': 'explosiveness',
-        'offense.rushingPPA': 'rushing_ppa', 'offense.passingPPA': 'passing_ppa', 'defense.ppa': 'defense_ppa',
-    }
-    team_stats.rename(columns=rename_map, inplace=True)
-    
-    STAT_FEATURES = ['ppa', 'success_rate', 'explosiveness', 'rushing_ppa', 'passing_ppa', 'defense_ppa']
-    
-    # --- FIX IS HERE ---
-    # Force all stat columns to be numeric. Any non-numeric values (like 'TempleArizona State')
-    # will be converted to NaN (Not a Number), which pandas can handle safely.
-    for col in STAT_FEATURES:
-        if col in team_stats.columns:
-            team_stats[col] = pd.to_numeric(team_stats[col], errors='coerce')
-
-    existing_stat_features = [col for col in STAT_FEATURES if col in team_stats.columns]
-    
-    # --- Season averages (for carry-forward logic) ---
-    print("  Calculating and saving season average stats...")
-    # This calculation is now safe because all columns are guaranteed to be numeric.
-    season_avg_stats = team_stats.groupby(['season', 'team'], as_index=False)[existing_stat_features].mean()
-    season_avg_stats.to_parquet(SEASON_AVG_PARQUET, index=False)
-
-    # --- Build full feature set ---
-    print("  Creating feature set...")
-    X, feature_list = create_feature_set(
-        schedule=schedule, team_stats=team_stats, venues_df=venues_df,
-        teams_df=teams_df, talent_df=talent_df, lines_df=lines_df,
-        manual_lines_df=manual_lines_df, games_to_predict_df=None
+    long_df = df.melt(
+        id_vars=[c for c in ID_VARS if c in df.columns],
+        value_vars=value_vars,
+        var_name="stat",
+        value_name="value",
     )
 
-    # --- Labels & Market Mapping ---
-    X["home_win"] = (pd.to_numeric(X["home_points"], errors='coerce') >
-                     pd.to_numeric(X["away_points"], errors='coerce')).astype(int)
+    # Coerce values to numeric and drop non-numeric rows
+    long_df["value"] = pd.to_numeric(long_df["value"], errors="coerce")
+    bad = long_df["value"].isna()
+    if bad.any():
+        # show a quick sample so you can locate the leak
+        sample = long_df.loc[bad, ["game_id", "team", "home_away", "stat", "value"]].head(25)
+        print("[FEATURES] Dropping non-numeric long rows (sample):")
+        print(sample.to_string(index=False))
+        long_df = long_df.loc[~bad].copy()
 
-    params = {}
-    if 'spread_home' in X.columns and X['spread_home'].notna().any():
-        params = fit_market_mapping(X["spread_home"], X["home_win"]) or {}
-        if 'a' in params and 'b' in params:
-            a, b = float(params["a"]), float(params["b"])
-            X["market_home_prob"] = 1.0 / (1.0 + np.exp(-(a + b * (-X["spread_home"]))))
-        else:
-            X["market_home_prob"] = np.nan
+    return long_df
+
+def create_feature_set(use_cache: bool = True, predict_only: bool = False):
+    """
+    Your existing entry point. Read your raw/cached inputs here,
+    build long stats safely, pivot, build sidewise rollups, etc.
+    """
+    # ----------------------------------------------------------------------
+    # 1) Load your preprocessed team-level wide stats table here
+    #    (Adjust these loads to your actual source; the point is to
+    #     show/validate the frame we’re about to melt.)
+    # ----------------------------------------------------------------------
+    # Example skeleton — replace with your actual upstream loads:
+    # team_wide = pd.read_parquet("data/derived/team_wide.parquet")
+    # schedule  = pd.read_parquet("data/derived/schedule.parquet")
+
+    # The following are placeholders — replace with your real source
+    try:
+        team_wide = pd.read_parquet("data/derived/team_wide.parquet")
+    except Exception:
+        # Fallback so code runs; replace with your true source integration
+        team_wide = pd.DataFrame()
+
+    try:
+        schedule = pd.read_parquet("data/derived/schedule.parquet")
+    except Exception:
+        schedule = pd.DataFrame()
+
+    _log_small("team_wide (pre-melt)", team_wide)
+    _log_small("schedule (pre-rollups)", schedule)
+
+    # ----------------------------------------------------------------------
+    # 2) Create long stats safely (numeric-only melt)
+    # ----------------------------------------------------------------------
+    if team_wide.empty:
+        print("[FEATURES] WARNING: team_wide is empty — downstream frames will be empty.")
+        team_stats_long = pd.DataFrame(columns=["season","week","game_id","team","home_away","date","stat","value"])
     else:
-        X["market_home_prob"] = np.nan
+        # Ensure required id columns exist; adapt to your schema as needed.
+        for col in ["season","week","game_id","team","home_away","date"]:
+            if col not in team_wide.columns:
+                team_wide[col] = pd.NA
 
-    X["market_home_prob"] = X.groupby("season")["market_home_prob"].transform(lambda s: s.fillna(s.mean()))
+        team_stats_long = _melt_numeric_only(team_wide)
 
-    # --- Finalize and Save ---
-    extra = ["spread_home", "over_under", "market_home_prob"]
-    final_feature_list = [f for f in (feature_list + extra) if f in X.columns]
-    
-    train_df = X.dropna(subset=["home_points", "away_points"]).copy()
-    for col in final_feature_list:
-        train_df[col] = pd.to_numeric(train_df[col], errors='coerce').fillna(0.0).astype('float32')
+    _log_small("team_stats_long (post-melt)", team_stats_long)
 
-    train_df.to_parquet(TRAIN_PARQUET, index=False)
+    # ----------------------------------------------------------------------
+    # 3) Convert long → wide per game: home/away columns
+    # ----------------------------------------------------------------------
+    team_stats_sided = team_stats_long.pivot_table(
+        index=["season","week","game_id","team","home_away","date"],
+        columns="stat",
+        values="value",
+        aggfunc="mean",
+        observed=True,
+    ).reset_index()
 
-    meta = {
-        "generated": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "features": final_feature_list,
-        "market_params": params
-    }
-    save_json(META_JSON, meta)
-    print(f"Wrote {TRAIN_PARQUET} and {META_JSON}")
+    _log_small("team_stats_sided (pre-wide)", team_stats_sided)
 
-if __name__ == "__main__":
-    main()
+    # Now call the robust wide pivot (ensures game_id ends up as a column)
+    wide_stats = long_stats_to_wide(team_stats_sided)
+    _log_small("wide_stats (post-wide)", wide_stats)
 
+    # ----------------------------------------------------------------------
+    # 4) Sidewise rollups (last_n could be your configured windows, e.g., 5)
+    # ----------------------------------------------------------------------
+    LAST_N = 5
+    home_roll, away_roll = build_sidewise_rollups(
+        schedule=schedule,
+        wide_stats=wide_stats,
+        last_n=LAST_N,
+        predict_df=None  # or pass your predict-only frame if you're in predict mode
+    )
+    _log_small("home_roll", home_roll)
+    _log_small("away_roll", away_roll)
+
+    # ----------------------------------------------------------------------
+    # 5) Build your final feature matrix X and feature_list
+    #     (This is just a scaffold; plug in your actual logic here.)
+    # ----------------------------------------------------------------------
+    # Example: join home/away rollups and any other signals you use
+    if home_roll.empty and away_roll.empty:
+        X = pd.DataFrame()
+        feature_list = []
+    else:
+        # naive example: align on game_id and suffix columns
+        X = home_roll.merge(away_roll, on=["game_id","team"], how="outer", suffixes=("_home","_away"))
+        feature_cols = [c for c in X.columns if c not in {"game_id","team"}]
+        feature_list = feature_cols
+
+    return X, feature_list
