@@ -27,33 +27,23 @@ def _load_training():
     if "game_id" not in df.columns:
         if getattr(df.index, "name", None) == "game_id":
             df = df.reset_index()
-        else:
-            # As a last resort: if index looks unique, promote it
-            if df.index.is_unique:
-                df = df.reset_index().rename(columns={"index": "game_id"})
+        elif df.index.is_unique:
+            df = df.reset_index().rename(columns={"index": "game_id"})
 
     # If labels missing, try to merge from raw schedule cache
     need_labels = ("home_points" not in df.columns) or ("away_points" not in df.columns)
-    if need_labels:
-        if os.path.exists(RAW_SCHED):
-            # low_memory=False prevents mixed-type warnings/behaviour
-            sched = pd.read_csv(RAW_SCHED, low_memory=False)
-            if "id" in sched.columns and "game_id" not in sched.columns:
-                sched = sched.rename(columns={"id": "game_id"})
-            for c in ["home_points", "away_points"]:
-                if c not in sched.columns:
-                    sched[c] = pd.NA
-                sched[c] = pd.to_numeric(sched[c], errors="coerce")
+    if need_labels and os.path.exists(RAW_SCHED):
+        sched = pd.read_csv(RAW_SCHED, low_memory=False)
+        if "game_id" not in sched.columns and "id" in sched.columns:
+            sched = sched.rename(columns={"id": "game_id"})
+        for c in ["home_points", "away_points"]:
+            if c not in sched.columns:
+                sched[c] = pd.NA
+            sched[c] = pd.to_numeric(sched[c], errors="coerce")
 
-            if "game_id" not in df.columns:
-                raise KeyError(
-                    "training.parquet has no 'game_id' column even after index recovery. "
-                    "Fix build_dataset to always include 'game_id'."
-                )
-
-            df = df.merge(sched[["game_id", "home_points", "away_points"]], on="game_id", how="left")
-        else:
-            print("[TRAIN] WARNING: raw schedule not found; cannot attach labels. Training will be skipped if labels remain NaN.")
+        if "game_id" not in df.columns:
+            raise KeyError("training.parquet has no 'game_id' column even after index recovery. Fix build_dataset.")
+        df = df.merge(sched[["game_id", "home_points", "away_points"]], on="game_id", how="left")
 
     return df
 
@@ -76,7 +66,7 @@ def main():
     # Keep only rows with completed games (labels present)
     train_df = df[df["home_points"].notna() & df["away_points"].notna()].copy()
     if train_df.empty:
-        raise ValueError("No completed games with labels found. Ensure your raw schedule cache includes historical results.")
+        raise ValueError("No completed games with labels found. Ensure the fetch workflow pulled finals with scores.")
 
     # Example binary target: did the home team win?
     train_df["home_win"] = (train_df["home_points"] > train_df["away_points"]).astype(int)
