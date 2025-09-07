@@ -15,22 +15,19 @@ def long_stats_to_wide(team_stats: pd.DataFrame) -> pd.DataFrame:
 
     Requires columns:
       - game_id
-      - home_away  (values like 'home'/'away'; we normalize)
+      - home_away ('home'/'away' or equivalents)
       - team
-      - numeric stat columns to aggregate (everything else must be numeric)
+      - numeric stat columns to aggregate
 
-    Strategy:
-      1) Normalize 'home_away'
-      2) Coerce possible numeric object cols to numeric
-      3) Groupby ['game_id','home_away'] and take mean of numeric cols
-      4) Unstack 'home_away' into _home / _away columns
+    If there are no numeric stats, a clear error is raised (so you know
+    upstream melt/merge is wrong).
     """
     if team_stats is None or team_stats.empty:
         return pd.DataFrame(columns=["game_id"])
 
     df = team_stats.copy()
 
-    # --- sanity
+    # Required columns
     required = {"game_id", "home_away"}
     missing = required - set(df.columns)
     if missing:
@@ -39,17 +36,15 @@ def long_stats_to_wide(team_stats: pd.DataFrame) -> pd.DataFrame:
             f"Have: {list(df.columns)}"
         )
 
-    # Normalize home_away to just 'home'/'away'
+    # Normalize home_away
     df["home_away"] = df["home_away"].astype(str).str.lower().str.strip()
     df["home_away"] = df["home_away"].replace(
-        {
-            "h": "home", "home_team": "home", "host": "home",
-            "a": "away", "away_team": "away", "visitor": "away"
-        }
+        {"h": "home", "home_team": "home", "host": "home",
+         "a": "away", "away_team": "away", "visitor": "away"}
     )
     df = df[df["home_away"].isin(["home", "away"])]
 
-    # Coerce object columns to numeric where possible (never ids/meta)
+    # Coerce object columns to numeric where possible (exclude meta/id fields)
     id_like = {"game_id", "home_away", "team", "season", "week", "date"}
     for c in df.columns:
         if c in id_like:
@@ -59,35 +54,27 @@ def long_stats_to_wide(team_stats: pd.DataFrame) -> pd.DataFrame:
             if tmp.notna().any():
                 df[c] = tmp
 
-    # Numeric-only stat columns for aggregation (exclude ids/meta)
+    # Numeric stat columns (never average ids)
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     numeric_cols = [c for c in numeric_cols if c not in {"game_id", "season", "week"}]
-
     if not numeric_cols:
-        # Show a helpful slice so we can identify the leak upstream
         sample = df.head(25)[list(set(df.columns) - {"date"})].to_dict(orient="records")
         raise ValueError(
             "long_stats_to_wide(): no numeric stat columns to aggregate. "
-            "Upstream melt/merge likely included text columns as stats. "
+            "Upstream melt/merge likely included text columns as stats or no stats were loaded. "
             f"Sample rows (trimmed): {sample}"
         )
 
-    # ---- robust wide transform (never loses 'game_id')
-    # mean by game_id & home_away for each numeric stat
+    # Group and unstack (robustly preserves game_id)
     grp = df.groupby(["game_id", "home_away"], dropna=False)[numeric_cols].mean()
-
-    # Unstack to columns: <stat>_<home|away>
     wide = grp.unstack("home_away")
-    # If unstack produced no columns (e.g., only one side present), guard it
     if isinstance(wide.columns, pd.MultiIndex):
         wide.columns = [f"{stat}_{side}" for stat, side in wide.columns.to_list()]
     else:
-        # Degenerate case: no 'home'/'away' split. Make it explicit anyway.
         wide.columns = [f"{c}_home" for c in wide.columns]
 
-    wide = wide.reset_index()  # <- guarantees 'game_id' is a column
+    wide = wide.reset_index()  # ensures 'game_id' is a column
 
-    # Final assert (belt-and-suspenders)
     if "game_id" not in wide.columns:
         raise ValueError("long_stats_to_wide(): 'game_id' still missing after unstack/reset_index()")
 
@@ -97,14 +84,13 @@ def long_stats_to_wide(team_stats: pd.DataFrame) -> pd.DataFrame:
 def _get_rollups(df: pd.DataFrame, last_n: int, season_averages_df: pd.DataFrame) -> pd.DataFrame:
     """
     Compute per-team rolling means with previous-season padding.
-    Expects df to have: ['game_id', 'date', 'season', 'team', <numeric stat columns>]
+    Expects: ['game_id','date','season','team', <numeric stat columns>]
     """
     if df is None or df.empty:
         return pd.DataFrame()
 
     df = df.sort_values(by=["date"]).reset_index(drop=True)
 
-    # Only roll over numeric stats
     stat_cols = [
         c for c in df.columns
         if c not in {"game_id", "date", "season", "team"} and pd.api.types.is_numeric_dtype(df[c])
@@ -117,7 +103,6 @@ def _get_rollups(df: pd.DataFrame, last_n: int, season_averages_df: pd.DataFrame
         seasons = team_df["season"].dropna().unique()
         for season in seasons:
             s_df = team_df[team_df["season"] == season]
-            # previous-season padding (carry some baseline into early weeks)
             prior = season - 1
             pad_rows = []
             if not season_averages_df.empty:
@@ -134,12 +119,10 @@ def _get_rollups(df: pd.DataFrame, last_n: int, season_averages_df: pd.DataFrame
             else:
                 padded = s_df[stat_cols]
 
-            # Rolling mean over last_n, shifted so we don't peek at the current game
             rolling = padded.rolling(window=last_n, min_periods=1).mean()
             final = rolling.iloc[-len(s_df):].shift(1)
             final.columns = [f"R{last_n}_{c}" for c in stat_cols]
 
-            # How many real games we had backing the rolling window (1..last_n)
             counts = pd.Series(range(1, len(s_df) + 1), index=s_df.index)
             counts[counts > last_n] = last_n
             final[f"R{last_n}_count"] = counts
@@ -166,55 +149,56 @@ def build_sidewise_rollups(
     """
     Create separate home/away rolling frames aligned by game_id
     from a joined schedule+wide_stats table.
+
+    Now tolerant of empty/malformed schedule: returns empty rollups instead
+    of crashing.
     """
+    # If schedule is missing or lacks required keys, bail gracefully
+    if schedule is None or schedule.empty or "game_id" not in schedule.columns:
+        return pd.DataFrame(), pd.DataFrame()
+
     season_averages_df = (
         pd.read_parquet(SEASON_AVG_PARQUET) if os.path.exists(SEASON_AVG_PARQUET) else pd.DataFrame()
     )
 
     schedule = schedule.copy()
     if "date" in schedule.columns:
-        # Normalize times to UTC; if tz-aware, convert; if naive, localize
         schedule["date"] = pd.to_datetime(schedule["date"], errors="coerce")
-        if getattr(schedule["date"].dt, "tz", None) is None:
-            schedule["date"] = schedule["date"].dt.tz_localize("UTC")
-        else:
-            schedule["date"] = schedule["date"].dt.tz_convert("UTC")
+        try:
+            # localize if naive; convert if tz-aware
+            if getattr(schedule["date"].dt, "tz", None) is None:
+                schedule["date"] = schedule["date"].dt.tz_localize("UTC")
+            else:
+                schedule["date"] = schedule["date"].dt.tz_convert("UTC")
+        except Exception:
+            # Worst case: keep as naive; rolling still works
+            pass
 
     # Ensure 'game_id' is a column on wide_stats
     if "game_id" not in wide_stats.columns:
-        wide_stats = wide_stats.reset_index()
+        wide_stats = wide_stats.reset_index(drop=False)
 
-    if "game_id" not in wide_stats.columns:
-        raise ValueError(
-            f"build_sidewise_rollups(): 'game_id' missing on wide_stats. "
-            f"wide_stats columns={list(wide_stats.columns)} shape={wide_stats.shape}"
-        )
-
-    # If wide_stats is empty, create a shell keyed by schedule game_ids
-    if wide_stats.empty:
-        wide_stats = pd.DataFrame({"game_id": schedule["game_id"].unique()})
-
+    # Merge schedule + wide_stats
     full_df = schedule.merge(wide_stats, on="game_id", how="left")
 
-    # --- Build per-team (home) frame
+    # Per-team frames
     home_df = full_df[["game_id", "date", "season", "home_team"]].rename(columns={"home_team": "team"})
     home_stats_cols = [c for c in full_df.columns if c.endswith("_home")]
     home_stats = full_df[home_stats_cols].copy()
     home_stats.columns = [c.replace("_home", "") for c in home_stats.columns]
     home_df = pd.concat([home_df, home_stats], axis=1)
 
-    # --- Build per-team (away) frame
     away_df = full_df[["game_id", "date", "season", "away_team"]].rename(columns={"away_team": "team"})
     away_stats_cols = [c for c in full_df.columns if c.endswith("_away")]
     away_stats = full_df[away_stats_cols].copy()
     away_stats.columns = [c.replace("_away", "") for c in away_stats.columns]
     away_df = pd.concat([away_df, away_stats], axis=1)
 
-    # If predicting, append the games to the per-team frames with future dates
+    # Predict-mode support
     if predict_df is not None and not predict_df.empty:
         pred = predict_df.copy()
         pred["date"] = pd.Timestamp.now(tz="UTC") + pd.Timedelta(days=365)
-        if "season" not in pred.columns:
+        if "season" not in pred.columns and "season" in schedule.columns:
             pred["season"] = schedule["season"].max()
 
         home_pred = pred[["game_id", "date", "season", "home_team"]].rename(columns={"home_team": "team"})
