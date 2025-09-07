@@ -1,7 +1,7 @@
 name: Generate Weekly Football Predictions
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # <-- This makes the "Run workflow" button appear
   push:
     paths:
       - "data/raw/cfbd/*.csv"
@@ -21,44 +21,45 @@ jobs:
       PYTHONUNBUFFERED: "1"
 
     steps:
-      - name: Checkout repo
+      - name: 1) Checkout repo
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: 2) Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install dependencies (pinned core + project)
+      - name: 3) Install dependencies (pinned core + project)
         run: |
           python -m pip install --upgrade pip
-          pip install "pandas==2.2.2" "numpy==1.26.4" "pyarrow==16.1.0" "requests>=2.31.0" "scikit-learn>=1.4.0"
+          pip install "pandas==2.2.2" "numpy==1.26.4" "pyarrow==16.1.0" "requests>=2.31.0" "scikit-learn>=1.4.0" "joblib>=1.3.0"
           pip install -r requirements.txt || true
 
-      - name: Guard: raw CSVs must be present
+      - name: 4) Guard: raw CSVs must exist in repo
         run: |
+          ls -lh data/raw/cfbd || true
           if [ ! -f "data/raw/cfbd/cfb_schedule.csv" ]; then
-            echo "No raw CFBD data found in repo. Run 'Manual Fetch and Commit CFBD Data' first."
+            echo "No raw CFBD data found in repo at data/raw/cfbd/. Run 'Manual Fetch and Commit CFBD Data' first."
             exit 1
           fi
 
-      - name: Build training dataset
+      - name: 5) Build training dataset
         run: python -m scripts.build_dataset
 
-      - name: Train model
+      - name: 6) Train model
         run: python -m scripts.train_model
 
-      - name: Generate predictions
+      - name: 7) Generate predictions
         env:
-          # only needed if your `scripts.predict` also hits API
+          # Only needed if scripts.predict also calls the CFBD API
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
         run: python -m scripts.predict
 
-      - name: Create website snapshot
+      - name: 8) Create website snapshot
         run: python -m scripts.generate_data_snapshot
 
-      - name: Commit & push results (predictions + snapshot)
+      - name: 9) Commit & push results (predictions + snapshot)
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           branch: main
@@ -70,7 +71,7 @@ jobs:
           commit_user_email: "github-actions@github.com"
           commit_author: "GitHub Actions Bot <github-actions@github.com>"
 
-      - name: Upload debug artifacts on failure
+      - name: 10) Upload debug artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
