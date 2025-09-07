@@ -2,11 +2,28 @@
 # scripts/predict.py
 
 import os
+import sys
 import json
-import joblib
+import types
 import pandas as pd
 import numpy as np
+import joblib
 import shap
+
+# ---- NumPy 1.x -> 2.x pickle compatibility shim ---------------------------
+# Some models pickled under NumPy 1.x reference private modules like
+# 'numpy.random._pcg64.PCG64'. NumPy 2.x removed those private paths.
+# This shim provides an alias so joblib/pickle can resolve the old name.
+try:
+    import numpy.random as _npr
+    if hasattr(_npr, "PCG64") and "numpy.random._pcg64" not in sys.modules:
+        _shim = types.ModuleType("numpy.random._pcg64")
+        _shim.PCG64 = _npr.PCG64
+        sys.modules["numpy.random._pcg64"] = _shim
+except Exception:
+    # Non-fatal; we'll still try to load below. If it fails, you'll get a clear error.
+    pass
+# ---------------------------------------------------------------------------
 
 from .lib.io_utils import load_csv_local_or_url, save_json
 from .lib.parsing import parse_games_txt, load_aliases, ensure_schedule_columns
@@ -25,7 +42,6 @@ ALIASES_JSON = "docs/input/aliases.json"
 MANUAL_LINES_CSV = "docs/input/lines.csv"
 
 LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
-LOCAL_LINES = f"{LOCAL_DIR}/cfb_lines.csv"
 
 RAW_BASE = "https://raw.githubusercontent.com/moneyball-ab/cfb-data/master/csv"
 FALLBACK_SCHEDULE_URL = f"{RAW_BASE}/cfb_schedule.csv"
@@ -34,8 +50,17 @@ FALLBACK_SCHEDULE_URL = f"{RAW_BASE}/cfb_schedule.csv"
 def main():
     print("Generating predictions...")
 
-    # --- Load model and metadata ---
-    model_payload = joblib.load(MODEL_JOBLIB)
+    # --- Load model and metadata (robust errors) ---
+    try:
+        model_payload = joblib.load(MODEL_JOBLIB)
+    except Exception as e:
+        msg = (
+            f"[PREDICT] Failed to load {MODEL_JOBLIB}: {e}\n"
+            "This usually means the model was trained under a different NumPy/Sklearn version.\n"
+            "Fix: pin dependencies (see requirements.txt below) and/or retrain the model."
+        )
+        raise RuntimeError(msg) from e
+
     model = model_payload["model"]
     base_estimator = model_payload.get("base_estimator")
 
@@ -56,12 +81,9 @@ def main():
         print("No games listed in docs/input/games.txt. Wrote empty predictions.")
         return
 
-    # Make a DF for requested games if team names are available; used later to filter X.
     predict_df = pd.DataFrame(games_to_predict)
-    # We'll try to filter by home/away if those columns exist after we build X.
 
     # --- Build features with the simplified API ---
-    # current create_feature_set() builds from cached raw CSVs; no kwargs supported.
     X, _ = create_feature_set()
 
     # --- Ensure identifiers present for output (merge from schedule if needed) ---
@@ -69,18 +91,17 @@ def main():
     if "neutral_site" in schedule.columns:
         id_cols.append("neutral_site")
     sched_small = schedule[id_cols].drop_duplicates("game_id")
-    # Merge on keys we know exist in X: "game_id" (and season/week we preserved)
-    # If season/week aren't in X for some reason, the left merge on game_id will still work.
+
     merge_keys = [k for k in ["game_id", "season", "week"] if k in X.columns and k in sched_small.columns]
     if not merge_keys:
         merge_keys = ["game_id"]
+
     X = X.merge(sched_small, on=merge_keys, how="left")
 
-    # Default neutral_site if missing after merge
     if "neutral_site" not in X.columns:
         X["neutral_site"] = 0
 
-    # Optional: filter to requested games if predict_df has team names
+    # Optional: filter to requested games if predict_df has the names
     if {"home_team", "away_team"}.issubset(predict_df.columns):
         want = predict_df[["home_team", "away_team"]].drop_duplicates()
         before = len(X)
@@ -93,7 +114,7 @@ def main():
         return
 
     # --- Market-implied home win prob from spread (if configured) ---
-    # Features use "home_closing_spread" (not "spread_home")
+    # Features provide 'home_closing_spread' (not 'spread_home').
     if market_params and "a" in market_params and "b" in market_params and "home_closing_spread" in X.columns:
         a, b = market_params["a"], market_params["b"]
         X["market_home_prob"] = X["home_closing_spread"].apply(
@@ -122,15 +143,11 @@ def main():
 
     # --- Build output JSON ---
     output = []
-    n = len(X)
-    for i in range(n):
+    for i in range(len(X)):
         prob = float(probs[i])
-
-        # These columns now exist because we merged from schedule
         home_team = X.get("home_team").iloc[i] if "home_team" in X.columns else None
         away_team = X.get("away_team").iloc[i] if "away_team" in X.columns else None
         neutral_site = bool(X.get("neutral_site").iloc[i]) if "neutral_site" in X.columns else False
-
         pick = home_team if prob > 0.5 else away_team
 
         explanation = []
