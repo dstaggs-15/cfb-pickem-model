@@ -10,9 +10,6 @@ import numpy as np
 import joblib
 
 # ---- NumPy 1.x -> 2.x pickle compatibility shim ---------------------------
-# Models pickled under NumPy 1.x may reference private modules like
-# 'numpy.random._pcg64.PCG64'. NumPy 2.x removed those private paths.
-# This shim provides an alias so joblib/pickle can resolve the old name.
 try:
     import numpy.random as _npr
     if hasattr(_npr, "PCG64") and "numpy.random._pcg64" not in sys.modules:
@@ -27,9 +24,8 @@ from .lib.io_utils import load_csv_local_or_url, save_json
 from .lib.parsing import parse_games_txt, load_aliases, ensure_schedule_columns
 from .lib.features import create_feature_set
 
-# File paths
+# Paths
 DERIVED = "data/derived"
-
 LOCAL_DIR = "data/raw/cfbd"
 MODEL_JOBLIB = f"{DERIVED}/model.joblib"
 META_JSON = "docs/data/train_meta.json"
@@ -38,32 +34,64 @@ GAMES_TXT = "docs/input/games.txt"
 ALIASES_JSON = "docs/input/aliases.json"
 
 LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
-
 RAW_BASE = "https://raw.githubusercontent.com/moneyball-ab/cfb-data/master/csv"
 FALLBACK_SCHEDULE_URL = f"{RAW_BASE}/cfb_schedule.csv"
+
+
+def _load_model_payload(path: str):
+    try:
+        payload = joblib.load(path)
+        return payload
+    except Exception as e:
+        msg = (
+            f"[PREDICT] Failed to load {path}: {e}\n"
+            "Likely version mismatch (NumPy/Sklearn). Pin deps and/or retrain."
+        )
+        raise RuntimeError(msg) from e
+
+
+def _resolve_model_and_base(payload):
+    """
+    Accept either:
+      - dict-like payload: {'model': estimator, 'base_estimator': optional}
+      - bare estimator object: CalibratedClassifierCV / HistGradientBoostingClassifier, etc.
+    Return (model, base_estimator_or_None)
+    """
+    if isinstance(payload, dict):
+        model = payload["model"]
+        base = payload.get("base_estimator")
+        return model, base
+
+    # Bare estimator; try to detect a calibrated wrapper
+    model = payload
+    base = getattr(model, "base_estimator_", None) or getattr(model, "base_estimator", None)
+    return model, base
+
+
+def _load_features_list():
+    # Prefer meta file; otherwise try model.feature_names_in_
+    if os.path.exists(META_JSON):
+        with open(META_JSON, "r") as f:
+            meta = json.load(f)
+        feats = meta.get("features")
+        market_params = meta.get("market_params", {})
+        if feats:
+            return feats, market_params
+    # Fallback: we’ll fill features later from model.feature_names_in_
+    return None, {}
 
 
 def main():
     print("Generating predictions...")
 
-    # --- Load model and metadata (fail loud if environment mismatch) ---
-    try:
-        model_payload = joblib.load(MODEL_JOBLIB)
-    except Exception as e:
-        msg = (
-            f"[PREDICT] Failed to load {MODEL_JOBLIB}: {e}\n"
-            "Likely version mismatch (NumPy/Sklearn). Pin deps and/or retrain."
-        )
-        raise RuntimeError(msg) from e
+    # Load model payload (dict or estimator)
+    payload = _load_model_payload(MODEL_JOBLIB)
+    model, base_estimator = _resolve_model_and_base(payload)
 
-    model = model_payload["model"]
+    # Load features metadata (or fallback)
+    features, market_params = _load_features_list()
 
-    with open(META_JSON, "r") as f:
-        meta = json.load(f)
-    features = meta["features"]
-    market_params = meta.get("market_params", {})
-
-    # --- Load schedule and requested games ---
+    # Load schedule and requested games
     schedule = load_csv_local_or_url(LOCAL_SCHEDULE, FALLBACK_SCHEDULE_URL)
     schedule = ensure_schedule_columns(schedule)
 
@@ -77,10 +105,10 @@ def main():
 
     predict_df = pd.DataFrame(games_to_predict)
 
-    # --- Build features with the simplified API (no kwargs supported) ---
+    # Build features with the simplified API (no kwargs supported)
     X, _ = create_feature_set()
 
-    # --- Ensure identifiers present for output (merge from schedule if needed) ---
+    # Ensure identifiers present for output (merge from schedule if needed)
     id_cols = ["game_id", "season", "week", "home_team", "away_team"]
     if "neutral_site" in schedule.columns:
         id_cols.append("neutral_site")
@@ -106,8 +134,7 @@ def main():
         print("No matching games after filtering; wrote empty predictions.")
         return
 
-    # --- Market-implied home win prob from spread (if configured) ---
-    # Feature name is 'home_closing_spread' (NOT 'spread_home').
+    # Market-implied home win prob from spread (if configured)
     if market_params and "a" in market_params and "b" in market_params and "home_closing_spread" in X.columns:
         a, b = market_params["a"], market_params["b"]
         X["market_home_prob"] = X["home_closing_spread"].apply(
@@ -116,16 +143,29 @@ def main():
     else:
         X["market_home_prob"] = 0.5
 
-    # --- Ensure model features exist and are numeric ---
+    # Resolve feature list for the model
+    if features is None:
+        # Try to infer from the model object if available
+        if hasattr(model, "feature_names_in_"):
+            features = list(model.feature_names_in_)
+            print(f"[PREDICT] Using model.feature_names_in_ (n={len(features)})")
+        else:
+            # Brutal fallback: use all non-identifier columns except obvious labels
+            exclude = {"game_id", "season", "week", "home_points", "away_points",
+                       "home_team", "away_team", "neutral_site"}
+            features = [c for c in X.columns if c not in exclude]
+            print(f"[PREDICT] Using all columns minus identifiers as features (n={len(features)})")
+
+    # Ensure model features exist and are numeric
     for col in features:
         if col not in X.columns:
             X[col] = 0.0
         X[col] = pd.to_numeric(X[col], errors="coerce").fillna(0.0)
 
-    # --- Predict ---
+    # Predict
     probs = model.predict_proba(X[features])[:, 1]
 
-    # --- Build output JSON (no SHAP/explanations) ---
+    # Build output JSON (no SHAP/explanations)
     output = []
     for i in range(len(X)):
         prob = float(probs[i])
@@ -140,7 +180,7 @@ def main():
                 "away_team": away_team,
                 "neutral_site": neutral_site,
                 "model_prob_home": prob,
-                "pick": pick
+                "pick": pick,
             }
         )
 
