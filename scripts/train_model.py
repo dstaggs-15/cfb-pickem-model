@@ -23,17 +23,34 @@ def _load_training():
         raise FileNotFoundError(f"Training matrix not found at {TRAIN_PATH}. Did build_dataset run successfully?")
     df = pd.read_parquet(TRAIN_PATH)
 
+    # If someone saved with 'game_id' as index, recover it
+    if "game_id" not in df.columns:
+        if getattr(df.index, "name", None) == "game_id":
+            df = df.reset_index()
+        else:
+            # As a last resort: if index looks unique, promote it
+            if df.index.is_unique:
+                df = df.reset_index().rename(columns={"index": "game_id"})
+
     # If labels missing, try to merge from raw schedule cache
     need_labels = ("home_points" not in df.columns) or ("away_points" not in df.columns)
     if need_labels:
         if os.path.exists(RAW_SCHED):
-            sched = pd.read_csv(RAW_SCHED)
+            # low_memory=False prevents mixed-type warnings/behaviour
+            sched = pd.read_csv(RAW_SCHED, low_memory=False)
             if "id" in sched.columns and "game_id" not in sched.columns:
                 sched = sched.rename(columns={"id": "game_id"})
             for c in ["home_points", "away_points"]:
                 if c not in sched.columns:
                     sched[c] = pd.NA
                 sched[c] = pd.to_numeric(sched[c], errors="coerce")
+
+            if "game_id" not in df.columns:
+                raise KeyError(
+                    "training.parquet has no 'game_id' column even after index recovery. "
+                    "Fix build_dataset to always include 'game_id'."
+                )
+
             df = df.merge(sched[["game_id", "home_points", "away_points"]], on="game_id", how="left")
         else:
             print("[TRAIN] WARNING: raw schedule not found; cannot attach labels. Training will be skipped if labels remain NaN.")
@@ -57,11 +74,7 @@ def main():
         raise KeyError("Expected 'home_points' and 'away_points' in training data. Fix features/build to include labels.")
 
     # Keep only rows with completed games (labels present)
-    if "home_points" not in df.columns or "away_points" not in df.columns:
-        raise KeyError("Labels still missing after attempted merge from schedule.")
-
     train_df = df[df["home_points"].notna() & df["away_points"].notna()].copy()
-
     if train_df.empty:
         raise ValueError("No completed games with labels found. Ensure your raw schedule cache includes historical results.")
 
@@ -79,10 +92,11 @@ def main():
 
     if not features:
         blacklist = {"game_id", "team", "season", "week", "home_points", "away_points", "home_win"}
+        # Only numeric columns become features
         features = [c for c in train_df.columns if c not in blacklist and pd.api.types.is_numeric_dtype(train_df[c])]
 
     if not features:
-        raise ValueError("No numeric features available to train on after exclusions.")
+        raise ValueError("No numeric features available to train on after exclusions. Build features first.")
 
     X = train_df[features].fillna(0.0).values
     y = train_df["home_win"].values
