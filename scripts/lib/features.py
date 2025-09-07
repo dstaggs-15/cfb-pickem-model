@@ -35,7 +35,8 @@ def _load_schedule_from_raw() -> pd.DataFrame:
     Load schedule from cached CFBD CSV and normalize columns:
       - rename 'id' -> 'game_id'
       - parse 'start_date' -> 'date'
-      - keep season/week/home_team/away_team
+      - keep season/week/home_team/away_team/home_points/away_points
+    Expect file at: data/raw/cfbd/cfb_schedule.csv
     """
     path = "data/raw/cfbd/cfb_schedule.csv"
     if not os.path.exists(path):
@@ -43,9 +44,12 @@ def _load_schedule_from_raw() -> pd.DataFrame:
         return pd.DataFrame()
 
     df = pd.read_csv(path)
-    # Column normalization
+
+    # id -> game_id
     if "id" in df.columns and "game_id" not in df.columns:
         df = df.rename(columns={"id": "game_id"})
+
+    # start_date -> date
     if "start_date" in df.columns and "date" not in df.columns:
         df["date"] = pd.to_datetime(df["start_date"], errors="coerce")
     elif "date" in df.columns:
@@ -53,13 +57,16 @@ def _load_schedule_from_raw() -> pd.DataFrame:
     else:
         df["date"] = pd.NaT
 
-    # Ensure required columns exist (create empty ones if missing)
-    for c in ["season", "week", "home_team", "away_team", "game_id"]:
+    # Ensure expected columns exist
+    for c in ["season", "week", "home_team", "away_team", "game_id", "home_points", "away_points"]:
         if c not in df.columns:
             df[c] = pd.NA
 
-    # Minimal schedule slice the rest of the pipeline expects
-    keep = ["game_id", "season", "week", "home_team", "away_team", "date"]
+    # Make points numeric (so train can use them)
+    for c in ["home_points", "away_points"]:
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    keep = ["game_id", "season", "week", "home_team", "away_team", "date", "home_points", "away_points"]
     df = df[keep].drop_duplicates(subset=["game_id"])
     return df
 
@@ -87,17 +94,16 @@ def create_feature_set(use_cache: bool = True, predict_only: bool = False):
     """
     Build the feature matrix X and the feature list.
 
-    This function now:
-      - loads schedule from data/raw/cfbd/cfb_schedule.csv
-      - builds a shell wide_stats if no team stats are present (so we don't crash)
-      - builds sidewise rollups safely
+    - loads schedule from data/raw/cfbd/cfb_schedule.csv
+    - builds a shell wide_stats if no team stats are present (so we don't crash)
+    - builds sidewise rollups safely
+    - RETURNS X that includes labels: home_points, away_points (for training)
     """
-    # 1) Load schedule from raw cache
+    # 1) Load schedule from raw cache (now includes points)
     schedule = _load_schedule_from_raw()
     _log_small("schedule (raw normalized)", schedule)
 
     # 2) Load team-wide stats if you have them (customize these paths to your pipeline)
-    #    If you don't have a precomputed wide stats table yet, we start empty.
     possible_team_wide_paths = [
         "data/derived/team_wide.parquet",
         "data/derived/team_wide.feather",
@@ -126,7 +132,6 @@ def create_feature_set(use_cache: bool = True, predict_only: bool = False):
     # 3) Build long stats ONLY if team_wide exists and has numeric stats
     if team_wide.empty:
         print("[FEATURES] team_wide empty — proceeding with shell wide_stats keyed by schedule.game_id")
-        # If schedule exists, create a shell wide_stats with just game_id
         if not schedule.empty and "game_id" in schedule.columns:
             wide_stats = pd.DataFrame({"game_id": schedule["game_id"].unique()})
         else:
@@ -144,7 +149,6 @@ def create_feature_set(use_cache: bool = True, predict_only: bool = False):
             print("[FEATURES] No numeric long stats — using shell wide_stats from schedule.")
             wide_stats = pd.DataFrame({"game_id": schedule["game_id"].unique()}) if "game_id" in schedule.columns else pd.DataFrame(columns=["game_id"])
         else:
-            # Side note: If you already have a sided long frame upstream, you can skip this
             team_stats_sided = team_stats_long.pivot_table(
                 index=["season", "week", "game_id", "team", "home_away", "date"],
                 columns="stat",
@@ -153,8 +157,6 @@ def create_feature_set(use_cache: bool = True, predict_only: bool = False):
                 observed=True,
             ).reset_index()
             _log_small("team_stats_sided (pre-wide)", team_stats_sided)
-
-            # long->wide per game (home/away columns)
             wide_stats = long_stats_to_wide(team_stats_sided)
 
     _log_small("wide_stats (post-wide/shell)", wide_stats)
@@ -170,12 +172,19 @@ def create_feature_set(use_cache: bool = True, predict_only: bool = False):
     _log_small("home_roll", home_roll)
     _log_small("away_roll", away_roll)
 
-    # 5) Compose final X
+    # 5) Compose final X and include labels from schedule
     if home_roll.empty and away_roll.empty:
         X = pd.DataFrame()
         feature_list = []
     else:
+        # Join rollups on game_id/team, then bring in labels from schedule
         X = home_roll.merge(away_roll, on=["game_id", "team"], how="outer", suffixes=("_home", "_away"))
-        feature_list = [c for c in X.columns if c not in {"game_id", "team"}]
+
+        # Merge schedule labels onto X using game_id
+        if not schedule.empty:
+            labels = schedule[["game_id", "season", "week", "home_points", "away_points"]].copy()
+            X = X.merge(labels, on="game_id", how="left")
+
+        feature_list = [c for c in X.columns if c not in {"game_id", "team", "home_points", "away_points", "season", "week"}]
 
     return X, feature_list
