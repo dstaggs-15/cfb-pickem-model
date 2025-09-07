@@ -45,7 +45,7 @@ jobs:
 
       - name: Generate predictions
         env:
-          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}  # only needed if scripts.predict hits API
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
         run: python -m scripts.predict
 
       - name: Create website snapshot
@@ -56,9 +56,5 @@ jobs:
         with:
           branch: main
           commit_message: "📊 Update weekly predictions & data snapshot"
-          file_pattern: |
-            docs/data/predictions.json
-            docs/data/data_snapshot.json
-          commit_user_name: "GitHub Actions Bot"
-          commit_user_email: "github-actions@github.com"
+          file_pattern: docs/data/predictions.json docs/data/data_snapshot.json
           commit_author: "GitHub Actions Bot <github-actions@github.com>"
