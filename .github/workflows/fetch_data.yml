@@ -1,4 +1,4 @@
-name: Manual Fetch and Cache Data
+name: Manual Fetch and Cache Datag
 
 on:
   workflow_dispatch:
