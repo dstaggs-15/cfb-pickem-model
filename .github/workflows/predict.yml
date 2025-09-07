@@ -1,7 +1,7 @@
 name: Generate Weekly Football Predictions
 
 on:
-  workflow_dispatch:   # <-- This makes the "Run workflow" button appear
+  workflow_dispatch:   # <-- ensures "Run workflow" button
   push:
     paths:
       - "data/raw/cfbd/*.csv"
@@ -52,8 +52,7 @@ jobs:
 
       - name: 7) Generate predictions
         env:
-          # Only needed if scripts.predict also calls the CFBD API
-          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}   # only needed if your predict step hits API
         run: python -m scripts.predict
 
       - name: 8) Create website snapshot
