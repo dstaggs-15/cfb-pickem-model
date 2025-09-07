@@ -8,10 +8,9 @@ import types
 import pandas as pd
 import numpy as np
 import joblib
-import shap
 
 # ---- NumPy 1.x -> 2.x pickle compatibility shim ---------------------------
-# Some models pickled under NumPy 1.x reference private modules like
+# Models pickled under NumPy 1.x may reference private modules like
 # 'numpy.random._pcg64.PCG64'. NumPy 2.x removed those private paths.
 # This shim provides an alias so joblib/pickle can resolve the old name.
 try:
@@ -21,7 +20,6 @@ try:
         _shim.PCG64 = _npr.PCG64
         sys.modules["numpy.random._pcg64"] = _shim
 except Exception:
-    # Non-fatal; we'll still try to load below. If it fails, you'll get a clear error.
     pass
 # ---------------------------------------------------------------------------
 
@@ -33,13 +31,11 @@ from .lib.features import create_feature_set
 DERIVED = "data/derived"
 
 LOCAL_DIR = "data/raw/cfbd"
-TRAIN_PARQUET = f"{DERIVED}/training.parquet"
 MODEL_JOBLIB = f"{DERIVED}/model.joblib"
 META_JSON = "docs/data/train_meta.json"
 PREDICTIONS_JSON = "docs/data/predictions.json"
 GAMES_TXT = "docs/input/games.txt"
 ALIASES_JSON = "docs/input/aliases.json"
-MANUAL_LINES_CSV = "docs/input/lines.csv"
 
 LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
 
@@ -50,19 +46,17 @@ FALLBACK_SCHEDULE_URL = f"{RAW_BASE}/cfb_schedule.csv"
 def main():
     print("Generating predictions...")
 
-    # --- Load model and metadata (robust errors) ---
+    # --- Load model and metadata (fail loud if environment mismatch) ---
     try:
         model_payload = joblib.load(MODEL_JOBLIB)
     except Exception as e:
         msg = (
             f"[PREDICT] Failed to load {MODEL_JOBLIB}: {e}\n"
-            "This usually means the model was trained under a different NumPy/Sklearn version.\n"
-            "Fix: pin dependencies (see requirements.txt below) and/or retrain the model."
+            "Likely version mismatch (NumPy/Sklearn). Pin deps and/or retrain."
         )
         raise RuntimeError(msg) from e
 
     model = model_payload["model"]
-    base_estimator = model_payload.get("base_estimator")
 
     with open(META_JSON, "r") as f:
         meta = json.load(f)
@@ -83,7 +77,7 @@ def main():
 
     predict_df = pd.DataFrame(games_to_predict)
 
-    # --- Build features with the simplified API ---
+    # --- Build features with the simplified API (no kwargs supported) ---
     X, _ = create_feature_set()
 
     # --- Ensure identifiers present for output (merge from schedule if needed) ---
@@ -97,11 +91,10 @@ def main():
         merge_keys = ["game_id"]
 
     X = X.merge(sched_small, on=merge_keys, how="left")
-
     if "neutral_site" not in X.columns:
         X["neutral_site"] = 0
 
-    # Optional: filter to requested games if predict_df has the names
+    # Optional: filter to requested games if predict list contains team names
     if {"home_team", "away_team"}.issubset(predict_df.columns):
         want = predict_df[["home_team", "away_team"]].drop_duplicates()
         before = len(X)
@@ -114,7 +107,7 @@ def main():
         return
 
     # --- Market-implied home win prob from spread (if configured) ---
-    # Features provide 'home_closing_spread' (not 'spread_home').
+    # Feature name is 'home_closing_spread' (NOT 'spread_home').
     if market_params and "a" in market_params and "b" in market_params and "home_closing_spread" in X.columns:
         a, b = market_params["a"], market_params["b"]
         X["market_home_prob"] = X["home_closing_spread"].apply(
@@ -132,16 +125,7 @@ def main():
     # --- Predict ---
     probs = model.predict_proba(X[features])[:, 1]
 
-    # --- Optional SHAP explanations if base_estimator available ---
-    shap_values = None
-    if base_estimator is not None and os.path.exists(TRAIN_PARQUET):
-        print("  Generating SHAP explanations...")
-        train_df = pd.read_parquet(TRAIN_PARQUET)
-        train_df_features = train_df[features]
-        explainer = shap.TreeExplainer(base_estimator, train_df_features)
-        shap_values = explainer.shap_values(X[features])
-
-    # --- Build output JSON ---
+    # --- Build output JSON (no SHAP/explanations) ---
     output = []
     for i in range(len(X)):
         prob = float(probs[i])
@@ -150,24 +134,13 @@ def main():
         neutral_site = bool(X.get("neutral_site").iloc[i]) if "neutral_site" in X.columns else False
         pick = home_team if prob > 0.5 else away_team
 
-        explanation = []
-        if shap_values is not None:
-            shap_row = shap_values[i]
-            feature_names = X[features].columns
-            explanation = sorted(
-                [{"feature": name, "value": float(val)} for name, val in zip(feature_names, shap_row)],
-                key=lambda x: abs(x["value"]),
-                reverse=True,
-            )
-
         output.append(
             {
                 "home_team": home_team,
                 "away_team": away_team,
                 "neutral_site": neutral_site,
                 "model_prob_home": prob,
-                "pick": pick,
-                "explanation": explanation,
+                "pick": pick
             }
         )
 
