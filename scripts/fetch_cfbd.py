@@ -17,7 +17,7 @@ import requests
 
 # =====================================================================================
 # Hard-coded CFBD API key (DO NOT ADD 'Bearer ', just the raw string)
-CFBD_API_KEY = "gNvWfcy2FdrZ9B5iSmfhc7/4c4Akneo5cCXwAOiMn6uVZGqS99vxHWbxD3cwWvrq"
+CFBD_API_KEY = "B0R+lKakGg0vl2SFDvbmhYpY0M0YHz0OXKVhQnYQ2cwPdOuFLsvU5T4oDUmz2YY/"
 # =====================================================================================
 
 RAW_DIR = "data/raw/cfbd"
