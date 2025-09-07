@@ -1,0 +1,82 @@
+name: Generate Weekly Football Predictions
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "data/raw/cfbd/*.csv"
+      - "scripts/**"
+      - "docs/**"
+      - "requirements.txt"
+      - ".github/workflows/predict.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  run-prediction-pipeline:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONFAULTHANDLER: "1"
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies (pinned core + project)
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pandas==2.2.2" "numpy==1.26.4" "pyarrow==16.1.0" "requests>=2.31.0" "scikit-learn>=1.4.0"
+          pip install -r requirements.txt || true
+
+      - name: Guard: raw CSVs must be present
+        run: |
+          if [ ! -f "data/raw/cfbd/cfb_schedule.csv" ]; then
+            echo "No raw CFBD data found in repo. Run 'Manual Fetch and Commit CFBD Data' first."
+            exit 1
+          fi
+
+      - name: Build training dataset
+        run: python -m scripts.build_dataset
+
+      - name: Train model
+        run: python -m scripts.train_model
+
+      - name: Generate predictions
+        env:
+          # only needed if your `scripts.predict` also hits API
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+        run: python -m scripts.predict
+
+      - name: Create website snapshot
+        run: python -m scripts.generate_data_snapshot
+
+      - name: Commit & push results (predictions + snapshot)
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          branch: main
+          commit_message: "📊 Update weekly predictions & data snapshot"
+          file_pattern: |
+            docs/data/predictions.json
+            docs/data/data_snapshot.json
+          commit_user_name: "GitHub Actions Bot"
+          commit_user_email: "github-actions@github.com"
+          commit_author: "GitHub Actions Bot <github-actions@github.com>"
+
+      - name: Upload debug artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-artifacts
+          path: |
+            data/derived/**
+            docs/data/**
+            **/*.log
+          if-no-files-found: ignore
