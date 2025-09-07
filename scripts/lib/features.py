@@ -33,37 +33,21 @@ def _log_small(name, df, rows=5):
 def _load_schedule_from_raw() -> pd.DataFrame:
     """
     Load schedule from cached CFBD CSV and normalize columns:
-      - rename 'id' -> 'game_id'
-      - parse 'start_date' -> 'date'
-      - keep season/week/home_team/away_team/home_points/away_points
-    Expect file at: data/raw/cfbd/cfb_schedule.csv
+      - must have: game_id, season, week, home_team, away_team, date, home_points, away_points
     """
     path = "data/raw/cfbd/cfb_schedule.csv"
     if not os.path.exists(path):
         print(f"[FEATURES] WARNING: schedule raw file not found at {path}")
         return pd.DataFrame()
 
-    # low_memory=False avoids mixed-type chunk warnings, reads columns consistently
     df = pd.read_csv(path, low_memory=False)
 
-    # id -> game_id
-    if "id" in df.columns and "game_id" not in df.columns:
-        df = df.rename(columns={"id": "game_id"})
-
-    # start_date -> date
-    if "start_date" in df.columns and "date" not in df.columns:
-        df["date"] = pd.to_datetime(df["start_date"], errors="coerce")
-    elif "date" in df.columns:
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    else:
-        df["date"] = pd.NaT
-
-    # Ensure expected columns exist
-    for c in ["season", "week", "home_team", "away_team", "game_id", "home_points", "away_points"]:
+    # Ensure required columns exist
+    for c in ["game_id", "season", "week", "home_team", "away_team", "date", "home_points", "away_points"]:
         if c not in df.columns:
             df[c] = pd.NA
 
-    # Make points numeric (so train can use them)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce", utc=True)
     for c in ["home_points", "away_points"]:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
@@ -100,11 +84,11 @@ def create_feature_set(use_cache: bool = True, predict_only: bool = False):
     - builds sidewise rollups safely
     - ALWAYS returns X with 'game_id'; includes labels if schedule present
     """
-    # 1) Load schedule from raw cache (includes points)
+    # 1) Load schedule (has labels)
     schedule = _load_schedule_from_raw()
     _log_small("schedule (raw normalized)", schedule)
 
-    # 2) Load team-wide stats if you have them (customize these paths to your pipeline)
+    # 2) Load team-wide stats if you produce them elsewhere (optional)
     possible_team_wide_paths = [
         "data/derived/team_wide.parquet",
         "data/derived/team_wide.feather",
@@ -188,8 +172,8 @@ def create_feature_set(use_cache: bool = True, predict_only: bool = False):
             X = X.merge(labels, on="game_id", how="left")
         feature_list = [c for c in X.columns if c not in {"game_id", "team", "home_points", "away_points", "season", "week"}]
 
-    # Belt-and-suspenders: guarantee 'game_id' is a column
-    if "game_id" not in X.columns and X.index.name == "game_id":
+    # Guarantee 'game_id' is a column
+    if "game_id" not in X.columns and getattr(X.index, "name", None) == "game_id":
         X = X.reset_index()
 
     return X, feature_list
