@@ -42,7 +42,7 @@ jobs:
         run: |
           ls -lh data/raw/cfbd || true
           test -f data/raw/cfbd/cfb_schedule.csv
-
+ 
       - name: Commit raw CSVs into repo
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
