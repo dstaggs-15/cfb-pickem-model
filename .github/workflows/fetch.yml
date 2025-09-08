@@ -1,52 +1,37 @@
-name: Manual Fetch and Commit CFBD Data
+# .github/workflows/fetch_data.yml
+
+name: 'Manual Fetch and Cache Data'
 
 on:
+  # This makes it a manually triggered workflow
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  fetch-and-commit:
+  fetch-and-cache:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: 1. Checkout Repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Set up Python 3.11
+      - name: 2. Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install dependencies (pinned core + project)
-        run: |
-          python -m pip install --upgrade pip
-          pip install "pandas==2.2.2" "numpy==1.26.4" "pyarrow==16.1.0" "requests>=2.31.0"
-          pip install -r requirements.txt || true
+      - name: 3. Install Dependencies
+        run: pip install -r requirements.txt
 
-      - name: Ensure raw folder exists
-        run: mkdir -p data/raw/cfbd && touch data/raw/cfbd/.gitkeep
-
-      - name: Fetch CFBD data (games only)
-        run: |
-          START_SEASON=2014 END_SEASON=2025 INCLUDE_CURRENT=true python -m scripts.fetch_cfbd
-
-      - name: Verify CSVs exist
-        run: |
-          ls -lh data/raw/cfbd || true
-          test -f data/raw/cfbd/cfb_schedule.csv
-
-      - name: Commit raw CSVs into repo
-        uses: stefanzweifel/git-auto-commit-action@v5
+      - name: 4. Cache Raw Data
+        id: cache-raw-data
+        uses: actions/cache@v4
         with:
-          branch: main
-          commit_message: "⬇️ CFBD raw data refresh (games only)"
-          file_pattern: |
-            data/raw/cfbd/cfb_schedule.csv
-            data/raw/cfbd/.gitkeep
-          commit_user_name: "GitHub Actions Bot"
-          commit_user_email: "github-actions@github.com"
-          commit_author: "GitHub Actions Bot <github-actions@github.com>"
+          path: data/raw/cfbd
+          key: ${{ runner.os }}-raw-cfbd-data-v1
+
+      - name: 5. Fetch Latest Data from API
+        # We run this step only if the cache didn't already exist
+        if: steps.cache-raw-data.outputs.cache-hit != 'true'
+        env:
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+        run: python -m scripts.fetch_cfbd
