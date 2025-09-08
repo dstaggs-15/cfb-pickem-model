@@ -3,7 +3,7 @@
 name: 'Manual Fetch and Cache Data'
 
 on:
-  # This makes it a manually triggered workflow
+  # Run this manually from the Actions tab
   workflow_dispatch:
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
       - name: 3. Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: 4. Cache Raw Data
+      - name: 4. Restore Raw Data Cache
         id: cache-raw-data
         uses: actions/cache@v4
         with:
@@ -30,8 +30,19 @@ jobs:
           key: ${{ runner.os }}-raw-cfbd-data-v1
 
       - name: 5. Fetch Latest Data from API
-        # We run this step only if the cache didn't already exist
+        # Only run if the cache is empty (first run or cache bust)
         if: steps.cache-raw-data.outputs.cache-hit != 'true'
         env:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
         run: python -m scripts.fetch_cfbd
+
+      - name: 6. Commit and Push Raw Data
+        # This step writes updated raw data and snapshot back to main
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          branch: main
+          commit_message: "⬇️ CFBD raw data refresh"
+          file_pattern: "data/raw/cfbd/* docs/data/fetch_snapshot.json"
+          commit_user_name: "GitHub Actions Bot"
+          commit_user_email: "github-actions@github.com"
+          commit_author: "GitHub Actions Bot <github-actions@github.com>"
