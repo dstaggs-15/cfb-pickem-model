@@ -1,24 +1,77 @@
 /* docs/app.js
- * Renders predictions with:
- *  - Front-end de-duplication by (home_team, away_team) keeping the last entry
- *  - Robust team colors: use team_colors.json when available; otherwise
- *    generate a readable, deterministic color from the team name
- *  - Proper text contrast for readability
+ * Front-end only:
+ *  - De-duplicate by (home_team, away_team) keeping the last row
+ *  - Render in your exact order (list below)
+ *  - Team colors baked in here; readable text color computed automatically
  */
 
 (async function () {
   const PRED_URL = 'data/predictions.json';
-  const TEAM_COLORS_URL = 'data/team_colors.json';
 
-  // ---- helpers ----
+  // ===== 1) YOUR DESIRED DISPLAY ORDER (AWAY @ HOME) =====
+  // Edit this list any time. Matching is case/spacing/&-robust.
+  const DESIRED_ORDER = [
+    ["Clemson", "Georgia Tech"],
+    ["Memphis", "Troy"],
+    ["Georgia", "Tennessee"],
+    ["Washington State", "North Texas"],
+    ["Pittsburgh", "West Virginia"],
+    ["App State", "Southern Miss"],
+    ["Texas A&M", "Notre Dame"],
+    ["Vanderbilt", "South Carolina"],
+    ["Duke", "Tulane"],
+    ["Minnesota", "California"],
+    ["Wisconsin", "Alabama"],
+  ];
+  // =======================================================
+
+  // ===== 2) BAKED-IN TEAM COLORS (hex). Add as needed. =====
+  // Primary only; text color is picked for contrast. Fallback colors are generated.
+  const TEAM_COLORS = {
+    "Clemson": "#F56600",
+    "Georgia Tech": "#B3A369",
+    "Memphis": "#003087",
+    "Troy": "#7C0025",
+    "Georgia": "#BA0C2F",
+    "Tennessee": "#FF8200",
+    "Washington State": "#981E32",
+    "North Texas": "#00853E",
+    "Pittsburgh": "#003594",
+    "West Virginia": "#002855",
+    "Appalachian State": "#111111",
+    "App State": "#111111",
+    "Southern Miss": "#000000",
+    "Southern Mississippi": "#000000",
+    "Texas A&M": "#500000",
+    "Notre Dame": "#0C2340",
+    "Vanderbilt": "#866D3B",
+    "South Carolina": "#73000A",
+    "Duke": "#001A57",
+    "Tulane": "#006747",
+    "Minnesota": "#7A0019",
+    "California": "#003262",
+    "Cal": "#003262",
+    "Alabama": "#9E1B32",
+    "Wisconsin": "#C5050C"
+  };
+  // ========================================================
+
+  // ---------- helpers ----------
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
+  const normalize = (s) =>
+    String(s || '')
+      .toLowerCase()
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9 ]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
   function pickTextColor(hex) {
-    // WCAG-ish luminance calculation for contrast
-    if (!hex || typeof hex !== 'string') return '#fff';
+    if (!hex || typeof hex !== 'string') return '#ffffff';
     const h = hex.replace('#', '');
-    if (h.length !== 6) return '#fff';
+    if (h.length !== 6) return '#ffffff';
     const r = parseInt(h.slice(0, 2), 16) / 255;
     const g = parseInt(h.slice(2, 4), 16) / 255;
     const b = parseInt(h.slice(4, 6), 16) / 255;
@@ -27,7 +80,6 @@
     return L >= 0.6 ? '#000000' : '#ffffff';
   }
 
-  // Deterministic color from team name (fallback)
   function colorFromName(name) {
     const str = String(name || '');
     let hash = 0;
@@ -60,44 +112,18 @@
     if (!h) return null;
     if (!h.startsWith('#')) h = `#${h}`;
     if (h.length === 4) h = `#${h[1]}${h[1]}${h[2]}${h[2]}${h[3]}${h[3]}`;
-    if (h.length !== 7) return null;
-    // reject near-white or invalid
-    const isWhite = /^#(fff|ffffff)$/i.test(h);
-    return isWhite ? null : h.toLowerCase();
+    return h.length === 7 ? h.toLowerCase() : null;
   }
 
-  function indexColors(mapRaw) {
-    // map: { "Team Name": {primary:"#xxxxxx", text:"#xxxxxx"} }
-    const map = {};
-    const raw = mapRaw || {};
-    for (const [k, v] of Object.entries(raw)) {
-      const primary = normHex(v && (v.primary || v.color));
-      const text = normHex(v && (v.text));
-      if (!k) continue;
-      map[k] = {
-        primary: primary || null,
-        text: text || null
-      };
-      // quick aliases: school only (drop mascot) and without "University"/"State" noise not implemented: keep simple
-    }
-    return map;
-  }
-
-  function getTeamColor(team, colorsIdx) {
-    const exact = colorsIdx[team];
-    let primary = exact && exact.primary;
-    let text = exact && exact.text;
-
-    if (!primary) {
-      primary = colorFromName(team); // stable fallback
-      text = pickTextColor(primary);
-    } else if (!text) {
-      text = pickTextColor(primary);
-    }
+  function getTeamColor(team) {
+    const exact = TEAM_COLORS[team];
+    let primary = normHex(exact);
+    if (!primary) primary = colorFromName(team);
+    const text = pickTextColor(primary);
     return { primary, text };
   }
 
-  // Dedupe by (home_team, away_team) keeping the last occurrence
+  // Deduplicate by (home, away) keeping last occurrence
   function dedupeGames(games) {
     const byKey = {};
     games.forEach((g, i) => {
@@ -107,7 +133,36 @@
     return Object.values(byKey).sort((a, b) => a._order - b._order);
   }
 
-  // Try to find UI elements even if ids differ
+  // Build quick lookup for desired order using AWAY@HOME key
+  function makeDesiredIndex(list) {
+    const idx = new Map();
+    list.forEach((pair, i) => {
+      const [away, home] = pair;
+      idx.set(`${normalize(away)}@${normalize(home)}`, i);
+    });
+    return idx;
+  }
+
+  function sortToDesiredOrder(games, desiredIndex) {
+    const BIG = 1e9;
+    const withRank = games.map((g, pos) => {
+      const keyAwayAtHome = `${normalize(g.away_team)}@${normalize(g.home_team)}`;
+      const keyHomeAtAway = `${normalize(g.home_team)}@${normalize(g.away_team)}`;
+      let rank = desiredIndex.has(keyAwayAtHome)
+        ? desiredIndex.get(keyAwayAtHome)
+        : (desiredIndex.has(keyHomeAtAway) ? desiredIndex.get(keyHomeAtAway) : BIG + pos);
+      return { g, rank, pos };
+    });
+    withRank.sort((a, b) => (a.rank - b.rank) || (a.pos - b.pos));
+    return withRank.map(x => x.g);
+  }
+
+  function percent(x) {
+    const v = Math.max(0, Math.min(1, Number(x)));
+    return `${(v * 100).toFixed(1)}%`;
+  }
+
+  // Try to find existing container/search input regardless of id names
   function findSearchBox() {
     return (
       $('#team-filter') ||
@@ -120,10 +175,8 @@
     return $('#cards') || $('#predictions') || $('#list') || $('#root') || document.body;
   }
 
-  // ---- load data ----
+  // ---------- load predictions ----------
   let predictions = [];
-  let colorsIdx = {};
-
   try {
     const res = await fetch(PRED_URL, { cache: 'no-store' });
     const json = await res.json();
@@ -133,25 +186,13 @@
     predictions = [];
   }
 
-  try {
-    const res = await fetch(TEAM_COLORS_URL, { cache: 'no-store' });
-    const raw = await res.json();
-    colorsIdx = indexColors(raw);
-  } catch (e) {
-    console.warn('No team_colors.json or failed to parse; will use fallbacks.');
-    colorsIdx = {};
-  }
-
   const deduped = dedupeGames(predictions);
+  const desiredIndex = makeDesiredIndex(DESIRED_ORDER);
+  const ordered = sortToDesiredOrder(deduped, desiredIndex);
 
-  // ---- render ----
+  // ---------- render ----------
   const container = findCardsContainer();
-  container.innerHTML = ''; // clear existing
-
-  function percent(x) {
-    const v = Math.max(0, Math.min(1, Number(x)));
-    return `${(v * 100).toFixed(1)}%`;
-  }
+  container.innerHTML = '';
 
   function renderOne(g) {
     const home = String(g.home_team || '');
@@ -159,13 +200,12 @@
     const pHome = Number(g.model_prob_home || 0.5);
     const pAway = 1 - pHome;
 
-    const cHome = getTeamColor(home, colorsIdx);
-    const cAway = getTeamColor(away, colorsIdx);
+    const cHome = getTeamColor(home);
+    const cAway = getTeamColor(away);
 
     const card = document.createElement('div');
     card.className = 'card';
 
-    // header row
     const hdr = document.createElement('div');
     hdr.className = 'row hdr';
     hdr.innerHTML = `
@@ -174,9 +214,9 @@
       <div class="team right">${away}</div>
     `;
 
-    // bar
     const barWrap = document.createElement('div');
     barWrap.className = 'bar-wrap';
+
     const left = document.createElement('div');
     left.className = 'bar left';
     left.style.width = `${(pHome * 100).toFixed(1)}%`;
@@ -193,7 +233,6 @@
 
     barWrap.append(left, right);
 
-    // pick line
     const pickLine = document.createElement('div');
     pickLine.className = 'pick';
     const pickTeam = pHome >= 0.5 ? home : away;
@@ -208,16 +247,16 @@
     list.forEach(g => container.appendChild(renderOne(g)));
   }
 
-  // initial render
-  render(deduped);
+  // initial render in your order
+  render(ordered);
 
-  // search filter
+  // search filter (keeps your order within filtered subset)
   const search = findSearchBox();
   if (search) {
     search.addEventListener('input', () => {
       const q = (search.value || '').toLowerCase().trim();
-      if (!q) return render(deduped);
-      const filtered = deduped.filter(g =>
+      if (!q) return render(ordered);
+      const filtered = ordered.filter(g =>
         String(g.home_team).toLowerCase().includes(q) ||
         String(g.away_team).toLowerCase().includes(q)
       );
@@ -225,29 +264,27 @@
     });
   }
 
-  // Inject minimal styles (safe even if you already have a stylesheet)
+  // minimal styles (safe if you already have CSS)
   const style = document.createElement('style');
   style.textContent = `
     .card {
-      background: #1f1f1f; border-radius: 14px; padding: 16px 18px; margin: 18px auto;
-      max-width: 860px; box-shadow: 0 6px 18px rgba(0,0,0,0.25);
-      border: 1px solid rgba(255,255,255,0.06);
+      background:#1f1f1f; border-radius:14px; padding:16px 18px; margin:18px auto;
+      max-width:860px; box-shadow:0 6px 18px rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.06);
     }
-    .row.hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-    .row.hdr .team { font-weight:700; font-size:1.15rem; color:#eaeaea; }
-    .row.hdr .at { color:#bdbdbd; font-weight:700; }
-    .bar-wrap { display:flex; width:100%; height:28px; background:#3a3a3a; border-radius:8px; overflow:hidden; }
-    .bar { display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.9rem; }
-    .bar.left { border-right:1px solid rgba(0,0,0,0.2); }
-    .bar.right { }
-    .pick { margin-top:10px; color:#bdbdbd; font-weight:700; }
-    .pick .label { color:#9aa0a6; margin-right:8px; }
-    .pick .value { color:#eaeaea; }
-    @media (max-width: 640px) {
-      .card { margin: 14px 12px; }
-      .row.hdr .team { font-size:1rem; }
-      .bar-wrap { height:24px; }
-      .bar { font-size:0.85rem; }
+    .row.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .row.hdr .team{font-weight:700;font-size:1.15rem;color:#eaeaea}
+    .row.hdr .at{color:#bdbdbd;font-weight:700}
+    .bar-wrap{display:flex;width:100%;height:28px;background:#3a3a3a;border-radius:8px;overflow:hidden}
+    .bar{display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem}
+    .bar.left{border-right:1px solid rgba(0,0,0,0.2)}
+    .pick{margin-top:10px;color:#bdbdbd;font-weight:700}
+    .pick .label{color:#9aa0a6;margin-right:8px}
+    .pick .value{color:#eaeaea}
+    @media (max-width:640px){
+      .card{margin:14px 12px}
+      .row.hdr .team{font-size:1rem}
+      .bar-wrap{height:24px}
+      .bar{font-size:.85rem}
     }
   `;
   document.head.appendChild(style);
