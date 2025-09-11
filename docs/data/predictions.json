@@ -1,191 +1,345 @@
 [
   {
-    "home_team": "SMU",
-    "away_team": "Baylor",
+    "home_team": "Tennessee",
+    "away_team": "Georgia",
     "neutral_site": false,
-    "model_prob_home": 0.6349833687233808,
-    "pick": "SMU"
+    "model_prob_home": 0.3353963867501916,
+    "pick": "Georgia"
   },
   {
-    "home_team": "Iowa State",
-    "away_team": "Iowa",
-    "neutral_site": false,
-    "model_prob_home": 0.44580704373462526,
-    "pick": "Iowa"
-  },
-  {
-    "home_team": "Missouri",
-    "away_team": "Kansas",
-    "neutral_site": false,
-    "model_prob_home": 0.3842008956173362,
-    "pick": "Kansas"
-  },
-  {
-    "home_team": "Iowa State",
-    "away_team": "Iowa",
-    "neutral_site": false,
-    "model_prob_home": 0.34246261328206695,
-    "pick": "Iowa"
-  },
-  {
-    "home_team": "NC State",
-    "away_team": "Virginia",
-    "neutral_site": false,
-    "model_prob_home": 0.4488890758844352,
-    "pick": "Virginia"
-  },
-  {
-    "home_team": "Missouri",
-    "away_team": "Kansas",
-    "neutral_site": true,
-    "model_prob_home": 0.8536200912554209,
-    "pick": "Missouri"
-  },
-  {
-    "home_team": "Iowa State",
-    "away_team": "Iowa",
-    "neutral_site": false,
-    "model_prob_home": 0.19121260394885475,
-    "pick": "Iowa"
-  },
-  {
-    "home_team": "Missouri",
-    "away_team": "Kansas",
-    "neutral_site": true,
-    "model_prob_home": 0.8488068594332208,
-    "pick": "Missouri"
-  },
-  {
-    "home_team": "Iowa State",
-    "away_team": "Iowa",
-    "neutral_site": false,
-    "model_prob_home": 0.44571567046567234,
-    "pick": "Iowa"
-  },
-  {
-    "home_team": "NC State",
-    "away_team": "Virginia",
-    "neutral_site": false,
-    "model_prob_home": 0.834356622676439,
-    "pick": "NC State"
-  },
-  {
-    "home_team": "Iowa State",
-    "away_team": "Iowa",
-    "neutral_site": false,
-    "model_prob_home": 0.5356837829091833,
-    "pick": "Iowa State"
-  },
-  {
-    "home_team": "SMU",
-    "away_team": "Baylor",
-    "neutral_site": false,
-    "model_prob_home": 0.18243430997128773,
-    "pick": "Baylor"
-  },
-  {
-    "home_team": "Iowa State",
-    "away_team": "Iowa",
-    "neutral_site": false,
-    "model_prob_home": 0.3898482359589713,
-    "pick": "Iowa"
-  },
-  {
-    "home_team": "Iowa State",
-    "away_team": "Iowa",
-    "neutral_site": false,
-    "model_prob_home": 0.5638735929343436,
-    "pick": "Iowa State"
-  },
-  {
-    "home_team": "NC State",
-    "away_team": "Virginia",
-    "neutral_site": false,
-    "model_prob_home": 0.7625103994737916,
-    "pick": "NC State"
-  },
-  {
-    "home_team": "Iowa State",
-    "away_team": "Iowa",
-    "neutral_site": false,
-    "model_prob_home": 0.2496035598537112,
-    "pick": "Iowa"
-  },
-  {
-    "home_team": "Iowa State",
-    "away_team": "Iowa",
-    "neutral_site": false,
-    "model_prob_home": 0.4348794759862144,
-    "pick": "Iowa"
-  },
-  {
-    "home_team": "Iowa State",
-    "away_team": "Iowa",
-    "neutral_site": false,
-    "model_prob_home": 0.3627439891143968,
-    "pick": "Iowa"
-  },
-  {
-    "home_team": "Iowa State",
-    "away_team": "Iowa",
-    "neutral_site": false,
-    "model_prob_home": 0.6137751753661006,
-    "pick": "Iowa State"
-  },
-  {
-    "home_team": "Duke",
-    "away_team": "Illinois",
-    "neutral_site": false,
-    "model_prob_home": 0.37839069341207615,
-    "pick": "Illinois"
-  },
-  {
-    "home_team": "NC State",
-    "away_team": "Virginia",
-    "neutral_site": false,
-    "model_prob_home": 0.636155367386408,
-    "pick": "NC State"
-  },
-  {
-    "home_team": "SMU",
-    "away_team": "Baylor",
-    "neutral_site": false,
-    "model_prob_home": 0.6330814901330997,
-    "pick": "SMU"
-  },
-  {
-    "home_team": "Missouri",
-    "away_team": "Kansas",
-    "neutral_site": false,
-    "model_prob_home": 0.3904544889586945,
-    "pick": "Kansas"
-  },
-  {
-    "home_team": "Ohio",
-    "away_team": "West Virginia",
-    "neutral_site": false,
-    "model_prob_home": 0.685793097812735,
-    "pick": "Ohio"
-  },
-  {
-    "home_team": "Mississippi State",
-    "away_team": "Arizona State",
-    "neutral_site": false,
-    "model_prob_home": 0.31444784772171036,
-    "pick": "Arizona State"
-  },
-  {
-    "home_team": "Oklahoma",
-    "away_team": "Michigan",
-    "neutral_site": false,
-    "model_prob_home": 0.4783754456020073,
-    "pick": "Michigan"
-  },
-  {
-    "home_team": "Virginia Tech",
+    "home_team": "South Carolina",
     "away_team": "Vanderbilt",
     "neutral_site": false,
-    "model_prob_home": 0.4168132448296103,
+    "model_prob_home": 0.6188325593484266,
+    "pick": "South Carolina"
+  },
+  {
+    "home_team": "Georgia Tech",
+    "away_team": "Clemson",
+    "neutral_site": false,
+    "model_prob_home": 0.49326845691009513,
+    "pick": "Clemson"
+  },
+  {
+    "home_team": "West Virginia",
+    "away_team": "Pittsburgh",
+    "neutral_site": false,
+    "model_prob_home": 0.6419867171440176,
+    "pick": "West Virginia"
+  },
+  {
+    "home_team": "California",
+    "away_team": "Minnesota",
+    "neutral_site": false,
+    "model_prob_home": 0.4851366528033143,
+    "pick": "Minnesota"
+  },
+  {
+    "home_team": "Georgia Tech",
+    "away_team": "Clemson",
+    "neutral_site": false,
+    "model_prob_home": 0.5127222918019968,
+    "pick": "Georgia Tech"
+  },
+  {
+    "home_team": "Tennessee",
+    "away_team": "Georgia",
+    "neutral_site": false,
+    "model_prob_home": 0.4080959302936222,
+    "pick": "Georgia"
+  },
+  {
+    "home_team": "South Carolina",
+    "away_team": "Vanderbilt",
+    "neutral_site": false,
+    "model_prob_home": 0.7310570867130451,
+    "pick": "South Carolina"
+  },
+  {
+    "home_team": "West Virginia",
+    "away_team": "Pittsburgh",
+    "neutral_site": false,
+    "model_prob_home": 0.8488068594332208,
+    "pick": "West Virginia"
+  },
+  {
+    "home_team": "Georgia Tech",
+    "away_team": "Clemson",
+    "neutral_site": false,
+    "model_prob_home": 0.4593489922603846,
+    "pick": "Clemson"
+  },
+  {
+    "home_team": "Tennessee",
+    "away_team": "Georgia",
+    "neutral_site": false,
+    "model_prob_home": 0.6515133428599102,
+    "pick": "Tennessee"
+  },
+  {
+    "home_team": "South Carolina",
+    "away_team": "Vanderbilt",
+    "neutral_site": false,
+    "model_prob_home": 0.7705363167978109,
+    "pick": "South Carolina"
+  },
+  {
+    "home_team": "West Virginia",
+    "away_team": "Pittsburgh",
+    "neutral_site": false,
+    "model_prob_home": 0.4385486335461759,
+    "pick": "Pittsburgh"
+  },
+  {
+    "home_team": "South Carolina",
+    "away_team": "Vanderbilt",
+    "neutral_site": false,
+    "model_prob_home": 0.5257242422849929,
+    "pick": "South Carolina"
+  },
+  {
+    "home_team": "Tennessee",
+    "away_team": "Georgia",
+    "neutral_site": false,
+    "model_prob_home": 0.5257242422849929,
+    "pick": "Tennessee"
+  },
+  {
+    "home_team": "Georgia Tech",
+    "away_team": "Clemson",
+    "neutral_site": false,
+    "model_prob_home": 0.38105495689740937,
+    "pick": "Clemson"
+  },
+  {
+    "home_team": "West Virginia",
+    "away_team": "Pittsburgh",
+    "neutral_site": false,
+    "model_prob_home": 0.6781654724900941,
+    "pick": "West Virginia"
+  },
+  {
+    "home_team": "South Carolina",
+    "away_team": "Vanderbilt",
+    "neutral_site": false,
+    "model_prob_home": 0.4560918378890216,
     "pick": "Vanderbilt"
+  },
+  {
+    "home_team": "Tennessee",
+    "away_team": "Georgia",
+    "neutral_site": false,
+    "model_prob_home": 0.5274987329359527,
+    "pick": "Tennessee"
+  },
+  {
+    "home_team": "Southern Miss",
+    "away_team": "App State",
+    "neutral_site": false,
+    "model_prob_home": 0.3898482359589713,
+    "pick": "App State"
+  },
+  {
+    "home_team": "Georgia Tech",
+    "away_team": "Clemson",
+    "neutral_site": false,
+    "model_prob_home": 0.6380572459766891,
+    "pick": "Georgia Tech"
+  },
+  {
+    "home_team": "Tulane",
+    "away_team": "Duke",
+    "neutral_site": false,
+    "model_prob_home": 0.3626532500578303,
+    "pick": "Duke"
+  },
+  {
+    "home_team": "Alabama",
+    "away_team": "Wisconsin",
+    "neutral_site": true,
+    "model_prob_home": 0.8728264240752971,
+    "pick": "Alabama"
+  },
+  {
+    "home_team": "Tennessee",
+    "away_team": "Georgia",
+    "neutral_site": false,
+    "model_prob_home": 0.48841788025784405,
+    "pick": "Georgia"
+  },
+  {
+    "home_team": "South Carolina",
+    "away_team": "Vanderbilt",
+    "neutral_site": false,
+    "model_prob_home": 0.40858666293890633,
+    "pick": "Vanderbilt"
+  },
+  {
+    "home_team": "Georgia Tech",
+    "away_team": "Clemson",
+    "neutral_site": false,
+    "model_prob_home": 0.48289871788073224,
+    "pick": "Clemson"
+  },
+  {
+    "home_team": "Tennessee",
+    "away_team": "Georgia",
+    "neutral_site": false,
+    "model_prob_home": 0.4687508133765916,
+    "pick": "Georgia"
+  },
+  {
+    "home_team": "South Carolina",
+    "away_team": "Vanderbilt",
+    "neutral_site": false,
+    "model_prob_home": 0.8743616928573502,
+    "pick": "South Carolina"
+  },
+  {
+    "home_team": "Georgia Tech",
+    "away_team": "Clemson",
+    "neutral_site": false,
+    "model_prob_home": 0.2958180076274267,
+    "pick": "Clemson"
+  },
+  {
+    "home_team": "Tennessee",
+    "away_team": "Georgia",
+    "neutral_site": false,
+    "model_prob_home": 0.2496035598537112,
+    "pick": "Georgia"
+  },
+  {
+    "home_team": "South Carolina",
+    "away_team": "Vanderbilt",
+    "neutral_site": false,
+    "model_prob_home": 0.6788208385040271,
+    "pick": "South Carolina"
+  },
+  {
+    "home_team": "Georgia Tech",
+    "away_team": "Clemson",
+    "neutral_site": false,
+    "model_prob_home": 0.2180365991560648,
+    "pick": "Clemson"
+  },
+  {
+    "home_team": "South Carolina",
+    "away_team": "Vanderbilt",
+    "neutral_site": false,
+    "model_prob_home": 0.7687828724572962,
+    "pick": "South Carolina"
+  },
+  {
+    "home_team": "Tennessee",
+    "away_team": "Georgia",
+    "neutral_site": false,
+    "model_prob_home": 0.24032107546408396,
+    "pick": "Georgia"
+  },
+  {
+    "home_team": "Georgia Tech",
+    "away_team": "Clemson",
+    "neutral_site": true,
+    "model_prob_home": 0.06672453703703703,
+    "pick": "Clemson"
+  },
+  {
+    "home_team": "West Virginia",
+    "away_team": "Pittsburgh",
+    "neutral_site": false,
+    "model_prob_home": 0.5014105885129266,
+    "pick": "West Virginia"
+  },
+  {
+    "home_team": "South Carolina",
+    "away_team": "Vanderbilt",
+    "neutral_site": false,
+    "model_prob_home": 0.753479587072028,
+    "pick": "South Carolina"
+  },
+  {
+    "home_team": "Tennessee",
+    "away_team": "Georgia",
+    "neutral_site": false,
+    "model_prob_home": 0.35032905690800425,
+    "pick": "Georgia"
+  },
+  {
+    "home_team": "South Carolina",
+    "away_team": "Vanderbilt",
+    "neutral_site": false,
+    "model_prob_home": 0.5399862191733088,
+    "pick": "South Carolina"
+  },
+  {
+    "home_team": "Alabama",
+    "away_team": "Wisconsin",
+    "neutral_site": false,
+    "model_prob_home": 0.22158615989792296,
+    "pick": "Wisconsin"
+  },
+  {
+    "home_team": "Georgia Tech",
+    "away_team": "Clemson",
+    "neutral_site": false,
+    "model_prob_home": 0.47670360398522543,
+    "pick": "Clemson"
+  },
+  {
+    "home_team": "Troy",
+    "away_team": "Memphis",
+    "neutral_site": false,
+    "model_prob_home": 0.2982156338922108,
+    "pick": "Memphis"
+  },
+  {
+    "home_team": "Tennessee",
+    "away_team": "Georgia",
+    "neutral_site": false,
+    "model_prob_home": 0.5538921223605481,
+    "pick": "Tennessee"
+  },
+  {
+    "home_team": "North Texas",
+    "away_team": "Washington State",
+    "neutral_site": false,
+    "model_prob_home": 0.7170805685000756,
+    "pick": "North Texas"
+  },
+  {
+    "home_team": "West Virginia",
+    "away_team": "Pittsburgh",
+    "neutral_site": false,
+    "model_prob_home": 0.2776129456122087,
+    "pick": "Pittsburgh"
+  },
+  {
+    "home_team": "Southern Miss",
+    "away_team": "App State",
+    "neutral_site": false,
+    "model_prob_home": 0.1740909824235527,
+    "pick": "App State"
+  },
+  {
+    "home_team": "Notre Dame",
+    "away_team": "Texas A&M",
+    "neutral_site": false,
+    "model_prob_home": 0.5345787482784777,
+    "pick": "Notre Dame"
+  },
+  {
+    "home_team": "Tulane",
+    "away_team": "Duke",
+    "neutral_site": false,
+    "model_prob_home": 0.3823705930396708,
+    "pick": "Duke"
+  },
+  {
+    "home_team": "California",
+    "away_team": "Minnesota",
+    "neutral_site": false,
+    "model_prob_home": 0.28491987942249725,
+    "pick": "Minnesota"
   }
 ]
