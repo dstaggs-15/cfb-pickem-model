@@ -1,57 +1,64 @@
-# .github/workflows/main.yml (FINAL PRODUCTION VERSION)
-
-name: Generate Weekly Football Predictions
+name: Weekly Predictions
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 12 * * 2'
-  push:
-    paths:
-      - 'docs/input/games.txt'
+    - cron: "0 13 * * FRI"  # optional weekly run (13:00 UTC = 8am CT)
+
+permissions:
+  contents: write
 
 jobs:
-  run-prediction-pipeline:
+  predict:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - name: 1. Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # needed to pull/rebase and push cleanly
 
-      - name: 2. Set up Python 3.11
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
 
-      - name: 3. Install Dependencies
+      - name: Install deps
         run: pip install -r requirements.txt
 
-      - name: 4. Restore Raw Data from Cache
-        id: cache-raw-data
+      - name: Restore raw data cache
+        id: cache-raw
         uses: actions/cache@v4
         with:
           path: data/raw/cfbd
           key: ${{ runner.os }}-raw-cfbd-data-v1
 
-      - name: 5. Build Training Dataset
+      - name: Build dataset
         run: python -m scripts.build_dataset
 
-      - name: 6. Train Prediction Model
+      - name: Train model
         run: python -m scripts.train_model
 
-      - name: 7. Generate New Predictions
-        env:
-          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      - name: Predict
         run: python -m scripts.predict
 
-      - name: 8. Commit and Push Predictions
+      # IMPORTANT: pull/rebase before committing, to avoid non-fast-forward push
+      - name: Pull latest main (rebase)
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "github-actions@github.com"
+          git fetch origin main
+          # Rebase our local work on top of remote; ignore if nothing to pull
+          git pull --rebase origin main || true
+
+      - name: Commit predictions
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          branch: main # This ensures the commit goes to the main branch
+          branch: main
           commit_message: "📊 Update weekly predictions"
-          file_pattern: "docs/data/predictions.json"
+          file_pattern: docs/data/predictions.json
           commit_user_name: "GitHub Actions Bot"
           commit_user_email: "github-actions@github.com"
           commit_author: "GitHub Actions Bot <github-actions@github.com>"
+          # If remote moved again between pull and push, this prevents hard failures
+          push_options: --force-with-lease
