@@ -1,8 +1,12 @@
-# .github/workflows/fetch_data.yml
-name: 'Manual Fetch and Cache Data'
+name: Manual Fetch and Cache Data
 
+# IMPORTANT: ensure this file is on your default branch (main)
 on:
   workflow_dispatch:
+
+# Needed so git-auto-commit-action can push
+permissions:
+  contents: write
 
 jobs:
   fetch-and-cache:
@@ -14,8 +18,8 @@ jobs:
       - name: 2) Setup Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
 
       - name: 3) Install deps
         run: pip install -r requirements.txt
@@ -28,24 +32,23 @@ jobs:
           key: ${{ runner.os }}-raw-cfbd-data-v1
 
       - name: 5) Fetch CFBD via API
-        # Will overwrite CSVs each run; safe to re-run
         env:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
-          START_SEASON: 2014
-          END_SEASON: 2025
+          START_SEASON: "2014"
+          END_SEASON: "2025"
           INCLUDE_CURRENT: "true"
-        run: python -m scripts.fetch_cfbd
+        run: |
+          python -m scripts.fetch_cfbd
+          ls -lh data/raw/cfbd || true
 
       - name: 6) Commit and Push Raw Data + Snapshot
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           branch: main
           commit_message: "⬇️ CFBD raw data refresh"
-          # Use directories so it doesn't fail if a file is missing
           file_pattern: |
             data/raw/cfbd/*
             docs/data
           commit_user_name: "GitHub Actions Bot"
           commit_user_email: "github-actions@github.com"
           commit_author: "GitHub Actions Bot <github-actions@github.com>"
-s
