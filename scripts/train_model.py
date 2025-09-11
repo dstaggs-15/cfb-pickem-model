@@ -1,112 +1,95 @@
+#!/usr/bin/env python3
 # scripts/train_model.py
+#
+# Trains a simple classifier. Reads CSV first; Parquet optional.
 
-import os
-import sys
-import json
+from __future__ import annotations
+import os, json
 import joblib
 import pandas as pd
 import numpy as np
-from sklearn.metrics import roc_auc_score
+from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score
 
-DERIVED = "data/derived"
-RAW_SCHED = "data/raw/cfbd/cfb_schedule.csv"
-MODEL_DIR = "models"
-MODEL_PATH = os.path.join(MODEL_DIR, "model.pkl")
-FEATURES_PATH = os.path.join(DERIVED, "feature_list.json")
-TRAIN_PATH = os.path.join(DERIVED, "training.parquet")
+DERIVED_DIR = "data/derived"
+TRAIN_PARQUET = os.path.join(DERIVED_DIR, "training.parquet")
+TRAIN_CSV = os.path.join(DERIVED_DIR, "training.csv")
+FEATURES_JSON = os.path.join(DERIVED_DIR, "feature_list.json")
+MODEL_PKL = "models/model.pkl"
 
+ID_COLS = {
+    "game_id","season","week","home_team","away_team",
+    "home_points","away_points","neutral_site"
+}
 
-def _load_training():
-    if not os.path.exists(TRAIN_PATH):
-        raise FileNotFoundError(f"Training matrix not found at {TRAIN_PATH}. Did build_dataset run successfully?")
-    df = pd.read_parquet(TRAIN_PATH)
+def _load_training() -> pd.DataFrame:
+    if os.path.exists(TRAIN_CSV):
+        df = pd.read_csv(TRAIN_CSV)
+        print(f"[TRAIN] loaded CSV {TRAIN_CSV} shape={df.shape}")
+        return df
+    if os.path.exists(TRAIN_PARQUET):
+        df = pd.read_parquet(TRAIN_PARQUET)
+        print(f"[TRAIN] loaded Parquet {TRAIN_PARQUET} shape={df.shape}")
+        return df
+    raise FileNotFoundError("No training file found (training.csv or training.parquet). Run build_dataset first.")
 
-    # If someone saved with 'game_id' as index, recover it
-    if "game_id" not in df.columns:
-        if getattr(df.index, "name", None) == "game_id":
-            df = df.reset_index()
-        elif df.index.is_unique:
-            df = df.reset_index().rename(columns={"index": "game_id"})
+def _load_features(df: pd.DataFrame) -> list[str]:
+    if os.path.exists(FEATURES_JSON):
+        with open(FEATURES_JSON, "r") as f:
+            feats = json.load(f)
+        print(f"[TRAIN] using feature_list.json (n={len(feats)})")
+        return feats
+    # fallback: all numeric non-ID columns
+    numeric = [c for c in df.columns if c not in ID_COLS and pd.api.types.is_numeric_dtype(df[c])]
+    print(f"[TRAIN] using fallback features (n={len(numeric)})")
+    return numeric
 
-    # If labels missing, try to merge from raw schedule cache
-    need_labels = ("home_points" not in df.columns) or ("away_points" not in df.columns)
-    if need_labels and os.path.exists(RAW_SCHED):
-        sched = pd.read_csv(RAW_SCHED, low_memory=False)
-        if "game_id" not in sched.columns and "id" in sched.columns:
-            sched = sched.rename(columns={"id": "game_id"})
-        for c in ["home_points", "away_points"]:
-            if c not in sched.columns:
-                sched[c] = pd.NA
-            sched[c] = pd.to_numeric(sched[c], errors="coerce")
-
-        if "game_id" not in df.columns:
-            raise KeyError("training.parquet has no 'game_id' column even after index recovery. Fix build_dataset.")
-        df = df.merge(sched[["game_id", "home_points", "away_points"]], on="game_id", how="left")
-
-    return df
-
-
-def _target_columns_ok(df: pd.DataFrame) -> bool:
-    return ("home_points" in df.columns) and ("away_points" in df.columns)
-
-
-def main():
-    print("Training single model system...")
-
-    os.makedirs(MODEL_DIR, exist_ok=True)
-
+def main() -> int:
+    os.makedirs(os.path.dirname(MODEL_PKL), exist_ok=True)
     df = _load_training()
-    print(f"[TRAIN] training.parquet shape={df.shape} cols={list(df.columns)[:25]}")
 
-    if not _target_columns_ok(df):
-        raise KeyError("Expected 'home_points' and 'away_points' in training data. Fix features/build to include labels.")
+    # target: home win
+    df["home_points"] = pd.to_numeric(df.get("home_points"), errors="coerce")
+    df["away_points"] = pd.to_numeric(df.get("away_points"), errors="coerce")
+    y = (df["home_points"] > df["away_points"]).astype(int)
 
-    # Keep only rows with completed games (labels present)
-    train_df = df[df["home_points"].notna() & df["away_points"].notna()].copy()
-    if train_df.empty:
-        raise ValueError("No completed games with labels found. Ensure the fetch workflow pulled finals with scores.")
+    features = _load_features(df)
+    X = df[features].copy()
+    for c in X.columns:
+        X[c] = pd.to_numeric(X[c], errors="coerce").fillna(0.0)
 
-    # Example binary target: did the home team win?
-    train_df["home_win"] = (train_df["home_points"] > train_df["away_points"]).astype(int)
+    X_train, X_valid, y_train, y_valid = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
 
-    # Load feature list if produced; otherwise infer from df (exclude ids/labels)
-    features = None
-    if os.path.exists(FEATURES_PATH):
-        try:
-            with open(FEATURES_PATH, "r") as f:
-                features = json.load(f)
-        except Exception as e:
-            print(f"[TRAIN] WARNING: failed to read {FEATURES_PATH}: {e}")
-
-    if not features:
-        blacklist = {"game_id", "team", "season", "week", "home_points", "away_points", "home_win"}
-        # Only numeric columns become features
-        features = [c for c in train_df.columns if c not in blacklist and pd.api.types.is_numeric_dtype(train_df[c])]
-
-    if not features:
-        raise ValueError("No numeric features available to train on after exclusions. Build features first.")
-
-    X = train_df[features].fillna(0.0).values
-    y = train_df["home_win"].values
-
-    # Simple baseline: logistic regression
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    clf = LogisticRegression(max_iter=200, n_jobs=None, solver="lbfgs")
+    base = HistGradientBoostingClassifier(
+        max_depth=None,
+        learning_rate=0.08,
+        max_iter=350,
+        l2_regularization=0.0,
+        random_state=42
+    )
+    clf = CalibratedClassifierCV(base, method="isotonic", cv=3)
     clf.fit(X_train, y_train)
 
-    # Eval
-    prob = clf.predict_proba(X_test)[:, 1]
-    auc = roc_auc_score(y_test, prob)
-    print(f"[TRAIN] Validation AUC: {auc:.3f}")
+    try:
+        p = clf.predict_proba(X_valid)[:, 1]
+        auc = roc_auc_score(y_valid, p)
+        print(f"[TRAIN] validation AUC: {auc:.4f}")
+    except Exception as e:
+        print(f"[TRAIN] WARN could not score validation: {e}")
 
-    # Save model + feature list
-    joblib.dump({"model": clf, "features": features}, MODEL_PATH)
-    print(f"[TRAIN] Saved model to {MODEL_PATH}")
+    joblib.dump(clf, MODEL_PKL)
+    print(f"[TRAIN] wrote {MODEL_PKL}")
+
+    # Save features for predict.py
+    with open(os.path.join(DERIVED_DIR, "feature_list.json"), "w") as f:
+        json.dump(features, f, indent=2)
+    print(f"[TRAIN] wrote {FEATURES_JSON}")
 
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
