@@ -1,0 +1,137 @@
+year,school,mascot,abbreviation,conference,division,venue_id,latitude,longitude
+2025,Air Force,Falcons,AF,Mountain West,,,38.9969701,-104.8436165
+2025,Akron,Zips,AKR,Mid-American,,,41.0725534,-81.5083408
+2025,Alabama,Crimson Tide,ALA,SEC,,,33.2082752,-87.5503836
+2025,App State,Mountaineers,APP,Sun Belt,East,,36.2114267,-81.6854278
+2025,Arizona,Wildcats,ARIZ,Big 12,,,32.2288054,-110.9488677
+2025,Arizona State,Sun Devils,ASU,Big 12,,,33.4264471,-111.9325005
+2025,Arkansas,Razorbacks,ARK,SEC,,,36.0680662,-94.1789534
+2025,Arkansas State,Red Wolves,ARST,Sun Belt,West,,35.8488977,-90.6677436
+2025,Army,Black Knights,ARMY,American Athletic,,,41.3874924,-73.9640891
+2025,Auburn,Tigers,AUB,SEC,,,32.6025532,-85.4897479
+2025,Ball State,Cardinals,BALL,Mid-American,,,40.2159422,-85.4161148
+2025,Baylor,Bears,BAY,Big 12,,,31.5582015,-97.1156702
+2025,Boise State,Broncos,BOIS,Mountain West,,,43.6028839,-116.1958882
+2025,Boston College,Eagles,BC,ACC,,,42.335104,-71.1664413
+2025,Bowling Green,Falcons,BGSU,Mid-American,,,41.3780114,-83.6225
+2025,Buffalo,Bulls,BUF,Mid-American,,,42.9991334,-78.7775113
+2025,BYU,Cougars,BYU,Big 12,,,40.2575347,-111.6545247
+2025,California,Golden Bears,CAL,ACC,,,37.8710434,-122.2507729
+2025,Central Michigan,Chippewas,CMU,Mid-American,,,43.5777313,-84.7709904
+2025,Charlotte,49ers,CLT,American Athletic,,,35.3105033,-80.7401194
+2025,Cincinnati,Bearcats,CIN,Big 12,,,39.1312495,-84.5161913
+2025,Clemson,Tigers,CLEM,ACC,,,34.6787737,-82.8432428
+2025,Coastal Carolina,Chanticleers,CCU,Sun Belt,East,,33.7928506,-79.0166946
+2025,Colorado,Buffaloes,COLO,Big 12,,,40.0094746,-105.266905
+2025,Colorado State,Rams,CSU,Mountain West,,,40.570015,-105.088435
+2025,Delaware,Blue Hens,DEL,Conference USA,,,39.6617428,-75.7488224
+2025,Duke,Blue Devils,DUKE,ACC,,,35.9953688,-78.9417564
+2025,East Carolina,Pirates,ECU,American Athletic,,,35.5968486,-77.364564
+2025,Eastern Michigan,Eagles,EMU,Mid-American,,,42.256126,-83.647285
+2025,Florida,Gators,FLA,SEC,,,29.6499357,-82.3485788
+2025,Florida Atlantic,Owls,FAU,American Athletic,,,26.3763763,-80.1015759
+2025,Florida International,Panthers,FIU,Conference USA,,,,
+2025,Florida State,Seminoles,FSU,ACC,,,30.4381692,-84.3044032
+2025,Fresno State,Bulldogs,FRES,Mountain West,,,36.8143527,-119.7580092
+2025,Georgia,Bulldogs,UGA,SEC,,,33.9498197,-83.3733813
+2025,Georgia Southern,Eagles,GASO,Sun Belt,East,,32.4122471,-81.7849296
+2025,Georgia State,Panthers,GAST,Sun Belt,East,,33.735267,-84.389949
+2025,Georgia Tech,Yellow Jackets,GT,ACC,,,33.7724449,-84.3928054
+2025,Hawai'i,Rainbow Warriors,HAW,Mountain West,,,21.294294,-157.819338
+2025,Houston,Cougars,HOU,Big 12,,,29.7219885,-95.3491623
+2025,Illinois,Fighting Illini,ILL,Big Ten,,,40.0993268,-88.2359569
+2025,Indiana,Hoosiers,IU,Big Ten,,,39.1808959,-86.5256217
+2025,Iowa,Hawkeyes,IOWA,Big Ten,,,41.6586045,-91.5510829
+2025,Iowa State,Cyclones,ISU,Big 12,,,42.0139977,-93.6357716
+2025,Jacksonville State,Gamecocks,JXST,Conference USA,,,33.8201052,-85.76647
+2025,James Madison,Dukes,JMU,Sun Belt,East,,38.4352919,-78.8729349
+2025,Kansas,Jayhawks,KU,Big 12,,,38.9629418,-95.2463686
+2025,Kansas State,Wildcats,KSU,Big 12,,,39.2020096,-96.5938395
+2025,Kennesaw State,Owls,KENN,Conference USA,,,34.0289318,-84.5676234
+2025,Kent State,Golden Flashes,KENT,Mid-American,,,41.1390935,-81.31346
+2025,Kentucky,Wildcats,UK,SEC,,,38.0220905,-84.5053408
+2025,Liberty,Flames,LIB,Conference USA,,,37.3544305,-79.1750239
+2025,Louisiana,Ragin' Cajuns,UL,Sun Belt,West,,30.2158434,-92.0417371
+2025,Louisiana Tech,Bulldogs,LT,Conference USA,,,32.5321487,-92.6560019
+2025,Louisville,Cardinals,LOU,ACC,,,38.2057621,-85.7588141
+2025,LSU,Tigers,LSU,SEC,,,30.412035,-91.1838163
+2025,Marshall,Thundering Herd,MRSH,Sun Belt,East,,38.4247042,-82.4214412
+2025,Maryland,Terrapins,MD,Big Ten,,,38.9903332,-76.9473792
+2025,Massachusetts,Minutemen,MASS,Mid-American,,,42.3773244,-72.5360595
+2025,Memphis,Tigers,MEM,American Athletic,,,35.1209429,-89.977147
+2025,Miami,Hurricanes,MIA,ACC,,,25.9579665,-80.2388604
+2025,Miami (OH),RedHawks,M-OH,Mid-American,,,39.5197009,-84.7330255
+2025,Michigan,Wolverines,MICH,Big Ten,,,42.2658365,-83.7486956
+2025,Michigan State,Spartans,MSU,Big Ten,,,42.7281474,-84.4848526
+2025,Middle Tennessee,Blue Raiders,MTSU,Conference USA,,,35.8511463,-86.3681649
+2025,Minnesota,Golden Gophers,MINN,Big Ten,,,44.976525,-93.2245462
+2025,Mississippi State,Bulldogs,MSST,SEC,,,33.4563403,-88.7933652
+2025,Missouri,Tigers,MIZ,SEC,,,38.9358491,-92.3332009
+2025,Missouri State,Bears,MOST,Conference USA,,,37.1976229,-93.2798119
+2025,Navy,Midshipmen,NAVY,American Athletic,,,38.9846985,-76.5076335
+2025,NC State,Wolfpack,NCSU,ACC,,,35.8008001,-78.7195655
+2025,Nebraska,Cornhuskers,NEB,Big Ten,,,40.820682,-96.705594
+2025,Nevada,Wolf Pack,NEV,Mountain West,,,39.5469459,-119.8175435
+2025,New Mexico,Lobos,UNM,Mountain West,,,35.0669479,-106.6283225
+2025,New Mexico State,Aggies,NMSU,Conference USA,,,32.2796202,-106.7411148
+2025,North Carolina,Tar Heels,UNC,ACC,,,35.9069294,-79.0478889
+2025,Northern Illinois,Huskies,NIU,Mid-American,,,41.9339586,-88.7778357
+2025,North Texas,Mean Green,UNT,American Athletic,,,33.203899,-97.159245
+2025,Northwestern,Wildcats,NU,Big Ten,,,,
+2025,Notre Dame,Fighting Irish,ND,FBS Independents,,,41.698378,-86.2339425
+2025,Ohio,Bobcats,OHIO,Mid-American,,,39.3212794,-82.1034315
+2025,Ohio State,Buckeyes,OSU,Big Ten,,,40.0016447,-83.0197266
+2025,Oklahoma,Sooners,OU,SEC,,,35.2058537,-97.4423145
+2025,Oklahoma State,Cowboys,OKST,Big 12,,,36.125673,-97.066513
+2025,Old Dominion,Monarchs,ODU,Sun Belt,East,,36.8889533,-76.3049175
+2025,Ole Miss,Rebels,MISS,SEC,,,34.3619837,-89.5342076
+2025,Oregon,Ducks,ORE,Big Ten,,,44.0582712,-123.0684883
+2025,Oregon State,Beavers,ORST,Pac-12,,,44.5594559,-123.2814341
+2025,Penn State,Nittany Lions,PSU,Big Ten,,,40.8121958,-77.8561023
+2025,Pittsburgh,Panthers,PITT,ACC,,,40.4467648,-80.0157603
+2025,Purdue,Boilermakers,PUR,Big Ten,,,40.4352253,-86.9186843
+2025,Rice,Owls,RICE,American Athletic,,,29.7163297,-95.4093261
+2025,Rutgers,Scarlet Knights,RUTG,Big Ten,,,40.5462553,-74.4660408
+2025,Sam Houston,Bearkats,SHSU,Conference USA,,,30.713926,-95.5419802
+2025,San Diego State,Aztecs,SDSU,Mountain West,,,32.784444,-117.122833
+2025,San José State,Spartans,SJSU,Mountain West,,,37.3196675,-121.8682962
+2025,SMU,Mustangs,SMU,ACC,,,32.8377223,-96.7827859
+2025,South Alabama,Jaguars,USA,Sun Belt,West,,30.6943566,-88.0430541
+2025,South Carolina,Gamecocks,SC,SEC,,,33.9730239,-81.0191726
+2025,Southern Miss,Golden Eagles,USM,Sun Belt,West,,31.3289321,-89.3318118
+2025,South Florida,Bulls,USF,American Athletic,,,27.9758691,-82.5033344
+2025,Stanford,Cardinal,STAN,ACC,,,37.4345556,-122.1611271
+2025,Syracuse,Orange,SYR,ACC,,,43.0362269,-76.1363161
+2025,TCU,Horned Frogs,TCU,Big 12,,,32.7096604,-97.3680835
+2025,Temple,Owls,TEM,American Athletic,,,39.9007995,-75.1675414
+2025,Tennessee,Volunteers,TENN,SEC,,,35.9550131,-83.9250128
+2025,Texas,Longhorns,TEX,SEC,,,30.2836813,-97.7325345
+2025,Texas A&M,Aggies,TA&M,SEC,,,30.6098891,-96.3403828
+2025,Texas State,Bobcats,TXST,Sun Belt,West,,29.8910008,-97.9255735
+2025,Texas Tech,Red Raiders,TTU,Big 12,,,33.5910518,-101.8728824
+2025,Toledo,Rockets,TOL,Mid-American,,,41.6574777,-83.6135652
+2025,Troy,Trojans,TROY,Sun Belt,West,,31.7995565,-85.9518328
+2025,Tulane,Green Wave,TULN,American Athletic,,,29.944616,-90.116692
+2025,Tulsa,Golden Hurricane,TLSA,American Athletic,,,36.1489175,-95.9437853
+2025,UAB,Blazers,UAB,American Athletic,,,33.5206824,-86.8024326
+2025,UCF,Knights,UCF,Big 12,,,28.6079765,-81.1927233
+2025,UCLA,Bruins,UCLA,Big Ten,,,34.1613284,-118.1676462
+2025,UConn,Huskies,CONN,FBS Independents,,,41.7595675,-72.6187728
+2025,UL Monroe,Warhawks,ULM,Sun Belt,West,,32.5308089,-92.0660602
+2025,UNLV,Rebels,UNLV,Mountain West,,,36.1672559,-115.1485163
+2025,USC,Trojans,USC,Big Ten,,,34.014167,-118.287778
+2025,Utah,Utes,UTAH,Big 12,,,40.7599724,-111.8488255
+2025,Utah State,Aggies,USU,Mountain West,,,41.7517394,-111.8116007
+2025,UTEP,Miners,UTEP,Conference USA,,,31.7733353,-106.507957
+2025,UTSA,Roadrunners,UTSA,American Athletic,,,29.4169834,-98.4788143
+2025,Vanderbilt,Commodores,VAN,SEC,,,36.1440455,-86.8088942
+2025,Virginia,Cavaliers,UVA,ACC,,,38.0311801,-78.5137897
+2025,Virginia Tech,Hokies,VT,ACC,,,37.2199873,-80.4180643
+2025,Wake Forest,Demon Deacons,WAKE,ACC,,,36.1305507,-80.2545851
+2025,Washington,Huskies,WASH,Big Ten,,,47.6503235,-122.3015746
+2025,Washington State,Cougars,WSU,Pac-12,,,46.731831,-117.1604991
+2025,Western Kentucky,Hilltoppers,WKU,Conference USA,,,36.9847901,-86.4594041
+2025,Western Michigan,Broncos,WMU,Mid-American,,,42.2860064,-85.6007573
+2025,West Virginia,Mountaineers,WVU,Big 12,,,39.6502744,-79.9551873
+2025,Wisconsin,Badgers,WIS,Big Ten,,,43.06994,-89.4126943
+2025,Wyoming,Cowboys,WYO,Mountain West,,,41.31161,-105.5681384
