@@ -1,0 +1,51 @@
+{
+  "updated": "2025-09-11",
+  "source": "ESPN FPI",
+  "teams": {
+    "Clemson":        { "fpi": 9.2,  "rank": 32, "aliases": ["Clemson Tigers"] },
+    "Georgia Tech":   { "fpi": 9.2,  "rank": 31, "aliases": ["Georgia Tech Yellow Jackets", "Ga Tech"] },
+
+    "Memphis":        { "fpi": 5.7,  "rank": 47, "aliases": ["Memphis Tigers"] },
+    "Troy":           { "fpi": -5.0, "rank": 86, "aliases": ["Troy Trojans"] },
+
+    "Georgia":        { "fpi": 20.3, "rank": 6,  "aliases": ["Georgia Bulldogs", "UGA"] },
+    "Tennessee":      { "fpi": 18.9, "rank": 9,  "aliases": ["Tennessee Volunteers", "Vols"] },
+
+    "Washington State": { "fpi": -5.1, "rank": 87, "aliases": ["Washington St.", "Wazzu", "WSU Cougars"] },
+    "North Texas":    { "fpi": -5.4, "rank": 88, "aliases": ["North Texas Mean Green", "UNT"] },
+
+    "Pittsburgh":     { "fpi": 5.2,  "rank": 50, "aliases": ["Pitt", "Pittsburgh Panthers"] },
+    "West Virginia":  { "fpi": 0.2,  "rank": 66, "aliases": ["West Virginia Mountaineers", "WVU"] },
+
+    "App State":      { "fpi": -5.6, "rank": 89, "aliases": ["Appalachian State", "App State Mountaineers"] },
+    "Southern Miss":  { "fpi": null, "rank": null, "aliases": ["Southern Mississippi", "Southern Miss Golden Eagles"] },
+
+    "Texas A&M":      { "fpi": 13.7, "rank": 15, "aliases": ["Texas A&M Aggies", "A&M"] },
+    "Notre Dame":     { "fpi": 17.2, "rank": 10, "aliases": ["Notre Dame Fighting Irish"] },
+
+    "Vanderbilt":     { "fpi": 10.2, "rank": 28, "aliases": ["Vanderbilt Commodores", "Vandy"] },
+    "South Carolina": { "fpi": 13.1, "rank": 21, "aliases": ["South Carolina Gamecocks", "SC"] },
+
+    "Duke":           { "fpi": 0.8,  "rank": 64, "aliases": ["Duke Blue Devils"] },
+    "Tulane":         { "fpi": 5.9,  "rank": 45, "aliases": ["Tulane Green Wave"] },
+
+    "Minnesota":      { "fpi": 5.5,  "rank": 49, "aliases": ["Minnesota Golden Gophers"] },
+    "California":     { "fpi": 1.1,  "rank": 63, "aliases": ["Cal", "California Golden Bears"] },
+
+    "Wisconsin":      { "fpi": 6.9,  "rank": 40, "aliases": ["Wisconsin Badgers"] },
+    "Alabama":        { "fpi": 21.2, "rank": 4,  "aliases": ["Alabama Crimson Tide", "Bama"] }
+  },
+  "games": [
+    ["Clemson", "Georgia Tech"],
+    ["Memphis", "Troy"],
+    ["Georgia", "Tennessee"],
+    ["Washington State", "North Texas"],
+    ["Pittsburgh", "West Virginia"],
+    ["App State", "Southern Miss"],
+    ["Texas A&M", "Notre Dame"],
+    ["Vanderbilt", "South Carolina"],
+    ["Duke", "Tulane"],
+    ["Minnesota", "California"],
+    ["Wisconsin", "Alabama"]
+  ]
+}
