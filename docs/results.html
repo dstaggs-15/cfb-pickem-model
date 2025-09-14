@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CFB Pick'em — Results & Analytics</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0f0f10; --card:#171717; --muted:#9aa0a6; --fg:#eaeaea; --accent:#ab87ff; }
+    html,body { height:100%; margin:0; background:var(--bg); color:var(--fg); font-family:Inter,system-ui,Roboto,Arial,sans-serif; }
+    .wrap { max-width:1100px; margin:28px auto; padding:16px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+    h1 { margin:0; font-size:1.5rem; }
+    .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    button, input[type=file] { padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:var(--card); color:var(--fg); cursor:pointer; }
+    #table-wrap { background:var(--card); border-radius:12px; padding:12px; margin-top:12px; box-shadow:0 8px 32px rgba(0,0,0,0.5); }
+    table { width:100%; border-collapse:collapse; font-size:0.9rem; }
+    th,td { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.03); color:var(--fg); text-align:left; }
+    th { font-weight:700; color:var(--muted); font-size:0.85rem; position:sticky; top:0; background:linear-gradient(0deg, rgba(0,0,0,0.12), transparent); }
+    tr:hover td { background: rgba(255,255,255,0.01); }
+    .small { font-size:0.85rem; color:var(--muted); }
+    .flex { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+    .charts { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; }
+    canvas { background: #0b0b0b; border-radius:10px; padding:8px; }
+    .note { color:var(--muted); font-size:0.9rem; margin-top:8px; }
+    .danger { background:#3f1414; }
+    .ok { background:#15331a; }
+    footer { margin-top:18px; color:var(--muted); font-size:0.85rem; }
+    @media (max-width:900px) { .charts { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Results & Analytics</h1>
+        <div class="small">Enter game results, model picks, probabilities — visualize and export.</div>
+      </div>
+      <div class="controls">
+        <input id="fileImport" type="file" accept=".csv,.json" />
+        <button id="btnAdd">Add Row</button>
+        <button id="btnClear" class="danger">Clear Table</button>
+        <button id="btnDownloadJSON">Download JSON</button>
+        <button id="btnDownloadCSV">Download CSV</button>
+        <button id="btnLoadExample">Load Example</button>
+      </div>
+    </header>
+
+    <div id="table-wrap">
+      <div class="flex">
+        <div class="small">Tip: columns required for metrics: <code>season,week,home_team,away_team,home_points,away_points,model_prob_home</code></div>
+        <div style="margin-left:auto" class="small">
+          <button id="btnApplyToSite" title="Download results.json for commit" class="ok">Export & Commit</button>
+        </div>
+      </div>
+
+      <table id="resultsTable">
+        <thead>
+          <tr>
+            <th>season</th>
+            <th>week</th>
+            <th>home_team</th>
+            <th>away_team</th>
+            <th>home_points</th>
+            <th>away_points</th>
+            <th>model_pick</th>
+            <th>model_prob_home</th>
+            <th>notes</th>
+            <th style="width:80px">actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="charts">
+      <div>
+        <h3 class="small">Weekly Record (wins / losses)</h3>
+        <canvas id="chartWeekly" height="220"></canvas>
+      </div>
+      <div>
+        <h3 class="small">Cumulative Accuracy</h3>
+        <canvas id="chartCum" height="220"></canvas>
+      </div>
+
+      <div>
+        <h3 class="small">Calibration (prob bins)</h3>
+        <canvas id="chartCal" height="220"></canvas>
+      </div>
+      <div>
+        <h3 class="small">Model Probability Distribution</h3>
+        <canvas id="chartDist" height="220"></canvas>
+      </div>
+    </div>
+
+    <div class="note">
+      After you finish editing, click <strong>Download JSON</strong> and commit the downloaded file to <code>docs/data/results.json</code> in your repo. The rest of your site can be configured to read that file. If you want automatic commits, we can add a GitHub Actions step later.
+    </div>
+
+    <footer>
+      <div>Built for your static site — store locally or export to commit.</div>
+    </footer>
+  </div>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+  (function () {
+    // localStorage key
+    const STORAGE_KEY = 'cfb_results_v1';
+    // default columns
+    const COLUMNS = ["season","week","home_team","away_team","home_points","away_points","model_pick","model_prob_home","notes"];
+    // DOM refs
+    const tbody = document.querySelector('#resultsTable tbody');
+    const fileImport = document.getElementById('fileImport');
+    const btnAdd = document.getElementById('btnAdd');
+    const btnClear = document.getElementById('btnClear');
+    const btnDownloadJSON = document.getElementById('btnDownloadJSON');
+    const btnDownloadCSV = document.getElementById('btnDownloadCSV');
+    const btnLoadExample = document.getElementById('btnLoadExample');
+    const btnApplyToSite = document.getElementById('btnApplyToSite');
+
+    // charts
+    let chartWeekly, chartCum, chartCal, chartDist;
+
+    // utilities
+    function loadData() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      try { return JSON.parse(raw); } catch (e) { return []; }
+    }
+    function saveData(rows) { localStorage.setItem(STORAGE_KEY, JSON.stringify(rows)); }
+    function download(filename, content) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([content], {type: 'application/json'}));
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+    function csvEscape(v) {
+      if (v === null || v === undefined) return '';
+      const s = String(v);
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g,'""') + '"';
+      return s;
+    }
+
+    // table rendering
+    function renderTable() {
+      const rows = loadData();
+      tbody.innerHTML = '';
+      rows.forEach((r, i) => {
+        const tr = document.createElement('tr');
+        COLUMNS.forEach(col => {
+          const td = document.createElement('td');
+          const input = document.createElement('input');
+          input.value = r[col] !== undefined && r[col] !== null ? r[col] : '';
+          input.style.width = '100%';
+          input.addEventListener('change', (ev) => {
+            r[col] = ev.target.value;
+            // keep numeric types numeric where sensible
+            if (col==='season'||col==='week' || col==='home_points' || col==='away_points') {
+              const n = parseInt(r[col]);
+              r[col] = Number.isFinite(n) ? n : null;
+            }
+            if (col==='model_prob_home') {
+              const f = parseFloat(r[col]);
+              r[col] = Number.isFinite(f) ? f : null;
+            }
+            saveData(rows);
+            updateCharts();
+          });
+          td.appendChild(input);
+          tr.appendChild(td);
+        });
+
+        // actions
+        const act = document.createElement('td');
+        act.style.textAlign = 'center';
+        const del = document.createElement('button');
+        del.textContent = 'Delete';
+        del.addEventListener('click', () => {
+          rows.splice(i,1);
+          saveData(rows);
+          renderTable();
+          updateCharts();
+        });
+        act.appendChild(del);
+        tr.appendChild(act);
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function addRow(obj) {
+      const rows = loadData();
+      const base = {};
+      COLUMNS.forEach(c => base[c] = (obj && obj[c] !== undefined) ? obj[c] : null);
+      rows.push(base);
+      saveData(rows);
+      renderTable();
+      updateCharts();
+    }
+
+    // CSV import helper (simple)
+    function parseCSV(text) {
+      // naive CSV -> array of objects using first header row as keys
+      const lines = text.split(/\r?\n/).filter(l => l.trim().length>0);
+      if (!lines.length) return [];
+      const hdr = lines.shift().split(',').map(h => h.trim());
+      return lines.map(line => {
+        const parts = line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(s => s.replace(/^"|"$/g,'').replace(/""/g,'"'));
+        const obj = {};
+        hdr.forEach((h,i) => obj[h.trim()] = parts[i] === undefined ? null : parts[i]);
+        return obj;
+      });
+    }
+
+    // import file handler
+    fileImport.addEventListener('change', (ev) => {
+      const f = ev.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const txt = e.target.result;
+        if (f.name.toLowerCase().endsWith('.json')) {
+          try {
+            const arr = JSON.parse(txt);
+            if (Array.isArray(arr)) {
+              arr.forEach(a => addRow(a));
+            } else if (arr.games) {
+              arr.games.forEach(a => addRow(a));
+            } else alert('JSON must be an array of rows');
+          } catch (err) { alert('Invalid JSON file'); }
+        } else {
+          // CSV
+          try {
+            const arr = parseCSV(txt);
+            arr.forEach(a => addRow(a));
+          } catch (err) { alert('Invalid CSV file'); }
+        }
+        fileImport.value = '';
+      };
+      reader.readAsText(f);
+    });
+
+    // download / export JSON & CSV
+    btnDownloadJSON.addEventListener('click', () => {
+      const rows = loadData();
+      download('results.json', JSON.stringify(rows, null, 2));
+    });
+    btnDownloadCSV.addEventListener('click', () => {
+      const rows = loadData();
+      const hdr = COLUMNS.join(',');
+      const lines = rows.map(r => COLUMNS.map(c => csvEscape(r[c])).join(','));
+      download('results.csv', [hdr].concat(lines).join('\n'));
+    });
+
+    // Add / Clear / Example
+    btnAdd.addEventListener('click', () => addRow());
+    btnClear.addEventListener('click', () => {
+      if (!confirm('Clear all rows from the local table?')) return;
+      localStorage.removeItem(STORAGE_KEY);
+      renderTable();
+      updateCharts();
+    });
+    btnLoadExample.addEventListener('click', () => {
+      // small example with the games you showed
+      const EX = [
+        { season:2025, week:3, home_team:"Georgia Tech", away_team:"Clemson", home_points:21, away_points:28, model_pick:"Clemson", model_prob_home:0.42, notes:"example" },
+        { season:2025, week:3, home_team:"Troy", away_team:"Memphis", home_points:14, away_points:21, model_pick:"Memphis", model_prob_home:0.35, notes:"example" }
+      ];
+      EX.forEach(e => addRow(e));
+    });
+
+    // Apply to site: prepare commit-ready JSON and download it named docs_data_results.json
+    btnApplyToSite.addEventListener('click', () => {
+      const rows = loadData();
+      // default output file path expected by site: docs/data/results.json
+      const out = { updated: new Date().toISOString(), rows: rows };
+      download('docs_data_results.json', JSON.stringify(out, null, 2));
+      alert('Downloaded docs_data_results.json. Commit/rename to docs/data/results.json to publish it to the site.');
+    });
+
+    // CHART HELPERS
+    function calcMetrics(rows) {
+      // rows: array of objects. Returns per-week metrics and cumulative
+      // define canonical names
+      const cleaned = rows.map(r => ({
+        season: r.season ? Number(r.season):null,
+        week: r.week ? Number(r.week):null,
+        home: r.home_team || '',
+        away: r.away_team || '',
+        home_points: (r.home_points!==null && r.home_points!==undefined) ? Number(r.home_points) : null,
+        away_points: (r.away_points!==null && r.away_points!==undefined) ? Number(r.away_points) : null,
+        p_home: (r.model_prob_home!==null && r.model_prob_home!==undefined) ? Number(r.model_prob_home) : null,
+      })).filter(r=> r.season && r.week && (r.home_points!==null && r.away_points!==null) && (r.p_home!==null));
+
+      // group by season-week
+      const byWeek = {};
+      cleaned.forEach(r => {
+        const key = `${r.season}__${r.week}`;
+        byWeek[key] = byWeek[key] || { season:r.season, week:r.week, rows: [] };
+        byWeek[key].rows.push(r);
+      });
+      const keys = Object.keys(byWeek).sort((a,b) => {
+        const [sa,wa] = a.split('__').map(Number); const [sb,wb] = b.split('__').map(Number);
+        return sa!==sb ? sa-sb : wa-wb;
+      });
+
+      const weekly = keys.map(k => {
+        const g = byWeek[k];
+        const wins = g.rows.reduce((acc, r) => {
+          const homeWin = r.home_points > r.away_points;
+          const predHome = r.p_home >= 0.5;
+          return acc + (predHome === homeWin ? 1 : 0);
+        }, 0);
+        const total = g.rows.length;
+        return { season: g.season, week: g.week, wins, losses: total - wins, total, rows: g.rows };
+      });
+
+      // cumulative acc series
+      let cumCorrect = 0, cumTotal = 0;
+      const cumSeries = weekly.map(wk => {
+        cumCorrect += wk.wins; cumTotal += wk.total;
+        return { season: wk.season, week: wk.week, cumAcc: (cumTotal? cumCorrect/cumTotal:0), cumCorrect, cumTotal };
+      });
+
+      // calibration bins across all cleaned rows
+      const bins = Array.from({length:10}).map((_,i)=>({low:i*0.1, high:(i+1)*0.1, n:0, correct:0}));
+      cleaned.forEach(r => {
+        const p = Math.max(0, Math.min(0.999999, r.p_home));
+        const bin = Math.min(9, Math.floor(p*10));
+        const homeWin = r.home_points > r.away_points;
+        bins[bin].n += 1;
+        bins[bin].correct += (homeWin ? 1 : 0) * 1 * (r.p_home>=0.5||r.p_home<0.5 ? 1:0); // homeWin counts toward calibration
+      });
+
+      const binSeries = bins.map(b => ({ label: `${(b.low*100).toFixed(0)}-${(b.high*100).toFixed(0)}%`, n:b.n, frac: b.n? b.correct/b.n : null }));
+
+      // probability distribution
+      const probs = cleaned.map(r => r.p_home);
+      return { weekly, cumSeries, binSeries, probs };
+    }
+
+    function updateCharts() {
+      const rows = loadData();
+      const metrics = calcMetrics(rows);
+
+      // Weekly chart
+      const labels = metrics.weekly.map(w => `S${w.season}W${w.week}`);
+      const wins = metrics.weekly.map(w => w.wins);
+      const totals = metrics.weekly.map(w => w.total);
+      if (!chartWeekly) {
+        chartWeekly = new Chart(document.getElementById('chartWeekly').getContext('2d'), {
+          type: 'bar',
+          data: { labels, datasets: [{ label:'Wins', data:wins, backgroundColor:'#2b8a3e' }, { label:'Total', data:totals, backgroundColor:'#2b2b2b' }]},
+          options: { responsive:true, maintainAspectRatio:false }
+        });
+      } else {
+        chartWeekly.data.labels = labels;
+        chartWeekly.data.datasets[0].data = wins;
+        chartWeekly.data.datasets[1].data = totals;
+        chartWeekly.update();
+      }
+
+      // Cumulative accuracy line
+      const cumLabels = metrics.cumSeries.map(c => `S${c.season}W${c.week}`);
+      const cumAcc = metrics.cumSeries.map(c => (c.cumAcc*100).toFixed(2));
+      if (!chartCum) {
+        chartCum = new Chart(document.getElementById('chartCum').getContext('2d'), {
+          type: 'line',
+          data: { labels: cumLabels, datasets: [{ label:'Cumulative Accuracy (%)', data:cumAcc, borderColor:'#ab87ff', fill:false, tension:0.3 }]},
+          options: { responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true, max:100 }}}
+        });
+      } else {
+        chartCum.data.labels = cumLabels;
+        chartCum.data.datasets[0].data = cumAcc;
+        chartCum.update();
+      }
+
+      // Calibration bins (show percent correct per bin)
+      const binLabels = metrics.binSeries.map(b => b.label);
+      const binVals = metrics.binSeries.map(b => b.n? (b.frac*100).toFixed(1) : null);
+      if (!chartCal) {
+        chartCal = new Chart(document.getElementById('chartCal').getContext('2d'), {
+          type: 'bar',
+          data: { labels: binLabels, datasets: [{ label:'Observed % wins (per prob bin)', data: binVals, backgroundColor:'#f39c12' }]},
+          options: { responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true, max:100 }}}
+        });
+      } else {
+        chartCal.data.labels = binLabels;
+        chartCal.data.datasets[0].data = binVals;
+        chartCal.update();
+      }
+
+      // Distribution of predicted probabilities
+      const distBins = Array.from({length:10}).map(_=>0);
+      metrics.probs.forEach(p => {
+        if (p === null || p === undefined) return;
+        const idx = Math.min(9, Math.floor(Math.max(0, Math.min(0.9999, p))*10));
+        distBins[idx] += 1;
+      });
+      const distLabels = distBins.map((_,i)=>`${i*10}-${(i+1)*10}%`);
+      if (!chartDist) {
+        chartDist = new Chart(document.getElementById('chartDist').getContext('2d'), {
+          type: 'bar',
+          data: { labels: distLabels, datasets: [{ label:'Count', data:distBins, backgroundColor:'#3498db' }]},
+          options: { responsive:true, maintainAspectRatio:false }
+        });
+      } else {
+        chartDist.data.labels = distLabels;
+        chartDist.data.datasets[0].data = distBins;
+        chartDist.update();
+      }
+    }
+
+    // init
+    renderTable();
+    updateCharts();
+
+    // expose for debugging
+    window.__cfb_results = {
+      loadData, saveData, renderTable, updateCharts
+    };
+
+  })();
+  </script>
+</body>
+</html>
