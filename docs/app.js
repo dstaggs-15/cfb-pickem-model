@@ -12,49 +12,43 @@
   const FPI_URL  = 'data/fpi.json';
   const cacheBust = () => `?v=${Date.now()}`;
 
-  // ==== 1) YOUR ORDER (Away @ Home) ====
+  // ==== 1) YOUR ORDER (Away @ Home) - UPDATED FOR WEEK 4 ====
   const DESIRED_ORDER = [
-    ["Clemson", "Georgia Tech"],
-    ["Memphis", "Troy"],
-    ["Georgia", "Tennessee"],
-    ["Washington State", "North Texas"],
-    ["Pittsburgh", "West Virginia"],
-    ["App State", "Southern Miss"],
-    ["Texas A&M", "Notre Dame"],
-    ["Vanderbilt", "South Carolina"],
-    ["Duke", "Tulane"],
-    ["Minnesota", "California"],
-    ["Wisconsin", "Alabama"],
+    ["Texas Tech", "Utah"],
+    ["Arkansas", "Memphis"],
+    ["SMU", "TCU"],
+    ["Michigan", "Nebraska"],
+    ["North Carolina", "UCF"],
+    ["NC State", "Duke"],
+    ["Florida", "Miami"],
+    ["Illinois", "Indiana"],
+    ["Arizona State", "Baylor"],
+    ["BYU", "East Carolina"]
   ];
-  const ONLY_USE_DESIRED = true; // render only these 11, in this order
+  const ONLY_USE_DESIRED = true; // render only these games, in this order
 
-  // ==== 2) BAKED-IN TEAM COLORS (primary) ====
+  // ==== 2) BAKED-IN TEAM COLORS (primary) - UPDATED WITH NEW TEAMS ====
   const TEAM_COLORS = {
-    "Clemson": "#F56600",
-    "Georgia Tech": "#B3A369",
+    "Texas Tech": "#CC0000",
+    "Utah": "#CC0000",
+    "Arkansas": "#9D2235",
     "Memphis": "#003DA5",
-    "Troy": "#7C2131",
-    "Georgia": "#CC0000",
-    "Tennessee": "#FF8200",
-    "Washington State": "#981E32",
-    "North Texas": "#00853E",
-    "Pittsburgh": "#003594",
-    "West Virginia": "#002855",
-    "App State": "#B3A369",
-    "Appalachian State": "#B3A369",
-    "Southern Miss": "#FFC72C",
-    "Southern Mississippi": "#FFC72C",
-    "Texas A&M": "#500000",
-    "Notre Dame": "#0C2340",
-    "Vanderbilt": "#B3A369",
-    "South Carolina": "#73000A",
+    "SMU": "#C41230",
+    "TCU": "#4D1979",
+    "Michigan": "#00274C",
+    "Nebraska": "#E41C38",
+    "North Carolina": "#7BAFD4",
+    "UCF": "#BA9B37",
+    "NC State": "#CC0000",
     "Duke": "#003087",
-    "Tulane": "#006747",
-    "Minnesota": "#7A0019",
-    "California": "#003262",
-    "Cal": "#003262",
-    "Wisconsin": "#C5050C",
-    "Alabama": "#9E1B32",
+    "Florida": "#0021A5",
+    "Miami": "#F47321",
+    "Illinois": "#13294B",
+    "Indiana": "#990000",
+    "Arizona State": "#8C1D40",
+    "Baylor": "#004834",
+    "BYU": "#002E5D",
+    "East Carolina": "#592A8A",
   };
 
   // ---------- helpers ----------
