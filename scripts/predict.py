@@ -1,140 +1,123 @@
-#!/usr/bin/env python3
-# scripts/predict.py
-# Generate matchup predictions. Applies optional Platt calibrator if present.
-
-import os, json
-import joblib
-import numpy as np
 import pandas as pd
+import numpy as np
+import json
+import joblib
+import os
+import shap
 
 from .lib.io_utils import save_json
-from .lib.parsing import parse_games_txt, load_aliases
+from .lib.parsing import parse_games_txt, load_aliases, ensure_schedule_columns
 from .lib.features import create_feature_set
 
+# File paths
 DERIVED = "data/derived"
-FEATURES_JSON = os.path.join(DERIVED, "feature_list.json")
-MODEL_FILE = "models/model.pkl"
+LOCAL_DIR = "data/raw/cfbd"
+TRAIN_PARQUET = f"{DERIVED}/training.parquet"
+MODEL_JOBLIB = f"{DERIVED}/model.joblib"
+META_JSON = "docs/data/train_meta.json"
 PREDICTIONS_JSON = "docs/data/predictions.json"
 GAMES_TXT = "docs/input/games.txt"
 ALIASES_JSON = "docs/input/aliases.json"
-CALIB_PATH = os.path.join(DERIVED, "calibrator.json")
+MANUAL_LINES_CSV = "docs/input/lines.csv"
 
-ID_EXCLUDE = {
-    "game_id","season","week","home_team","away_team",
-    "neutral_site","home_points","away_points"
-}
-EPS = 1e-6
-
-def _load_feature_list(X: pd.DataFrame, model) -> list[str]:
-    # prefer saved list
-    if os.path.exists(FEATURES_JSON):
-        try:
-            with open(FEATURES_JSON, "r") as f:
-                feats = json.load(f)
-            if isinstance(feats, list) and feats:
-                print(f"[PREDICT] Using {FEATURES_JSON} (n={len(feats)})")
-                return feats
-        except Exception:
-            pass
-    # else model's names
-    if hasattr(model, "feature_names_in_"):
-        feats = list(model.feature_names_in_)
-        print(f"[PREDICT] Using model.feature_names_in_ (n={len(feats)})")
-        return feats
-    # fallback: all numeric non-ID
-    feats = [c for c in X.columns if c not in ID_EXCLUDE and pd.api.types.is_numeric_dtype(X[c])]
-    print(f"[PREDICT] Using fallback features (n={len(feats)})")
-    return feats
-
-def _dedup_latest(X: pd.DataFrame) -> pd.DataFrame:
-    keep_cols = list(X.columns)
-    sort_cols = [c for c in ["season","week","game_id"] if c in X.columns]
-    if not sort_cols:
-        return X.drop_duplicates(["home_team","away_team"], keep="last")
-    Xs = X.sort_values(sort_cols).drop_duplicates(["home_team","away_team"], keep="last")
-    return Xs[keep_cols]
-
-def _load_calibrator(path: str):
-    if not os.path.exists(path):
-        return None
-    try:
-        with open(path, "r") as f:
-            j = json.load(f)
-        if j.get("type") != "platt":  # ignore unknown types
-            return None
-        w = float(j.get("w", 1.0))
-        b = float(j.get("b", 0.0))
-    except Exception:
-        return None
-    def apply(p):
-        p = np.clip(np.asarray(p, dtype=float), EPS, 1-EPS)
-        z = np.log(p/(1-p))
-        q = 1/(1+np.exp(-(w*z + b)))
-        return q
-    print(f"[PREDICT] Calibrator loaded: w={w:.3f}, b={b:.3f}")
-    return apply
+LOCAL_SCHEDULE = f"{LOCAL_DIR}/cfb_schedule.csv"
+LOCAL_TEAM_STATS = f"{LOCAL_DIR}/cfb_game_team_stats.csv"
+LOCAL_LINES = f"{LOCAL_DIR}/cfb_lines.csv"
+LOCAL_VENUES = f"{LOCAL_DIR}/cfbd_venues.csv"
+LOCAL_TEAMS = f"{LOCAL_DIR}/cfbd_teams.csv"
+LOCAL_TALENT = f"{LOCAL_DIR}/cfbd_talent.csv"
 
 def main():
     print("Generating predictions...")
+    
+    # --- 1. Load Model and Metadata ---
+    model_payload = joblib.load(MODEL_JOBLIB)
+    model = model_payload['model']
+    base_estimator = model_payload.get('base_estimator')
 
-    # Load model
-    clf = joblib.load(MODEL_FILE)
+    with open(META_JSON, 'r') as f:
+        meta = json.load(f)
+    features = meta["features"]
+    market_params = meta.get("market_params", {})
 
-    # Parse target matchups
+    # --- 2. Load Raw Data for Prediction Context ---
+    schedule = pd.read_csv(LOCAL_SCHEDULE, low_memory=False)
+    team_stats = pd.read_csv(LOCAL_TEAM_STATS) if os.path.exists(LOCAL_TEAM_STATS) else pd.DataFrame()
+    lines_df = pd.read_csv(LOCAL_LINES) if os.path.exists(LOCAL_LINES) else pd.DataFrame()
+    venues_df = pd.read_csv(LOCAL_VENUES) if os.path.exists(LOCAL_VENUES) else pd.DataFrame()
+    teams_df = pd.read_csv(LOCAL_TEAMS) if os.path.exists(LOCAL_TEAMS) else pd.DataFrame()
+    talent_df = pd.read_csv(LOCAL_TALENT) if os.path.exists(LOCAL_TALENT) else pd.DataFrame()
+    manual_lines_df = pd.read_csv(MANUAL_LINES_CSV) if os.path.exists(MANUAL_LINES_CSV) else pd.DataFrame()
+
+    # --- 3. Prepare Games to Predict ---
     aliases = load_aliases(ALIASES_JSON)
     games_to_predict = parse_games_txt(GAMES_TXT, aliases)
+
     if not games_to_predict:
         save_json(PREDICTIONS_JSON, [])
-        print("No games to predict; wrote empty predictions.")
-        return
-    want = pd.DataFrame(games_to_predict)[["home_team","away_team"]].drop_duplicates()
-
-    # Build feature matrix & filter to desired games
-    X_all, _ = create_feature_set()
-    before = len(X_all)
-    X = X_all.merge(want, on=["home_team","away_team"], how="inner")
-    print(f"Filtered feature matrix to requested games: {before} -> {len(X)} rows")
-    X = _dedup_latest(X)
-    print(f"[PREDICT] After dedup: {len(X)} rows")
-
-    if X.empty:
-        save_json(PREDICTIONS_JSON, [])
-        print("No matching games after filtering/dedup; wrote empty predictions.")
         return
 
-    # Feature selection & sanitation
-    feats = _load_feature_list(X, clf)
-    for col in feats:
+    predict_df = pd.DataFrame(games_to_predict)
+    predict_df['game_id'] = [f"predict_{i}" for i in range(len(predict_df))]
+    predict_df['season'] = schedule['season'].max()
+    
+    # --- 4. Create Features for Prediction Games ---
+    # This now uses the exact same logic as the training script, ensuring consistency.
+    X, _ = create_feature_set(
+        schedule=schedule, team_stats=team_stats, venues_df=venues_df,
+        teams_df=teams_df, talent_df=talent_df, lines_df=lines_df,
+        manual_lines_df=manual_lines_df, games_to_predict_df=predict_df
+    )
+
+    # Add market features using parameters learned from training
+    if market_params and 'a' in market_params and 'b' in market_params:
+        a, b = market_params["a"], market_params["b"]
+        X["market_home_prob"] = 1.0 / (1.0 + np.exp(-(a + b * (-X["spread_home"]))))
+    else:
+        X["market_home_prob"] = 0.5
+
+    # Fill any missing feature columns with 0, which is safe.
+    for col in features:
         if col not in X.columns:
             X[col] = 0.0
-        X[col] = pd.to_numeric(X[col], errors="coerce").fillna(0.0)
+        X[col] = pd.to_numeric(X[col], errors='coerce').fillna(0.0)
+    
+    # --- 5. Generate Predictions and Explanations ---
+    probs = model.predict_proba(X[features])[:, 1]
 
-    # Raw model probabilities
-    p_raw = clf.predict_proba(X[feats])[:, 1].astype(float)
+    shap_values = None
+    if base_estimator:
+        print("  Generating SHAP explanations...")
+        train_df = pd.read_parquet(TRAIN_PARQUET)
+        train_df_features = train_df[features]
+        explainer = shap.TreeExplainer(base_estimator, train_df_features)
+        shap_values = explainer.shap_values(X[features])
+    
+    output = []
+    for i in range(len(X)):
+        prob = probs[i]
+        home_team = X['home_team'].iloc[i]
+        away_team = X['away_team'].iloc[i]
+        neutral_site = bool(X['neutral_site'].iloc[i])
+        pick = home_team if prob > 0.5 else away_team
+        
+        explanation = []
+        if shap_values is not None:
+            shap_row = shap_values[i]
+            feature_names = X[features].columns
+            explanation = sorted(
+                [{'feature': name, 'value': val} for name, val in zip(feature_names, shap_row)],
+                key=lambda x: abs(x['value']),
+                reverse=True
+            )
 
-    # Optional calibration
-    calib = _load_calibrator(CALIB_PATH)
-    p_final = calib(p_raw) if calib is not None else p_raw
-
-    # Build output
-    out = []
-    for prob_raw, prob_final, row in zip(p_raw, p_final, X.itertuples(index=False)):
-        home_team = getattr(row, "home_team")
-        away_team = getattr(row, "away_team")
-        neutral = bool(getattr(row, "neutral_site", 0))
-        pick = home_team if float(prob_final) >= 0.5 else away_team
-        out.append({
-            "home_team": home_team,
-            "away_team": away_team,
-            "neutral_site": neutral,
-            "model_prob_home_raw": float(prob_raw),
-            "model_prob_home": float(prob_final),
-            "pick": pick,
+        output.append({
+            'home_team': home_team, 'away_team': away_team, 'neutral_site': neutral_site,
+            'model_prob_home': prob, 'pick': pick, 'explanation': explanation
         })
 
-    os.makedirs(os.path.dirname(PREDICTIONS_JSON), exist_ok=True)
-    save_json(PREDICTIONS_JSON, out)
-    print(f"Successfully wrote {len(out)} predictions to {PREDICTIONS_JSON}")
+    save_json(PREDICTIONS_JSON, output)
+    print(f"Successfully wrote {len(output)} predictions to {PREDICTIONS_JSON}")
 
 if __name__ == "__main__":
     main()
