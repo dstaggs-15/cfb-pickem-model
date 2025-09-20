@@ -28,7 +28,7 @@ def main():
 
     # --- 1. Build the Full Feature Set ---
     # The create_feature_set function handles all data loading and feature engineering internally.
-    # This call now matches the one in your predict.py script, fixing the TypeError.
+    # This call now matches the older style of your predict.py script, fixing the TypeError.
     print("  Creating feature set for all historical games...")
     X, feature_list = create_feature_set()
 
