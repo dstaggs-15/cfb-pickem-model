@@ -92,9 +92,14 @@ def main():
     # --- 4. Build the Full Feature Set ---
     print("  Creating feature set for all historical games...")
     X, feature_list = create_feature_set(
-        schedule=schedule, team_stats=team_stats, venues_df=venues_df,
-        teams_df=teams_df, talent_df=talent_df, lines_df=lines_df,
-        manual_lines_df=manual_lines_df, games_to_predict_df=None
+        schedule=schedule,
+        team_stats=team_stats,
+        venues_df=venues_df,
+        teams_df=teams_df,
+        talent_df=talent_df,
+        lines_df=lines_df,
+        manual_lines_df=manual_lines_df,
+        games_to_predict_df=None
     )
 
     # --- 5. Add Labels and Market-Derived Features ---
