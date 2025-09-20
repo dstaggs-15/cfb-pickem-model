@@ -116,7 +116,7 @@ def main():
                 key=lambda x: abs(x['value']),
                 reverse=True
             )
-
+ 
         output.append({
             'home_team': home_team, 'away_team': away_team, 'neutral_site': neutral_site,
             'model_prob_home': prob, 'pick': pick, 'explanation': explanation
