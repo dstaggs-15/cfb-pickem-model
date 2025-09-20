@@ -3,6 +3,7 @@ import numpy as np
 import json
 import joblib
 import os
+import sys
 import shap
 
 from .lib.io_utils import save_json
@@ -31,6 +32,10 @@ def main():
     print("Generating predictions...")
     
     # --- 1. Load Model and Metadata ---
+    if not os.path.exists(MODEL_JOBLIB) or not os.path.exists(META_JSON):
+        print("FATAL: Model files not found. Please run the training workflow first.")
+        sys.exit(1)
+        
     model_payload = joblib.load(MODEL_JOBLIB)
     model = model_payload['model']
     base_estimator = model_payload.get('base_estimator')
@@ -89,6 +94,7 @@ def main():
     if base_estimator:
         print("  Generating SHAP explanations...")
         train_df = pd.read_parquet(TRAIN_PARQUET)
+        # Ensure training columns match prediction columns exactly
         train_df_features = train_df[features]
         explainer = shap.TreeExplainer(base_estimator, train_df_features)
         shap_values = explainer.shap_values(X[features])
@@ -121,3 +127,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
