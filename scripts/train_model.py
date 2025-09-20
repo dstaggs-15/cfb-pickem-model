@@ -1,95 +1,61 @@
-#!/usr/bin/env python3
-# scripts/train_model.py
-#
-# Trains a simple classifier. Reads CSV first; Parquet optional.
-
-from __future__ import annotations
-import os, json
-import joblib
 import pandas as pd
-import numpy as np
+import json
+import joblib
+import os
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.calibration import CalibratedClassifierCV
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score
 
-DERIVED_DIR = "data/derived"
-TRAIN_PARQUET = os.path.join(DERIVED_DIR, "training.parquet")
-TRAIN_CSV = os.path.join(DERIVED_DIR, "training.csv")
-FEATURES_JSON = os.path.join(DERIVED_DIR, "feature_list.json")
-MODEL_PKL = "models/model.pkl"
+# File paths
+DERIVED = "data/derived"
+TRAIN_PARQUET = f"{DERIVED}/training.parquet"
+META_JSON = "docs/data/train_meta.json"
+MODEL_JOBLIB = f"{DERIVED}/model.joblib"
 
-ID_COLS = {
-    "game_id","season","week","home_team","away_team",
-    "home_points","away_points","neutral_site"
-}
+def main():
+    print("Training model system...")
+    
+    # Load the prepared training data and metadata
+    train_df = pd.read_parquet(TRAIN_PARQUET)
+    with open(META_JSON, 'r') as f:
+        meta = json.load(f)
+    
+    features = meta['features']
+    target = 'home_win'
 
-def _load_training() -> pd.DataFrame:
-    if os.path.exists(TRAIN_CSV):
-        df = pd.read_csv(TRAIN_CSV)
-        print(f"[TRAIN] loaded CSV {TRAIN_CSV} shape={df.shape}")
-        return df
-    if os.path.exists(TRAIN_PARQUET):
-        df = pd.read_parquet(TRAIN_PARQUET)
-        print(f"[TRAIN] loaded Parquet {TRAIN_PARQUET} shape={df.shape}")
-        return df
-    raise FileNotFoundError("No training file found (training.csv or training.parquet). Run build_dataset first.")
+    X_train = train_df[features]
+    y_train = train_df[target]
 
-def _load_features(df: pd.DataFrame) -> list[str]:
-    if os.path.exists(FEATURES_JSON):
-        with open(FEATURES_JSON, "r") as f:
-            feats = json.load(f)
-        print(f"[TRAIN] using feature_list.json (n={len(feats)})")
-        return feats
-    # fallback: all numeric non-ID columns
-    numeric = [c for c in df.columns if c not in ID_COLS and pd.api.types.is_numeric_dtype(df[c])]
-    print(f"[TRAIN] using fallback features (n={len(numeric)})")
-    return numeric
-
-def main() -> int:
-    os.makedirs(os.path.dirname(MODEL_PKL), exist_ok=True)
-    df = _load_training()
-
-    # target: home win
-    df["home_points"] = pd.to_numeric(df.get("home_points"), errors="coerce")
-    df["away_points"] = pd.to_numeric(df.get("away_points"), errors="coerce")
-    y = (df["home_points"] > df["away_points"]).astype(int)
-
-    features = _load_features(df)
-    X = df[features].copy()
-    for c in X.columns:
-        X[c] = pd.to_numeric(X[c], errors="coerce").fillna(0.0)
-
-    X_train, X_valid, y_train, y_valid = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
-
-    base = HistGradientBoostingClassifier(
-        max_depth=None,
-        learning_rate=0.08,
-        max_iter=350,
-        l2_regularization=0.0,
+    # --- Model Definition ---
+    # A heavily regularized gradient boosting model to prevent overfitting
+    # and encourage a balanced use of all features.
+    base_estimator = HistGradientBoostingClassifier(
+        l2_regularization=20.0,
+        max_iter=200,
+        learning_rate=0.05,
         random_state=42
     )
-    clf = CalibratedClassifierCV(base, method="isotonic", cv=3)
-    clf.fit(X_train, y_train)
 
-    try:
-        p = clf.predict_proba(X_valid)[:, 1]
-        auc = roc_auc_score(y_valid, p)
-        print(f"[TRAIN] validation AUC: {auc:.4f}")
-    except Exception as e:
-        print(f"[TRAIN] WARN could not score validation: {e}")
-
-    joblib.dump(clf, MODEL_PKL)
-    print(f"[TRAIN] wrote {MODEL_PKL}")
-
-    # Save features for predict.py
-    with open(os.path.join(DERIVED_DIR, "feature_list.json"), "w") as f:
-        json.dump(features, f, indent=2)
-    print(f"[TRAIN] wrote {FEATURES_JSON}")
-
-    return 0
+    # --- Calibration ---
+    # This step ensures the model's probabilities are reliable.
+    # A 70% prediction should correspond to a ~70% win rate historically.
+    model = CalibratedClassifierCV(
+        base_estimator,
+        method='isotonic',
+        cv='prefit' # Use the already-fitted base estimator
+    )
+    
+    print("  Training final model on all data...")
+    base_estimator.fit(X_train, y_train)
+    model.fit(X_train, y_train)
+    
+    # Save the entire payload: the final calibrated model and the base estimator for SHAP
+    model_payload = {
+        'model': model,
+        'base_estimator': base_estimator
+    }
+    
+    joblib.dump(model_payload, MODEL_JOBLIB)
+    print(f"Wrote model payload to {MODEL_JOBLIB}")
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()
