@@ -20,27 +20,23 @@ def main():
     """
     This script orchestrates the creation of the final training dataset.
     It now calls a self-contained feature engineering function and then
-    processes the results to create the final training files.
+    processes and validates the results to create the final training files.
     """
     print("Building training dataset...")
     os.makedirs(DERIVED, exist_ok=True)
     os.makedirs(os.path.dirname(META_JSON), exist_ok=True)
 
     # --- 1. Build the Full Feature Set ---
-    # The create_feature_set function handles all data loading and feature engineering internally.
-    # This call now matches the one in your predict.py script, fixing the TypeError.
     print("  Creating feature set for all historical games...")
     X, feature_list = create_feature_set()
 
     # --- 2. Add Labels and Market-Derived Features ---
-    # Ensure points columns are numeric before comparison
     home_points = pd.to_numeric(X["home_points"], errors='coerce')
     away_points = pd.to_numeric(X["away_points"], errors='coerce')
     X["home_win"] = (home_points > away_points).astype(int)
 
     params = {}
     if 'spread_home' in X.columns and X['spread_home'].notna().any():
-        # Ensure target and feature are clean before fitting
         clean_market_data = X[['spread_home', 'home_win']].dropna()
         spreads = clean_market_data['spread_home']
         labels = clean_market_data['home_win']
@@ -56,16 +52,29 @@ def main():
         
     X["market_home_prob"] = X.groupby("season")["market_home_prob"].transform(lambda s: s.fillna(s.mean()))
 
-    # --- 3. Finalize and Save Training Data ---
+    # --- 3. Finalize and Clean Data ---
     extra = ["spread_home", "over_under", "market_home_prob"]
     final_feature_list = [f for f in (feature_list + extra) if f in X.columns]
     
-    # The final training data should only include completed games
     train_df = X[X['home_points'].notna()].copy()
     
     for col in final_feature_list:
         train_df[col] = pd.to_numeric(train_df[col], errors='coerce').fillna(0.0).astype('float32')
 
+    # --- 4. CRITICAL VALIDATION STEP ---
+    # This safeguard prevents a "dumb" model from ever being trained.
+    # It checks if the engineered features have any predictive power.
+    print("  Validating feature matrix...")
+    feature_variance = train_df[final_feature_list].var()
+    if feature_variance.sum() < 1e-6:
+        print("\nCRITICAL ERROR: Feature matrix has no variance.")
+        print("This means all feature values are zero, which will result in a useless model.")
+        print("This is likely due to an error in the feature engineering or data fetching process.")
+        sys.exit(1) # Fail the workflow with a non-zero exit code
+    else:
+        print("  Validation passed: Features contain meaningful data.")
+
+    # --- 5. Save Final Training Files ---
     train_df.to_parquet(TRAIN_PARQUET, index=False)
 
     meta = {
