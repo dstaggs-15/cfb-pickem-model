@@ -3,80 +3,80 @@
     "home_team": "Memphis",
     "away_team": "Arkansas",
     "neutral_site": false,
-    "model_prob_home_raw": 0.20063937198650575,
-    "model_prob_home": 0.20063937198650575,
+    "model_prob_home_raw": 0.0,
+    "model_prob_home": 0.0,
     "pick": "Arkansas"
   },
   {
     "home_team": "Miami",
     "away_team": "Florida",
     "neutral_site": false,
-    "model_prob_home_raw": 0.07019072881141845,
-    "model_prob_home": 0.07019072881141845,
+    "model_prob_home_raw": 0.0,
+    "model_prob_home": 0.0,
     "pick": "Florida"
   },
   {
     "home_team": "Indiana",
     "away_team": "Illinois",
     "neutral_site": false,
-    "model_prob_home_raw": 0.16125893729206728,
-    "model_prob_home": 0.16125893729206728,
+    "model_prob_home_raw": 0.0,
+    "model_prob_home": 0.0,
     "pick": "Illinois"
   },
   {
     "home_team": "Nebraska",
     "away_team": "Michigan",
     "neutral_site": false,
-    "model_prob_home_raw": 0.29117492381313487,
-    "model_prob_home": 0.29117492381313487,
+    "model_prob_home_raw": 0.0,
+    "model_prob_home": 0.0,
     "pick": "Michigan"
   },
   {
     "home_team": "Duke",
     "away_team": "NC State",
     "neutral_site": false,
-    "model_prob_home_raw": 0.2982156338922108,
-    "model_prob_home": 0.2982156338922108,
+    "model_prob_home_raw": 0.0,
+    "model_prob_home": 0.0,
     "pick": "NC State"
   },
   {
     "home_team": "TCU",
     "away_team": "SMU",
     "neutral_site": false,
-    "model_prob_home_raw": 0.7654488493260736,
-    "model_prob_home": 0.7654488493260736,
-    "pick": "TCU"
+    "model_prob_home_raw": 0.0,
+    "model_prob_home": 0.0,
+    "pick": "SMU"
   },
   {
     "home_team": "UCF",
     "away_team": "North Carolina",
     "neutral_site": false,
-    "model_prob_home_raw": 0.43036209973232875,
-    "model_prob_home": 0.43036209973232875,
+    "model_prob_home_raw": 0.0,
+    "model_prob_home": 0.0,
     "pick": "North Carolina"
   },
   {
     "home_team": "Baylor",
     "away_team": "Arizona State",
     "neutral_site": false,
-    "model_prob_home_raw": 0.20404464908034017,
-    "model_prob_home": 0.20404464908034017,
+    "model_prob_home_raw": 0.0,
+    "model_prob_home": 0.0,
     "pick": "Arizona State"
   },
   {
     "home_team": "East Carolina",
     "away_team": "BYU",
     "neutral_site": false,
-    "model_prob_home_raw": 0.045737269266681035,
-    "model_prob_home": 0.045737269266681035,
+    "model_prob_home_raw": 0.0,
+    "model_prob_home": 0.0,
     "pick": "BYU"
   },
   {
     "home_team": "Utah",
     "away_team": "Texas Tech",
     "neutral_site": false,
-    "model_prob_home_raw": 0.11984336114770898,
-    "model_prob_home": 0.11984336114770898,
+    "model_prob_home_raw": 0.0,
+    "model_prob_home": 0.0,
     "pick": "Texas Tech"
   }
 ]
