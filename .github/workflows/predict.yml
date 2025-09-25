@@ -1,37 +1,64 @@
-name: Weekly Predictions
+name: Build Model and Predict (Commit outputs)
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 13 * * FRI"  # optional weekly run (13:00 UTC = 8am CT)
+    inputs:
+      week:
+        description: "CFB Week number (e.g., 5)"
+        required: true
+        default: "5"
+      ref:
+        description: "Branch or ref to commit to (default: current)"
+        required: false
+        default: ""
+  push:
+    branches:
+      - main
+      - fix/**
+    paths:
+      - "docs/input/**"
+      - "scripts/**"
+      - "data/raw/cfbd/**"
+      - "requirements.txt"
 
 permissions:
   contents: write
 
 jobs:
-  predict:
+  build-and-predict:
     runs-on: ubuntu-latest
+    concurrency:
+      group: build-predict-${{ github.ref }}
+      cancel-in-progress: false
+
+    env:
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      PYTHONUNBUFFERED: "1"
+      WEEK: ${{ github.event.inputs.week }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # needed to pull/rebase and push cleanly
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Ensure raw data exists
+        run: |
+          if [ ! -f data/raw/cfbd/cfb_schedule.csv ]; then
+            echo "::error::data/raw/cfbd/cfb_schedule.csv not found. Run the 'Fetch CFBD Data' workflow first."
+            exit 1
+          fi
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
       - name: Install deps
-        run: pip install -r requirements.txt
-
-      - name: Restore raw data cache
-        id: cache-raw
-        uses: actions/cache@v4
-        with:
-          path: data/raw/cfbd
-          key: ${{ runner.os }}-raw-cfbd-data-v1
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Build dataset
         run: python -m scripts.build_dataset
@@ -39,26 +66,28 @@ jobs:
       - name: Train model
         run: python -m scripts.train_model
 
-      - name: Predict
-        run: python -m scripts.predict
-
-      # IMPORTANT: pull/rebase before committing, to avoid non-fast-forward push
-      - name: Pull latest main (rebase)
+      - name: Predict games for week
         run: |
-          git config user.name "GitHub Actions Bot"
-          git config user.email "github-actions@github.com"
-          git fetch origin main
-          # Rebase our local work on top of remote; ignore if nothing to pull
-          git pull --rebase origin main || true
+          W="${WEEK:-5}"
+          echo "Predicting Week ${W}"
+          python -m scripts.predict --week "${W}"
 
-      - name: Commit predictions
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          branch: main
-          commit_message: "📊 Update weekly predictions"
-          file_pattern: docs/data/predictions.json
-          commit_user_name: "GitHub Actions Bot"
-          commit_user_email: "github-actions@github.com"
-          commit_author: "GitHub Actions Bot <github-actions@github.com>"
-          # If remote moved again between pull and push, this prevents hard failures
-          push_options: --force-with-lease
+      - name: Commit & push predictions/meta
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A docs/data/predictions.json docs/data/train_meta.json
+
+          if ! git diff --cached --quiet; then
+            MSG="chore(predictions): update Week ${WEEK:-manual} $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            git commit -m "$MSG"
+            TARGET_REF="${{ github.event.inputs.ref || github.ref_name }}"
+            git push origin "HEAD:${TARGET_REF}"
+          else
+            echo "No prediction output changes to commit."
+          fi
+
+      - name: List outputs
+        run: ls -l docs/data || true
