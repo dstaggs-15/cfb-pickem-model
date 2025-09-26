@@ -1,217 +1,287 @@
-# scripts/lib/context.py
+# scripts/lib/features.py
 
 from __future__ import annotations
-import pandas as pd
+import os
+import json
 import numpy as np
-from haversine import haversine
+import pandas as pd
 
-def _std_venue_table(venues_df: pd.DataFrame) -> pd.DataFrame:
-    """Return a venues table with columns: venue_id(str), venue_name, venue_lat, venue_lon"""
-    if venues_df is None or venues_df.empty:
-        return pd.DataFrame(columns=["venue_id", "venue_name", "venue_lat", "venue_lon"])
+from .parsing import ensure_schedule_columns
+from . import elo as elo_lib
+from . import market as market_lib
+from . import context as context_lib
+from . import rolling as rolling_lib
 
-    v = venues_df.copy()
+# ---------- File locations ----------
+RAW_DIR = "data/raw/cfbd"
+SCHED_CSV = f"{RAW_DIR}/cfb_schedule.csv"
+STATS_CSV = f"{RAW_DIR}/cfb_game_team_stats.csv"
+LINES_CSV = f"{RAW_DIR}/cfb_lines.csv"
+TEAMS_CSV = f"{RAW_DIR}/cfbd_teams.csv"
+VENUES_CSV = f"{RAW_DIR}/cfbd_venues.csv"
+TALENT_CSV = f"{RAW_DIR}/cfbd_talent.csv"
 
-    # Common CFBD variants
-    id_col = None
-    for cand in ["venue_id", "id", "venueId"]:
-        if cand in v.columns:
-            id_col = cand
-            break
-    name_col = None
-    for cand in ["name", "venue", "venue_name"]:
-        if cand in v.columns:
-            name_col = cand
-            break
-    lat_col = None
-    for cand in ["latitude", "lat", "location.latitude"]:
-        if cand in v.columns:
-            lat_col = cand
-            break
-    lon_col = None
-    for cand in ["longitude", "lon", "lng", "location.longitude"]:
-        if cand in v.columns:
-            lon_col = cand
-            break
+# Manual lines (optional)
+MANUAL_LINES_CSV = "docs/input/manual_lines.csv"
 
-    out = pd.DataFrame()
-    if id_col is not None:
-        out["venue_id"] = v[id_col].astype(str)
+
+def _load_csv(path: str) -> pd.DataFrame:
+    # low_memory=False avoids mixed-type chunk inference warnings
+    return pd.read_csv(path, low_memory=False) if os.path.exists(path) else pd.DataFrame()
+
+
+def _load_raw(
+    schedule: pd.DataFrame | None,
+    team_stats: pd.DataFrame | None,
+    lines_df: pd.DataFrame | None,
+    teams_df: pd.DataFrame | None,
+    venues_df: pd.DataFrame | None,
+    talent_df: pd.DataFrame | None,
+    manual_lines_df: pd.DataFrame | None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    sched = schedule.copy() if schedule is not None else _load_csv(SCHED_CSV)
+    stats = team_stats.copy() if team_stats is not None else _load_csv(STATS_CSV)
+    lines = lines_df.copy() if lines_df is not None else _load_csv(LINES_CSV)
+    teams = teams_df.copy() if teams_df is not None else _load_csv(TEAMS_CSV)
+    venues = venues_df.copy() if venues_df is not None else _load_csv(VENUES_CSV)
+    talent = talent_df.copy() if talent_df is not None else _load_csv(TALENT_CSV)
+    manual_lines = manual_lines_df.copy() if manual_lines_df is not None else _load_csv(MANUAL_LINES_CSV)
+    return sched, stats, lines, teams, venues, talent, manual_lines
+
+
+def _prep_schedule(df: pd.DataFrame) -> pd.DataFrame:
+    df = ensure_schedule_columns(df.copy())
+    # Normalize team names (trim spaces) and make sure dates are usable
+    for c in ["home_team", "away_team"]:
+        if c in df.columns:
+            df[c] = df[c].astype(str).str.strip()
+    df["date"] = pd.to_datetime(df["date"], errors="coerce", utc=True)
+    # Coerce numerics where appropriate
+    for c in ["season", "week", "home_points", "away_points", "venue_id"]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+    # Unify to string game_id for all downstream merges
+    if "game_id" in df.columns:
+        df["game_id"] = df["game_id"].astype(str)
+    return df
+
+
+def _prep_team_stats(schedule: pd.DataFrame, team_stats_raw: pd.DataFrame) -> pd.DataFrame:
+    """
+    Build a team-game long table with advanced stats, then label rows as 'home'/'away'
+    based on the schedule. Output will have columns: game_id, team, home_away, <stats...>
+    """
+    if team_stats_raw.empty:
+        return pd.DataFrame(columns=["game_id", "team", "home_away"])
+
+    # The CFBD /stats/game/advanced data in this repo is stored as long form with 'stat'/'value'
+    cols = [c.lower() for c in team_stats_raw.columns]
+    rename = dict(zip(team_stats_raw.columns, cols))
+    ts = team_stats_raw.rename(columns=rename).copy()
+
+    # Standard field names
+    if "game_id" not in ts.columns and "gameid" in ts.columns:
+        ts = ts.rename(columns={"gameid": "game_id"})
+    if "team" not in ts.columns:
+        if "school" in ts.columns:
+            ts = ts.rename(columns={"school": "team"})
+        else:
+            ts["team"] = np.nan
+
+    # Ensure string game_id for merge compatibility
+    if "game_id" in ts.columns:
+        ts["game_id"] = ts["game_id"].astype(str)
+
+    # pivot: one row per (game_id, team), columns = stat names
+    if "stat" in ts.columns and "value" in ts.columns:
+        team_long = ts.pivot_table(index=["game_id", "team"], columns="stat", values="value").reset_index()
     else:
-        out["venue_id"] = pd.Series(dtype="object")
-    out["venue_name"] = v[name_col].astype(str) if name_col else pd.Series(dtype="object")
-    out["venue_lat"] = pd.to_numeric(v[lat_col], errors="coerce") if lat_col else np.nan
-    out["venue_lon"] = pd.to_numeric(v[lon_col], errors="coerce") if lon_col else np.nan
-    return out.drop_duplicates()
+        keep = [c for c in ts.columns if c in ("game_id", "team")]
+        team_long = ts[keep].copy()
 
+    # Make numeric
+    for c in team_long.columns:
+        if c not in ("game_id", "team"):
+            team_long[c] = pd.to_numeric(team_long[c], errors="coerce")
 
-def _std_team_table(teams_df: pd.DataFrame) -> pd.DataFrame:
-    """Return a teams table with columns: team(str), team_lat, team_lon"""
-    if teams_df is None or teams_df.empty:
-        return pd.DataFrame(columns=["team", "team_lat", "team_lon"])
+    # Attach home/away flag by joining schedule
+    join = schedule[["game_id", "home_team", "away_team"]].drop_duplicates()
+    # Merge (both sides have string game_id)
+    out = team_long.merge(join, on="game_id", how="left")
 
-    t = teams_df.copy()
+    # SAFE assignment using object dtype (avoids NumPy dtype promotion with NaN)
+    out["home_away"] = pd.Series(index=out.index, dtype="object")
+    out.loc[out["team"].eq(out["home_team"]), "home_away"] = "home"
+    out.loc[out["team"].eq(out["away_team"]), "home_away"] = "away"
 
-    # Team name
-    team_col = None
-    for cand in ["school", "team", "name"]:
-        if cand in t.columns:
-            team_col = cand
-            break
-
-    # Latitude/Longitude (various shapes)
-    lat_col = None
-    for cand in ["latitude", "lat", "location.latitude", "venue.latitude", "home_latitude"]:
-        if cand in t.columns:
-            lat_col = cand
-            break
-    lon_col = None
-    for cand in ["longitude", "lon", "location.longitude", "venue.longitude", "home_longitude"]:
-        if cand in t.columns:
-            lon_col = cand
-            break
-
-    out = pd.DataFrame()
-    out["team"] = t[team_col].astype(str) if team_col else pd.Series(dtype="object")
-    out["team_lat"] = pd.to_numeric(t[lat_col], errors="coerce") if lat_col else np.nan
-    out["team_lon"] = pd.to_numeric(t[lon_col], errors="coerce") if lon_col else np.nan
-    return out.drop_duplicates()
-
-
-def _attach_venue_coords(schedule: pd.DataFrame, venues_df: pd.DataFrame) -> pd.DataFrame:
-    """Attach venue coordinates by venue_id if present, else try venue name match."""
-    df = schedule.copy()
-
-    # Ensure we have venue_id and venue (name) columns even if empty
-    if "venue_id" not in df.columns:
-        df["venue_id"] = pd.NA
-    if "venue" not in df.columns:
-        df["venue"] = pd.NA
-
-    venues = _std_venue_table(venues_df)
-
-    # Try join on venue_id first (string on both sides)
-    left = df.copy()
-    left["venue_id"] = left["venue_id"].astype(str)
-    venues_id = venues[["venue_id", "venue_lat", "venue_lon"]].dropna(subset=["venue_id"])
-    venues_id["venue_id"] = venues_id["venue_id"].astype(str)
-
-    df1 = left.merge(venues_id, on="venue_id", how="left", suffixes=("", "_idmatch"))
-
-    # For rows with no lat/lon from id, try name join
-    missing = df1["venue_lat"].isna() | df1["venue_lon"].isna()
-    if missing.any():
-        venues_name = venues[["venue_name", "venue_lat", "venue_lon"]].dropna(subset=["venue_name"])
-        # Normalize for fuzzy-ish exact match
-        name_left = df1.loc[missing, ["game_id", "venue"]].copy()
-        name_left["venue_name"] = name_left["venue"].astype(str).str.strip().str.lower()
-        venues_name["venue_name"] = venues_name["venue_name"].astype(str).str.strip().str.lower()
-
-        name_join = name_left.merge(venues_name, on="venue_name", how="left")
-        name_join = name_join[["game_id", "venue_lat", "venue_lon"]]
-
-        df1 = df1.merge(name_join, on="game_id", how="left", suffixes=("", "_name"))
-        # Prefer id-match coords; fill with name-match coords
-        for coord in ["venue_lat", "venue_lon"]:
-            df1[coord] = df1[coord].where(~df1[coord].isna(), df1[f"{coord}_name"])
-        df1 = df1.drop(columns=[c for c in df1.columns if c.endswith("_name")])
-
-    return df1
-
-
-def _compute_rest_days(schedule: pd.DataFrame) -> pd.DataFrame:
-    """Compute rest days per team per game."""
-    df = schedule.copy()
-    # Days since previous game for each team, then merge home/away
-    def side_rest(side_team_col: str, prefix: str) -> pd.DataFrame:
-        side = df[["game_id", "date", "season", side_team_col]].rename(columns={side_team_col: "team"}).copy()
-        side = side.dropna(subset=["team"])
-        side["date"] = pd.to_datetime(side["date"], errors="coerce", utc=True)
-        side = side.sort_values(["team", "date"])
-        side["prev_date"] = side.groupby("team")["date"].shift(1)
-        side[f"rest_{prefix}_days"] = (side["date"] - side["prev_date"]).dt.total_seconds() / (60 * 60 * 24)
-        return side[["game_id", f"rest_{prefix}_days"]]
-
-    home_rest = side_rest("home_team", "home")
-    away_rest = side_rest("away_team", "away")
-
-    out = df[["game_id"]].drop_duplicates()
-    out = out.merge(home_rest, on="game_id", how="left")
-    out = out.merge(away_rest, on="game_id", how="left")
+    out = out.dropna(subset=["home_away"]).drop(columns=["home_team", "away_team"])
     return out
 
 
-def _compute_travel_km(schedule_with_coords: pd.DataFrame, teams_df: pd.DataFrame) -> pd.DataFrame:
-    """Compute great-circle distance from team home coords to venue coords (km)."""
-    df = schedule_with_coords.copy()
-    teams = _std_team_table(teams_df)
-
-    # Home team coords
-    h = df[["game_id", "home_team", "venue_lat", "venue_lon"]].copy()
-    h = h.merge(teams.rename(columns={"team": "home_team", "team_lat": "home_lat", "team_lon": "home_lon"}),
-                on="home_team", how="left")
-    # Away team coords
-    a = df[["game_id", "away_team", "venue_lat", "venue_lon"]].copy()
-    a = a.merge(teams.rename(columns={"team": "away_team", "team_lat": "away_lat", "team_lon": "away_lon"}),
-                on="away_team", how="left")
-
-    def _dist(row_lat1, row_lon1, row_lat2, row_lon2):
-        if pd.isna(row_lat1) or pd.isna(row_lon1) or pd.isna(row_lat2) or pd.isna(row_lon2):
-            return np.nan
-        try:
-            return haversine((row_lat1, row_lon1), (row_lat2, row_lon2))
-        except Exception:
-            return np.nan
-
-    h["travel_home_km"] = [
-        _dist(h.loc[i, "home_lat"], h.loc[i, "home_lon"], h.loc[i, "venue_lat"], h.loc[i, "venue_lon"])
-        for i in h.index
-    ]
-    a["travel_away_km"] = [
-        _dist(a.loc[i, "away_lat"], a.loc[i, "away_lon"], a.loc[i, "venue_lat"], a.loc[i, "venue_lon"])
-        for i in a.index
-    ]
-
-    out = df[["game_id"]].drop_duplicates()
-    out = out.merge(h[["game_id", "travel_home_km"]], on="game_id", how="left")
-    out = out.merge(a[["game_id", "travel_away_km"]], on="game_id", how="left")
-    return out
-
-
-def rest_and_travel(
+def _team_rollup_features(
     schedule: pd.DataFrame,
-    teams_df: pd.DataFrame | None = None,
-    venues_df: pd.DataFrame | None = None,
-    predict_df: pd.DataFrame | None = None
+    team_stats_sided: pd.DataFrame,
+    predict_df: pd.DataFrame | None,
+    last_n: int = 5
 ) -> pd.DataFrame:
     """
-    Returns a DataFrame keyed by game_id with:
-      - rest_home_days, rest_away_days
-      - travel_home_km, travel_away_km  (NaN if coords missing)
-      - neutral_site, postseason (if present on schedule; otherwise left alone)
+    Use rolling.py helpers to compute rolling means of advanced stats with prior-season padding.
+    Returns a game-level table with home/away-prefixed rolling features.
     """
-    if schedule is None or schedule.empty:
-        return pd.DataFrame(columns=[
-            "game_id", "rest_home_days", "rest_away_days", "travel_home_km", "travel_away_km"
-        ])
+    if team_stats_sided.empty:
+        return pd.DataFrame()
 
-    df = schedule.copy()
-    # Dates normalized in features._prep_schedule, but make sure:
-    df["date"] = pd.to_datetime(df["date"], errors="coerce", utc=True)
+    # Convert sided long stats to one row per game with _home/_away suffixes
+    wide_stats = rolling_lib.long_stats_to_wide(team_stats_sided)
 
-    # Attach venue coordinates via id or name (robust)
-    df = _attach_venue_coords(df, venues_df if venues_df is not None else pd.DataFrame())
+    # Build team-side rolling windows, with padding using previous-season averages
+    home_roll, away_roll = rolling_lib.build_sidewise_rollups(
+        schedule=schedule,
+        wide_stats=wide_stats,
+        last_n=last_n,
+        predict_df=predict_df
+    )
+    # Join to schedule to label home/away rows correctly
+    home_join = schedule[["game_id", "home_team"]].rename(columns={"home_team": "team"})
+    away_join = schedule[["game_id", "away_team"]].rename(columns={"away_team": "team"})
 
-    # Rest days
-    rest = _compute_rest_days(df)
+    home_feats = home_roll.merge(home_join, on=["game_id", "team"], how="inner").drop(columns=["team"])
+    away_feats = away_roll.merge(away_join, on=["game_id", "team"], how="inner").drop(columns=["team"])
 
-    # Travel distances (may be NaN when coords absent)
-    travel = _compute_travel_km(df, teams_df if teams_df is not None else pd.DataFrame())
+    # Add prefixes to distinguish home vs away
+    def _pref(df: pd.DataFrame, pfx: str) -> pd.DataFrame:
+        df = df.copy()
+        ren = {c: f"{pfx}{c}" for c in df.columns if c.startswith("R")}
+        return df.rename(columns=ren)
 
-    out = df[["game_id", "neutral_site"]].drop_duplicates()
-    if "postseason" in df.columns:
-        out = out.merge(df[["game_id", "postseason"]].drop_duplicates(), on="game_id", how="left")
-    out = out.merge(rest, on="game_id", how="left")
-    out = out.merge(travel, on="game_id", how="left")
+    home_feats = _pref(home_feats, "home_")
+    away_feats = _pref(away_feats, "away_")
 
+    out = home_feats.merge(away_feats, on="game_id", how="outer")
     return out
+
+
+def _market_features(lines_df: pd.DataFrame, manual_lines_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Build market features (median spread & total). If manual lines exist, let them override.
+    """
+    lines = pd.concat([lines_df, manual_lines_df], ignore_index=True) if not manual_lines_df.empty else lines_df.copy()
+    if lines.empty:
+        return pd.DataFrame(columns=["game_id", "spread_home", "over_under"])
+    # Normalize game_id to string before any downstream joins
+    if "game_id" in lines.columns:
+        lines["game_id"] = lines["game_id"].astype(str)
+    med = market_lib.median_lines(lines)
+    if "game_id" in med.columns:
+        med["game_id"] = med["game_id"].astype(str)
+    return med[["game_id", "spread_home", "over_under"]]
+
+
+def _talent_features(schedule: pd.DataFrame, talent_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Simple recruiting/talent differential: home - away.
+    """
+    if talent_df.empty or "school" not in talent_df.columns or "talent" not in talent_df.columns:
+        return pd.DataFrame(columns=["game_id", "talent_diff"])
+
+    t = talent_df.copy()
+    t["school"] = t["school"].astype(str).str.strip()
+
+    home = schedule[["game_id", "home_team"]].merge(
+        t[["school", "talent"]].rename(columns={"school": "home_team", "talent": "home_talent"}),
+        on="home_team", how="left"
+    )
+    away = schedule[["game_id", "away_team"]].merge(
+        t[["school", "talent"]].rename(columns={"school": "away_team", "talent": "away_talent"}),
+        on="away_team", how="left"
+    )
+
+    out = home.merge(away, on="game_id", how="left")
+    out["talent_diff"] = pd.to_numeric(out["home_talent"], errors="coerce") - pd.to_numeric(out["away_talent"], errors="coerce")
+    return out[["game_id", "talent_diff"]]
+
+
+def create_feature_set(
+    schedule: pd.DataFrame | None = None,
+    team_stats: pd.DataFrame | None = None,
+    venues_df: pd.DataFrame | None = None,
+    teams_df: pd.DataFrame | None = None,
+    talent_df: pd.DataFrame | None = None,
+    lines_df: pd.DataFrame | None = None,
+    manual_lines_df: pd.DataFrame | None = None,
+    games_to_predict_df: pd.DataFrame | None = None
+) -> tuple[pd.DataFrame, list[str]]:
+    """
+    Build the feature matrix and list of feature names for both training and prediction.
+
+    Returns:
+        (X, feature_cols):
+          X: DataFrame with id columns (game_id, season, week, home_team, away_team,
+             neutral_site, home_points, away_points) and engineered numeric features.
+          feature_cols: list of the feature column names used for modeling.
+    """
+    # Load or use provided raw tables
+    schedule, stats_raw, lines_raw, teams_raw, venues_raw, talent_raw, manual_lines_raw = _load_raw(
+        schedule, team_stats, lines_df, teams_df, venues_df, talent_df, manual_lines_df
+    )
+
+    schedule = _prep_schedule(schedule)
+
+    # If we have predict games, append them into the working schedule (ids must be unique)
+    if games_to_predict_df is not None and not games_to_predict_df.empty:
+        pred = games_to_predict_df.copy()
+        for c in ["season", "week", "neutral_site", "home_points", "away_points"]:
+            if c not in pred.columns:
+                pred[c] = 0
+        pred["date"] = pd.to_datetime(pred.get("date"), errors="coerce", utc=True)
+        # Ensure string ids for predicted games too
+        if "game_id" in pred.columns:
+            pred["game_id"] = pred["game_id"].astype(str)
+        schedule = pd.concat([schedule, pred], ignore_index=True, sort=False)
+
+    # --------- Build per-module features ---------
+    # 1) Rolling advanced team stats (last 5), with previous-season padding for early weeks
+    sided = _prep_team_stats(schedule, stats_raw)
+    roll_feats = _team_rollup_features(schedule, sided, games_to_predict_df, last_n=5)
+
+    # 2) Market (median spread/OU)
+    market_feats = _market_features(lines_raw, manual_lines_raw)
+
+    # 3) Elo pre-game win prob (handles prior-season vs current-season logic)
+    elo_probs = elo_lib.pregame_probs(schedule=schedule, talent_df=talent_raw, predict_df=games_to_predict_df)
+
+    # 4) Context: rest, travel, bye, neutral/postseason
+    ctx = context_lib.rest_and_travel(schedule=schedule, teams_df=teams_raw, venues_df=venues_raw, predict_df=games_to_predict_df)
+
+    # 5) Talent differential
+    talent_feats = _talent_features(schedule, talent_raw)
+
+    # --------- Assemble master table ---------
+    id_cols = [
+        "game_id", "season", "week",
+        "home_team", "away_team", "neutral_site",
+        "home_points", "away_points"
+    ]
+    base = schedule[id_cols].drop_duplicates("game_id")
+    base["game_id"] = base["game_id"].astype(str)
+
+    X = base
+    for part in (roll_feats, market_feats, elo_probs, ctx, talent_feats):
+        if not part.empty:
+            if "game_id" in part.columns:
+                part = part.copy()
+                part["game_id"] = part["game_id"].astype(str)
+            X = X.merge(part, on="game_id", how="left")
+
+    # Clean and select feature columns
+    feature_cols = [c for c in X.columns if c not in id_cols]
+    for c in feature_cols:
+        X[c] = pd.to_numeric(X[c], errors="coerce")
+
+    # Per-season mean imputation then global mean
+    for c in feature_cols:
+        X[c] = X.groupby("season")[c].transform(lambda s: s.fillna(s.mean()))
+        X[c] = X[c].fillna(X[c].mean())
+
+    kept = [c for c in feature_cols if X[c].notna().any()]
+    return X[id_cols + kept].copy(), kept
