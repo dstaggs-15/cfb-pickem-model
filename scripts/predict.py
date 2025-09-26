@@ -35,7 +35,6 @@ GAMES_TXT   = INPUT_DIR / "games.txt"
 ALIASES_JSON= INPUT_DIR / "aliases.json"
 MANUAL_LINES= INPUT_DIR / "manual_lines.csv"
 
-# Streaming params
 CHUNKSIZE   = 200_000
 
 
@@ -44,7 +43,6 @@ def _read_csv(path: Path, usecols=None) -> pd.DataFrame:
         return pd.DataFrame()
     if usecols is None:
         return pd.read_csv(path, low_memory=False)
-    # read header to intersect requested columns with actual
     cols = pd.read_csv(path, nrows=0).columns
     keep = [c for c in cols if c in set(usecols)]
     return pd.read_csv(path, usecols=keep, low_memory=False)
@@ -67,7 +65,6 @@ def _load_games_list(path: Path) -> list[str]:
     if not path.exists():
         return []
     lines = [l.strip() for l in path.read_text().splitlines() if l.strip()]
-    # allow "Team A vs Team B" or "Team A,Team B"
     out = []
     for l in lines:
         if " vs " in l:
@@ -88,14 +85,13 @@ def _apply_alias(name: str, aliases: dict) -> str:
 
 def _make_predict_rows(sched: pd.DataFrame, games_list: list[str], season: int, week: int, aliases: dict) -> pd.DataFrame:
     """
-    Build a small DataFrame of the games we want to predict (one row each),
+    Build a DataFrame of the games we want to predict (one row each),
     aligned to schedule so we pick up game_id/neutral_site/etc.
-    Matching is done on (season, week, home_team, away_team) after alias normalization.
     """
     if not games_list:
-        # fallback: predict all games in season+week
         return sched[(sched["season"] == season) & (sched["week"] == week)][
-            ["game_id", "season", "week", "date", "home_team", "away_team", "neutral_site", "home_points", "away_points", "venue_id", "venue"]
+            ["game_id", "season", "week", "date", "home_team", "away_team",
+             "neutral_site", "home_points", "away_points", "venue_id", "venue"]
         ].drop_duplicates()
 
     want = []
@@ -107,5 +103,21 @@ def _make_predict_rows(sched: pd.DataFrame, games_list: list[str], season: int, 
         a = _apply_alias(a, aliases)
         b = _apply_alias(b, aliases)
 
-        # Try both orientations: (a home vs b) and (b home vs a)
-        rows = sched[(sched["season"] == season) & (sched["week"] ==
+        # both orientations
+        rows = sched[
+            (sched["season"] == season) &
+            (sched["week"] == week) &
+            (
+                ((sched["home_team"] == a) & (sched["away_team"] == b)) |
+                ((sched["home_team"] == b) & (sched["away_team"] == a))
+            )
+        ][["game_id", "season", "week", "date", "home_team", "away_team",
+           "neutral_site", "home_points", "away_points", "venue_id", "venue"]]
+
+        if not rows.empty:
+            want.append(rows)
+
+    if not want:
+        return pd.DataFrame(columns=["game_id","season","week","date","home_team","away_team",
+                                     "neutral_site","home_points","away_points","venue_id","venue"])
+    return pd.concat(want, ignore_index=True).drop_duplicates()
