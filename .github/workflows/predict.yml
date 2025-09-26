@@ -30,6 +30,7 @@ jobs:
     timeout-minutes: 120
     concurrency:
       group: build-predict-${{ github.ref }}
+      cancel-in-progress: false
     env:
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
       PYTHONUNBUFFERED: "1"
@@ -59,25 +60,25 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      # ---------- DERIVED CACHE: restore if raw+code unchanged ----------
+      # ---------- Deterministic cache key for derived data ----------
       - name: Compute cache key
         id: ck
+        shell: bash
         run: |
-          echo "key=train-$(python - <<'PY'
-import hashlib, glob
-def hfile(p):
-  try:
-    with open(p,'rb') as f: return hashlib.sha256(f.read()).hexdigest()
-  except: return 'x'
-parts=[]
-for p in sorted(glob.glob('data/raw/cfbd/*.csv')): parts.append(hfile(p))
-for p in sorted(glob.glob('scripts/**/*.py', recursive=True)): parts.append(hfile(p))
-for p in ['requirements.txt']: parts.append(hfile(p))
-key=hashlib.sha256(('\n'.join(parts)).encode()).hexdigest()[:16]
-print(key)
-PY
-)"
-          echo "key=${key}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          tmpfile=$(mktemp)
+          if [ -d data/raw/cfbd ]; then
+            find data/raw/cfbd -type f -name '*.csv' -print0 | sort -z | xargs -0 sha256sum >> "$tmpfile" || true
+          fi
+          if [ -d scripts ]; then
+            find scripts -type f -name '*.py' -print0 | sort -z | xargs -0 sha256sum >> "$tmpfile" || true
+          fi
+          if [ -f requirements.txt ]; then
+            sha256sum requirements.txt >> "$tmpfile"
+          fi
+          key=$(sha256sum "$tmpfile" | cut -c1-16)
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+          echo "Cache key: $key"
 
       - name: Restore derived cache
         id: cache-derived
@@ -85,10 +86,11 @@ PY
         with:
           path: |
             data/derived
-          key: ${{ steps.ck.outputs.key }}
+          key: train-${{ steps.ck.outputs.key }}
 
       - name: Check derived presence
         id: has-derived
+        shell: bash
         run: |
           if [ -f data/derived/training.parquet ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
@@ -96,7 +98,7 @@ PY
             echo "present=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # ---------- Build dataset only on cache miss ----------
+      # ---------- Build dataset only if cache miss ----------
       - name: Build dataset (chunked/streaming)
         if: steps.has-derived.outputs.present == 'false'
         run: python -m scripts.build_dataset
@@ -107,7 +109,7 @@ PY
         with:
           path: |
             data/derived
-          key: ${{ steps.ck.outputs.key }}
+          key: train-${{ steps.ck.outputs.key }}
 
       # ---------- Train & Predict ----------
       - name: Train model
