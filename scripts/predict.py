@@ -6,7 +6,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Iterable, Dict, List, Tuple
+from typing import Iterable, Dict, List, Tuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -35,7 +35,6 @@ DEBUG_JSON  = DOCS_DATA / "debug_predict.json"
 
 # Inputs
 GAMES_TXT   = INPUT_DIR / "games.txt"
-ALIASES_JSON= INPUT_DIR / "aliases.json"
 MANUAL_LINES= INPUT_DIR / "manual_lines.csv"
 
 MODEL_FILE  = DERIVED_DIR / "model.joblib"
@@ -46,10 +45,39 @@ DESIRED_SCHED_COLS = [
     "neutral_site","home_points","away_points","venue_id","venue"
 ]
 
+# -----------------------
+# String normalization
+# -----------------------
+STOP = {
+    "THE","OF","UNIVERSITY","UNIV","U","STATE","ST","&","AND","AT"
+}
+
 def _canon(s: str) -> str:
-    if not isinstance(s, str):
-        return ""
-    return re.sub(r"[^A-Z0-9]", "", s.upper())
+    """Aggressive canonical form used for equality checks."""
+    if not isinstance(s, str): return ""
+    s = s.upper()
+    s = s.replace("&", " AND ")
+    s = s.replace("A&M", "A AND M").replace("A & M", "A AND M")
+    s = s.replace(".", " ").replace("'", " ")
+    # expand common abbreviations
+    s = re.sub(r"\bST\b", "STATE", s)
+    s = re.sub(r"\bPENN ST\b", "PENN STATE", s)
+    s = re.sub(r"\bKANSAS ST\b", "KANSAS STATE", s)
+    s = re.sub(r"\bOLE MISS\b", "MISSISSIPPI", s)
+    s = re.sub(r"\bUSC\b", "SOUTHERN CALIFORNIA", s)
+    s = re.sub(r"\bBYU\b", "BRIGHAM YOUNG", s)
+    s = re.sub(r"\bUCF\b", "CENTRAL FLORIDA", s)
+    s = re.sub(r"\bLSU\b", "LOUISIANA STATE", s)
+    s = re.sub(r"\bPITT\b", "PITTSBURGH", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+def _tokens(s: str) -> List[str]:
+    """Token set for fuzzy overlap scoring."""
+    if not isinstance(s, str): return []
+    s = _canon(s)
+    toks = re.split(r"[^A-Z0-9]+", s)
+    return [t for t in toks if t and t not in STOP]
 
 def _read_csv(path: Path, usecols: Iterable[str] | None = None) -> pd.DataFrame:
     if not path.exists():
@@ -63,7 +91,7 @@ def _read_csv(path: Path, usecols: Iterable[str] | None = None) -> pd.DataFrame:
 def _prep_schedule(df: pd.DataFrame) -> pd.DataFrame:
     df = ensure_schedule_columns(df.copy())
     df["game_id"] = df["game_id"].astype(str)
-    for c in ("home_team", "away_team", "venue"):
+    for c in ("home_team","away_team","venue"):
         if c in df.columns:
             df[c] = df[c].astype(str).str.strip()
     df["date"] = pd.to_datetime(df.get("date"), errors="coerce", utc=True)
@@ -73,6 +101,11 @@ def _prep_schedule(df: pd.DataFrame) -> pd.DataFrame:
     if "neutral_site" not in df.columns: df["neutral_site"] = False
     if "venue_id" not in df.columns: df["venue_id"] = pd.NA
     if "venue" not in df.columns: df["venue"] = pd.NA
+    # canonical + tokens for fuzzy match
+    df["home_c"] = df["home_team"].map(_canon)
+    df["away_c"] = df["away_team"].map(_canon)
+    df["home_toks"] = df["home_team"].map(_tokens)
+    df["away_toks"] = df["away_team"].map(_tokens)
     return df
 
 def _select_cols(df: pd.DataFrame, desired: List[str]) -> pd.DataFrame:
@@ -84,127 +117,108 @@ def _extract_pairs_from_text(txt: str) -> List[Tuple[str,str]]:
     pairs: List[Tuple[str,str]] = []
     # A @ B  (B is home)
     for m in re.finditer(r"([A-Za-z0-9&.\' \-]+?)\s*@\s*([A-Za-z0-9&.\' \-]+)", txt):
-        away = m.group(1).strip()
-        home = m.group(2).strip()
+        away = m.group(1).strip(); home = m.group(2).strip()
         pairs.append((away, home))
     # A vs B (A is home)  -> convert to (away, home)
     for m in re.finditer(r"([A-Za-z0-9&.\' \-]+?)\s*vs\s*([A-Za-z0-9&.\' \-]+)", txt, flags=re.IGNORECASE):
-        home = m.group(1).strip()
-        away = m.group(2).strip()
+        home = m.group(1).strip(); away = m.group(2).strip()
         pairs.append((away, home))
     # A,B (A is home) -> convert to (away, home)
     for m in re.finditer(r"([A-Za-z0-9&.\' \-]+?)\s*,\s*([A-Za-z0-9&.\' \-]+)", txt):
-        home = m.group(1).strip()
-        away = m.group(2).strip()
+        home = m.group(1).strip(); away = m.group(2).strip()
         pairs.append((away, home))
-    # Deduplicate while preserving order
-    seen = set()
-    dedup: List[Tuple[str,str]] = []
+    # Dedup preserving order
+    seen = set(); out = []
     for a,h in pairs:
         key = (a.lower(), h.lower())
         if key not in seen:
-            seen.add(key)
-            dedup.append((a,h))
-    return dedup
+            seen.add(key); out.append((a,h))
+    return out
 
 def _load_games_list(path: Path) -> List[Tuple[str, str]]:
-    """Parse games from file regardless of line breaks or spacing."""
     if not path.exists():
         return []
-    txt = path.read_text()
-    return _extract_pairs_from_text(txt)
+    return _extract_pairs_from_text(path.read_text())
 
-def _load_aliases() -> Dict[str, str]:
-    aliases: Dict[str, str] = {}
-    try:
-        if ALIASES_JSON.exists():
-            aliases = json.loads(ALIASES_JSON.read_text())
-    except Exception:
-        aliases = {}
-    defaults = {
-        "USC": "Southern California",
-        "Ole Miss": "Mississippi",
-        "BYU": "Brigham Young",
-        "Pitt": "Pittsburgh",
-        "Texas A&M": "Texas A and M",
-        "UCF": "Central Florida",
-        "LSU": "Louisiana State"
-    }
-    for k, v in defaults.items():
-        aliases.setdefault(k, v)
-    return aliases
+def _score_match(away_req: List[str], home_req: List[str], away_row: List[str], home_row: List[str]) -> float:
+    """
+    Simple token overlap score for (away,home) orientation.
+    Score is average Jaccard(sim_away, sim_home).
+    """
+    def jacc(a,b):
+        A,B = set(a), set(b)
+        return 0.0 if not A or not B else len(A&B)/len(A|B)
+    return 0.5 * (jacc(away_req, away_row) + jacc(home_req, home_row))
 
-def _map_alias(name: str, aliases: Dict[str, str]) -> str:
-    if not isinstance(name, str):
-        return name
-    name = name.strip()
-    return aliases.get(name, name)
+def _best_row_for_pair(pool: pd.DataFrame, away: str, home: str) -> Optional[pd.Series]:
+    """Pick best schedule row for a requested (away,home) by token overlap; consider both orientations."""
+    away_req = _tokens(away)
+    home_req = _tokens(home)
+    if pool.empty or not away_req or not home_req:
+        return None
 
-def _match_games_with_week_fallback(
-    sched_all: pd.DataFrame,
-    season: int,
-    desired_week: int,
-    requested_pairs: List[Tuple[str, str]],
-    aliases: Dict[str, str],
-) -> tuple[pd.DataFrame, int, dict]:
-    debug = {"season": season, "requested_week": desired_week, "tried": []}
+    # Pre-filter: rows where each side shares at least one token with one side of request
+    candidates = pool[
+        pool["home_toks"].apply(lambda t: bool(set(t)&set(home_req)) or bool(set(t)&set(away_req))) &
+        pool["away_toks"].apply(lambda t: bool(set(t)&set(home_req)) or bool(set(t)&set(away_req)))
+    ]
+    if candidates.empty:
+        return None
 
-    pool = sched_all[sched_all["season"] == season].copy()
-    pool["home_c"] = pool["home_team"].map(_canon)
-    pool["away_c"] = pool["away_team"].map(_canon)
+    best = None
+    best_score = -1.0
+    for _, row in candidates.iterrows():
+        sc1 = _score_match(away_req, home_req, row["away_toks"], row["home_toks"])  # as listed
+        sc2 = _score_match(away_req, home_req, row["home_toks"], row["away_toks"])  # swapped
+        sc  = max(sc1, sc2)
+        if sc > best_score:
+            best_score = sc
+            best = row
 
-    req = []
+    # require a minimum confidence to avoid bad picks
+    return best if best_score >= 0.40 else None  # tweakable threshold
+
+def _match_games_with_week_fallback(sched_all: pd.DataFrame, season: int, desired_week: int,
+                                    requested_pairs: List[Tuple[str,str]]) -> Tuple[pd.DataFrame, int, dict]:
+    """
+    Try requested week first (token overlap), then +/-1, then ANY week in season with best-per-pair.
+    Returns (rows, matched_week, debug).
+    """
+    debug = {"season": season, "requested_week": desired_week, "tried": [], "pairs": requested_pairs}
+
+    pool_season = sched_all[sched_all["season"] == season].copy()
+    tried_weeks = [desired_week, desired_week-1, desired_week+1]
+
+    def try_week(wk: int) -> pd.DataFrame:
+        cand = pool_season[pool_season["week"] == wk].copy()
+        picked = []
+        for away, home in requested_pairs:
+            row = _best_row_for_pair(cand, away, home)
+            if row is not None:
+                picked.append(row)
+        return pd.concat(picked, axis=1).T if picked else cand.iloc[0:0].copy()
+
+    # 1) exact, then +-1
+    for wk in tried_weeks:
+        if wk < 0: continue
+        rows = try_week(wk)
+        debug["tried"].append({"week": wk, "matched": int(len(rows))})
+        if not rows.empty and len(rows) >= max(1, len(requested_pairs)//2):
+            return _select_cols(rows, DESIRED_SCHED_COLS).drop_duplicates(), wk, debug
+
+    # 2) ANY week: pick best per pair across the whole season
+    picked = []
     for away, home in requested_pairs:
-        away_m = _canon(_map_alias(away, aliases))
-        home_m = _canon(_map_alias(home, aliases))
-        req.append((away_m, home_m))
-    debug["requested_pairs_canon"] = req
+        row = _best_row_for_pair(pool_season, away, home)
+        if row is not None:
+            picked.append(row)
+    rows_any = pd.concat(picked, axis=1).T if picked else pool_season.iloc[0:0].copy()
+    debug["tried"].append({"week": "ANY", "matched": int(len(rows_any))})
 
-    def find_for_week(wk: int) -> pd.DataFrame:
-        cand = pool[pool["week"] == wk].copy()
-        if cand.empty: return cand
-        hits = []
-        for (away_c, home_c) in req:
-            r = cand[
-                ((cand["home_c"] == home_c) & (cand["away_c"] == away_c)) |
-                ((cand["home_c"] == away_c) & (cand["away_c"] == home_c))
-            ]
-            if not r.empty:
-                hits.append(r)
-        return pd.concat(hits, ignore_index=True).drop_duplicates() if hits else cand.iloc[0:0].copy()
-
-    # exact
-    rows = find_for_week(desired_week)
-    debug["tried"].append({"week": desired_week, "matched": int(len(rows))})
-    if not rows.empty:
-        return _select_cols(rows, DESIRED_SCHED_COLS), desired_week, debug
-
-    # ±1
-    for wk in (desired_week - 1, desired_week + 1):
-        if wk >= 0:
-            r = find_for_week(wk)
-            debug["tried"].append({"week": wk, "matched": int(len(r))})
-            if not r.empty:
-                return _select_cols(r, DESIRED_SCHED_COLS), wk, debug
-
-    # any week
-    out_rows = []
-    weeks_hit = set()
-    for wk in sorted(pool["week"].dropna().unique()):
-        r = find_for_week(int(wk))
-        if not r.empty:
-            out_rows.append(r)
-            weeks_hit.add(int(wk))
-    rows_any = pd.concat(out_rows, ignore_index=True).drop_duplicates() if out_rows else pool.iloc[0:0].copy()
-    debug["tried"].append({"week": "ANY", "matched": int(len(rows_any)), "weeks_hit": sorted(list(weeks_hit))})
+    # Choose a representative week (most frequent among found rows), else desired_week
     if not rows_any.empty:
-        best_wk = None
-        best_count = -1
-        for wk in sorted(weeks_hit):
-            cnt = len(rows_any[rows_any["week"] == wk])
-            if cnt > best_count:
-                best_count, best_wk = cnt, wk
-        return _select_cols(rows_any[rows_any["week"] == best_wk], DESIRED_SCHED_COLS), int(best_wk), debug
+        wk = int(rows_any["week"].mode().iloc[0]) if "week" in rows_any.columns and not rows_any["week"].isna().all() else desired_week
+        return _select_cols(rows_any, DESIRED_SCHED_COLS).drop_duplicates(), wk, debug
 
     return rows_any, desired_week, debug  # empty
 
@@ -217,8 +231,7 @@ def _stream_filter_by_gids(csv_path: Path, gids: set[str], candidate_cols=("game
     for cand in candidate_cols:
         for c in columns:
             if c.lower() == cand.lower():
-                gid_col = c
-                break
+                gid_col = c; break
         if gid_col: break
     keep = []
     for chunk in pd.read_csv(csv_path, chunksize=CHUNKSIZE, low_memory=False):
@@ -230,19 +243,20 @@ def _stream_filter_by_gids(csv_path: Path, gids: set[str], candidate_cols=("game
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--week", type=int, required=True)
-    ap.add_argument("--season", type=int, default=None)
+    ap.add_argument("--week", type=int, required=True, help="CFB week to predict (e.g., 5)")
+    ap.add_argument("--season", type=int, default=None, help="Override season (default: latest season in schedule)")
     args = ap.parse_args()
 
+    # model + meta
     if not MODEL_FILE.exists():
-        print(f"ERROR: {MODEL_FILE} not found.", file=sys.stderr); sys.exit(2)
+        print(f"ERROR: {MODEL_FILE} not found. Run scripts.train_model first.", file=sys.stderr); sys.exit(2)
     model = joblib_load(MODEL_FILE)
-
     if not META_JSON.exists():
-        print(f"ERROR: {META_JSON} not found.", file=sys.stderr); sys.exit(2)
+        print(f"ERROR: {META_JSON} not found. Run scripts.build_dataset first.", file=sys.stderr); sys.exit(2)
     meta = json.loads(META_JSON.read_text())
     feature_names: list[str] = meta.get("features", [])
 
+    # schedule
     sched_all = _read_csv(SCHED_CSV)
     if sched_all.empty:
         print("ERROR: schedule CSV not found or empty.", file=sys.stderr); sys.exit(2)
@@ -252,16 +266,15 @@ def main():
     week   = int(args.week)
     print(f"Predicting season={season}, week={week}")
 
-    requested_pairs = _load_games_list(GAMES_TXT)   # list of (away, home)
+    # input pairs (away, home)
+    requested_pairs = _load_games_list(GAMES_TXT)
     if not requested_pairs:
-        print(f"NOTE: {GAMES_TXT} empty or unparsable.")
-    aliases = _load_aliases()
-
-    pred_rows, matched_week, dbg = _match_games_with_week_fallback(
-        sched_all, season, week, requested_pairs, aliases
-    )
+        print(f"NOTE: {GAMES_TXT} empty/unparsable.")
+        # If truly empty, try predicting all games of that week:
+        requested_pairs = [(a,b) for _,a,b in sched_all[(sched_all["season"]==season)&(sched_all["week"]==week)][["away_team","home_team"]].itertuples(index=False)]
+    # robust match
+    pred_rows, matched_week, dbg = _match_games_with_week_fallback(sched_all, season, week, requested_pairs)
     dbg["matched_week"] = matched_week
-    dbg["requested_pairs"] = requested_pairs
     dbg["matched_games_preview"] = pred_rows[["home_team","away_team","season","week"]].to_dict(orient="records") if not pred_rows.empty else []
     print(f"Matched {len(pred_rows)} games (using week {matched_week}).")
 
@@ -273,6 +286,7 @@ def main():
         return
 
     gids = set(pred_rows["game_id"].astype(str).unique())
+
     teams_df  = _read_csv(TEAMS_CSV)
     venues_df = _read_csv(VENUES_CSV)
     talent_df = _read_csv(TALENT_CSV)
@@ -289,14 +303,21 @@ def main():
         manual_lines_df=_read_csv(MANUAL_LINES) if MANUAL_LINES.exists() else None,
         games_to_predict_df=pred_rows
     )
-    Xp = X_all[X_all["game_id"].isin(gids)].copy()
 
+    Xp = X_all[X_all["game_id"].isin(gids)].copy()
+    # align features
     for c in feature_names:
         if c not in Xp.columns: Xp[c] = 0.0
-    Xp = Xp[["game_id","home_team","away_team","neutral_site"] + feature_names].copy()
+    base_cols = ["game_id","home_team","away_team"]
+    if "neutral_site" in Xp.columns:
+        base_cols.append("neutral_site")
+    else:
+        Xp["neutral_site"] = False
+        base_cols.append("neutral_site")
+    Xp = Xp[base_cols + feature_names].copy()
 
-    probs = model.predict_proba(Xp[feature_names])[:, 1]  # P(home win)
-
+    # predict
+    probs = model.predict_proba(Xp[feature_names])[:, 1]  # P(home)
     out = []
     for (gid, home, away, ns, p_home) in zip(
         Xp["game_id"], Xp["home_team"], Xp["away_team"], Xp.get("neutral_site", False), probs
@@ -314,7 +335,6 @@ def main():
     DOCS_DATA.mkdir(parents=True, exist_ok=True)
     with open(PRED_JSON, "w") as f: json.dump({"games": out}, f, indent=2)
     with open(DEBUG_JSON, "w") as f: json.dump(dbg, f, indent=2)
-
     print(f"Wrote {len(out)} predictions to {PRED_JSON} (matched on week {matched_week}). Debug in {DEBUG_JSON}.")
 
 if __name__ == "__main__":
