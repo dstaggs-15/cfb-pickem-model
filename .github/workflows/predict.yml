@@ -137,13 +137,3 @@ jobs:
 
       - name: List outputs (for debugging)
         run: ls -l docs/data || true
-
-              - name: Commit and push predictions/meta
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A docs/data/predictions.json docs/data/train_meta.json docs/data/debug_predict.json
-          git commit -m "chore(predictions): update Week ${WEEK}" || true
-          git push origin "${{ github.event.inputs.ref || github.ref_name }}"
-
