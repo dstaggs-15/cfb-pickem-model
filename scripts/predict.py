@@ -3,7 +3,6 @@
 from __future__ import annotations
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Iterable
@@ -40,6 +39,11 @@ MANUAL_LINES= INPUT_DIR / "manual_lines.csv"
 MODEL_FILE  = DERIVED_DIR / "model.joblib"
 CHUNKSIZE   = 200_000
 
+DESIRED_SCHED_COLS = [
+    "game_id","season","week","date","home_team","away_team",
+    "neutral_site","home_points","away_points","venue_id","venue"
+]
+
 
 def _read_csv(path: Path, usecols: Iterable[str] | None = None) -> pd.DataFrame:
     if not path.exists():
@@ -58,10 +62,22 @@ def _prep_schedule(df: pd.DataFrame) -> pd.DataFrame:
         if c in df.columns:
             df[c] = df[c].astype(str).str.strip()
     df["date"] = pd.to_datetime(df.get("date"), errors="coerce", utc=True)
-    for c in ("season", "week", "home_points", "away_points", "venue_id"):
+    for c in ("season","week","home_points","away_points","venue_id"):
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
+    # ensure optionals exist with safe defaults
+    if "neutral_site" not in df.columns:
+        df["neutral_site"] = False
+    if "venue_id" not in df.columns:
+        df["venue_id"] = pd.NA
+    if "venue" not in df.columns:
+        df["venue"] = pd.NA
     return df
+
+
+def _select_cols(df: pd.DataFrame, desired: list[str]) -> pd.DataFrame:
+    present = [c for c in desired if c in df.columns]
+    return df[present]
 
 
 def _load_games_list(path: Path) -> list[str]:
@@ -70,7 +86,7 @@ def _load_games_list(path: Path) -> list[str]:
       - 'A @ B'  (B is home)
       - 'A vs B'
       - 'A,B'
-    Normalizes to 'Home vs Away' order for matching logic (but we still match both orientations).
+    Normalizes '@' to 'B vs A' (right side is home).
     """
     if not path.exists():
         return []
@@ -79,7 +95,6 @@ def _load_games_list(path: Path) -> list[str]:
     for l in lines:
         if " @ " in l:
             a, b = [p.strip() for p in l.split(" @ ", 1)]
-            # '@' means right side is HOME
             out.append(f"{b} vs {a}")
         elif " vs " in l:
             out.append(l)
@@ -103,11 +118,10 @@ def _make_predict_rows(sched: pd.DataFrame, games_list: list[str], season: int, 
     aligned to schedule so we pick up game_id/neutral_site/etc.
     """
     if not games_list:
-        df = sched[(sched["season"] == season) & (sched["week"] == week)][
-            ["game_id", "season", "week", "date", "home_team", "away_team",
-             "neutral_site", "home_points", "away_points", "venue_id", "venue"]
-        ].drop_duplicates()
-        return df
+        return _select_cols(
+            sched[(sched["season"] == season) & (sched["week"] == week)],
+            DESIRED_SCHED_COLS
+        ).drop_duplicates()
 
     want = []
     for gl in games_list:
@@ -118,37 +132,31 @@ def _make_predict_rows(sched: pd.DataFrame, games_list: list[str], season: int, 
         a = _apply_alias(a, aliases)
         b = _apply_alias(b, aliases)
 
-        rows = sched[
-            (sched["season"] == season) &
-            (sched["week"] == week) &
-            (
-                ((sched["home_team"] == a) & (sched["away_team"] == b)) |
-                ((sched["home_team"] == b) & (sched["away_team"] == a))
-            )
-        ][["game_id", "season", "week", "date", "home_team", "away_team",
-           "neutral_site", "home_points", "away_points", "venue_id", "venue"]]
-
+        rows = _select_cols(
+            sched[
+                (sched["season"] == season) &
+                (sched["week"] == week) &
+                (
+                    ((sched["home_team"] == a) & (sched["away_team"] == b)) |
+                    ((sched["home_team"] == b) & (sched["away_team"] == a))
+                )
+            ],
+            DESIRED_SCHED_COLS
+        )
         if not rows.empty:
             want.append(rows)
 
     if not want:
-        return pd.DataFrame(columns=[
-            "game_id","season","week","date","home_team","away_team",
-            "neutral_site","home_points","away_points","venue_id","venue"
-        ])
+        return pd.DataFrame(columns=[c for c in DESIRED_SCHED_COLS if c in sched.columns])
     return pd.concat(want, ignore_index=True).drop_duplicates()
 
 
 def _stream_filter_by_gids(csv_path: Path, gids: set[str], candidate_cols=("game_id","gameid")) -> pd.DataFrame:
-    """
-    Stream a large CSV and return only rows whose game_id is in 'gids'.
-    """
     if not csv_path.exists() or not gids:
         return pd.DataFrame()
 
     header = pd.read_csv(csv_path, nrows=0)
     columns = list(header.columns)
-    # Find the actual name of the game_id column
     gid_col = None
     for cand in candidate_cols:
         for c in columns:
@@ -161,7 +169,6 @@ def _stream_filter_by_gids(csv_path: Path, gids: set[str], candidate_cols=("game
     keep_chunks = []
     for chunk in pd.read_csv(csv_path, chunksize=CHUNKSIZE, low_memory=False):
         if gid_col is None:
-            # can't filter w/o a game id; keep nothing (defensive)
             continue
         chunk[gid_col] = chunk[gid_col].astype(str)
         piece = chunk[chunk[gid_col].isin(gids)]
@@ -174,10 +181,10 @@ def _stream_filter_by_gids(csv_path: Path, gids: set[str], candidate_cols=("game
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--week", type=int, required=True, help="CFB week to predict (e.g., 5)")
-    ap.add_argument("--season", type=int, default=None, help="Override season (default: latest 'season' in schedule)")
+    ap.add_argument("--season", type=int, default=None, help="Override season (default: latest season in schedule)")
     args = ap.parse_args()
 
-    # Load artifacts
+    # Load model + meta
     if not MODEL_FILE.exists():
         print(f"ERROR: {MODEL_FILE} not found. Run scripts.train_model first.", file=sys.stderr)
         sys.exit(2)
@@ -189,7 +196,7 @@ def main():
     meta = json.loads(META_JSON.read_text())
     feature_names: list[str] = meta.get("features", [])
 
-    # Load schedule + determine season
+    # Load schedule and determine season/week
     sched_all = _read_csv(SCHED_CSV)
     if sched_all.empty:
         print("ERROR: schedule CSV not found or empty.", file=sys.stderr)
@@ -204,13 +211,11 @@ def main():
     games_list = _load_games_list(GAMES_TXT)
     if not games_list:
         print(f"NOTE: {GAMES_TXT} is empty or missing; predicting all games in season={season} week={week}")
-    aliases = {}
-    if ALIASES_JSON.exists():
-        try:
-            aliases = json.loads(ALIASES_JSON.read_text())
-        except Exception:
-            aliases = {}
-    # Helpful defaults (harmless if already present)
+    try:
+        aliases = json.loads(ALIASES_JSON.read_text()) if ALIASES_JSON.exists() else {}
+    except Exception:
+        aliases = {}
+    # helpful defaults
     for k, v in {
         "USC": "Southern California",
         "Ole Miss": "Mississippi",
@@ -218,11 +223,10 @@ def main():
     }.items():
         aliases.setdefault(k, v)
 
-    # Build the predict rows by matching to schedule
+    # Match requested games to schedule
     pred_rows = _make_predict_rows(sched_all, games_list, season=season, week=week, aliases=aliases)
     print(f"Matched {len(pred_rows)} games from input list.")
     if pred_rows.empty:
-        # Write an empty file so the frontend doesn't show old games
         DOCS_DATA.mkdir(parents=True, exist_ok=True)
         with open(PRED_JSON, "w") as f:
             json.dump({"games": []}, f, indent=2)
@@ -231,15 +235,14 @@ def main():
 
     gids = set(pred_rows["game_id"].astype(str).unique())
 
-    # Load small reference tables and stream-filter the big ones by game_id
+    # Load small reference tables and stream-filter big ones
     teams_df  = _read_csv(TEAMS_CSV)
     venues_df = _read_csv(VENUES_CSV)
     talent_df = _read_csv(TALENT_CSV)
-
     stats_chunk = _stream_filter_by_gids(STATS_CSV, gids)
     lines_chunk = _stream_filter_by_gids(LINES_CSV,  gids)
 
-    # Create features only for the selected games
+    # Feature creation only for selected games
     X_all, feat_list = create_feature_set(
         schedule=sched_all[sched_all["game_id"].isin(gids)].copy(),
         team_stats=stats_chunk,
@@ -251,24 +254,26 @@ def main():
         games_to_predict_df=pred_rows
     )
 
-    # Keep only our target games (defensive)
     Xp = X_all[X_all["game_id"].isin(gids)].copy()
 
-    # Order columns as training features; missing => fill with 0.0
+    # Align to training features
     for c in feature_names:
         if c not in Xp.columns:
             Xp[c] = 0.0
     Xp = Xp[["game_id","home_team","away_team"] + feature_names].copy()
 
-    # Model probabilities for home team
-    probs = model.predict_proba(Xp[feature_names])[:, 1]  # assuming binary classifier with class 1 = home win
-    preds = []
+    probs = model.predict_proba(Xp[feature_names])[:, 1]  # P(home win)
+
+    # Map neutral_site from pred_rows if present
+    pred_meta = pred_rows.set_index("game_id")
+    out = []
     for (gid, home, away, p_home) in zip(Xp["game_id"], Xp["home_team"], Xp["away_team"], probs):
+        ns = bool(pred_meta.loc[gid, "neutral_site"]) if ("neutral_site" in pred_meta.columns and gid in pred_meta.index) else False
         pick = home if p_home >= 0.5 else away
-        preds.append({
+        out.append({
             "home_team": str(home),
             "away_team": str(away),
-            "neutral_site": bool(False),  # could be added from schedule if desired
+            "neutral_site": ns,
             "model_prob_home": float(round(p_home, 4)),
             "pick": pick,
             "explanation": []
@@ -276,8 +281,8 @@ def main():
 
     DOCS_DATA.mkdir(parents=True, exist_ok=True)
     with open(PRED_JSON, "w") as f:
-        json.dump({"games": preds}, f, indent=2)
-    print(f"Wrote {len(preds)} predictions to {PRED_JSON}")
+        json.dump({"games": out}, f, indent=2)
+    print(f"Wrote {len(out)} predictions to {PRED_JSON}")
 
 
 if __name__ == "__main__":
