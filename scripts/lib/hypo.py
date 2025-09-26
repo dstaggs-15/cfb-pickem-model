@@ -33,31 +33,36 @@ def _canon_team(s: str) -> str:
     return re.sub(r"\s+", " ", s.strip())
 
 # ---------- load & pivot team-game stats ----------
-def load_team_game_stats(stats_csv: Path) -> tuple[pd.DataFrame, dict] | tuple[(), dict]:
+def load_team_game_stats(stats_csv: Path) -> tuple[pd.DataFrame, dict]:
     """
     Load CFBD team-game stats flexibly; pivot to wide per game per team.
     Looks for columns like: game_id, season, team, stat, value.
-    Returns (wide_df, meta) or ((), {}) if not loadable.
+    RETURNS: (wide_df, meta) — NEVER returns tuples of tuples.
     """
     if not stats_csv.exists():
-        return (), {}
+        return pd.DataFrame(), {}
 
-    # Try to map columns from header
-    header = pd.read_csv(stats_csv, nrows=0)
+    try:
+        header = pd.read_csv(stats_csv, nrows=0)
+    except Exception:
+        return pd.DataFrame(), {}
+
     cols = list(header.columns)
-
     c_game   = _ci_lookup(cols, ["game_id", "gameid"])
     c_season = _ci_lookup(cols, ["season", "year"])
     c_team   = _ci_lookup(cols, ["team", "school"])
     c_stat   = _ci_lookup(cols, ["stat_name", "statname", "category", "stat"])
     c_value  = _ci_lookup(cols, ["stat_value", "statvalue", "value"])
 
-    usecols = [x for x in [c_game, c_season, c_team, c_stat, c_value] if x]
-    if not usecols or (c_game is None or c_season is None or c_team is None or c_stat is None or c_value is None):
-        # fallback: load full and pray
-        df = pd.read_csv(stats_csv, low_memory=False)
-    else:
-        df = pd.read_csv(stats_csv, usecols=usecols, low_memory=False)
+    try:
+        if c_game and c_season and c_team and c_stat and c_value:
+            usecols = [c_game, c_season, c_team, c_stat, c_value]
+            df = pd.read_csv(stats_csv, usecols=usecols, low_memory=False)
+        else:
+            # Fallback: read everything and hope common names exist
+            df = pd.read_csv(stats_csv, low_memory=False)
+    except Exception:
+        return pd.DataFrame(), {}
 
     # Canonical names
     ren = {}
@@ -78,20 +83,28 @@ def load_team_game_stats(stats_csv: Path) -> tuple[pd.DataFrame, dict] | tuple[(
 
     need = {"game_id","season","team","stat","value"}
     if not need.issubset(df.columns):
-        return (), {}
+        return pd.DataFrame(), {}
 
-    # keep frequent stats only (cuts noise/misc categories)
-    frequent = df["stat"].value_counts()
-    frequent = frequent[frequent > 100].index.tolist()
-    df = df[df["stat"].isin(frequent)].copy()
+    # Keep frequent stats to reduce noise
+    vc = df["stat"].value_counts()
+    keep_stats = vc[vc > 100].index.tolist()
+    if keep_stats:
+        df = df[df["stat"].isin(keep_stats)].copy()
 
-    wide = df.pivot_table(index=["game_id","season","team"], columns="stat", values="value", aggfunc="first")
-    wide = wide.reset_index()
+    if df.empty:
+        return pd.DataFrame(), {}
+
+    try:
+        wide = df.pivot_table(index=["game_id","season","team"], columns="stat", values="value", aggfunc="first")
+        wide = wide.reset_index()
+    except Exception:
+        return pd.DataFrame(), {}
+
     for c in ["team"]:
         if c in wide.columns:
             wide[c] = wide[c].map(_canon_team)
 
-    # Try to locate some common offense metrics (names vary across dumps)
+    # Locate common offense metrics (names vary)
     def col_like(options: List[str]) -> Optional[str]:
         for opt in options:
             pat = re.sub(r"[^a-z]", "", opt.lower())
@@ -104,7 +117,7 @@ def load_team_game_stats(stats_csv: Path) -> tuple[pd.DataFrame, dict] | tuple[(
         "pts_off":  col_like(["points", "points_for", "score", "pointsfor"]),
         "ypp_off":  col_like(["yards_per_play", "ypp", "off_ypp", "offense_ypp"]),
         "sr_off":   col_like(["success_rate", "off_success_rate", "succ_rate_off"]),
-        # You can extend with defensive columns when present (e.g., opp_points, ypp_def, sr_def)
+        # Extend with defensive metrics when available in your dump
     }
     return wide, meta
 
@@ -115,17 +128,26 @@ def season_aggregates(wide: pd.DataFrame, meta: dict,
     Average per-team per-season stats for seasons in [lo, hi].
     Returns one row per (season, team) with 'games' count.
     """
-    df = wide[(wide["season"] >= lo) & (wide["season"] <= hi)].copy()
+    if not isinstance(wide, pd.DataFrame) or wide.empty:
+        return pd.DataFrame()
+
+    if "season" not in wide.columns or "team" not in wide.columns:
+        return pd.DataFrame()
+
+    df = wide[(pd.to_numeric(wide["season"], errors="coerce") >= lo) &
+              (pd.to_numeric(wide["season"], errors="coerce") <= hi)].copy()
+    if df.empty:
+        return pd.DataFrame()
+
     df["team"] = df["team"].map(_canon_team)
 
     stat_cols = [c for c in [meta.get("pts_off"), meta.get("ypp_off"), meta.get("sr_off")] if c and c in df.columns]
+    gp = df.groupby(["season","team"], as_index=False).size().rename(columns={"size":"games"})
+
     if not stat_cols:
-        # At least return games played for weighting if columns missing
-        gp = df.groupby(["season","team"], as_index=False).size().rename(columns={"size":"games"})
-        return gp
+        return gp  # at least games played
 
     agg = df.groupby(["season","team"], as_index=False)[stat_cols].mean()
-    gp  = df.groupby(["season","team"], as_index=False).size().rename(columns={"size":"games"})
     out = agg.merge(gp, on=["season","team"], how="left")
     return out
 
@@ -134,8 +156,11 @@ def fuse_current_with_baseline(cur: pd.DataFrame, base: pd.DataFrame, season: in
     Blend current-season means with multi-year baseline per team.
     Weight current by games/(games+3) to stabilize early season.
     """
-    cur = cur[cur["season"] == season].copy()
-    base = base[base["season"] < season].copy()
+    if cur.empty and base.empty:
+        return pd.DataFrame()
+
+    cur = cur[cur.get("season", season) == season].copy() if "season" in cur.columns else pd.DataFrame()
+    base = base[base.get("season", season-1) < season].copy() if "season" in base.columns else pd.DataFrame()
 
     if not base.empty:
         base_team = base.groupby("team", as_index=False).mean(numeric_only=True)
@@ -143,13 +168,13 @@ def fuse_current_with_baseline(cur: pd.DataFrame, base: pd.DataFrame, season: in
     else:
         base_team = pd.DataFrame(columns=["team"])
 
-    cur = cur.set_index("team")
-    base_team = base_team.set_index("team") if "team" in base_team.columns else base_team
+    cur = cur.set_index("team") if "team" in cur.columns else pd.DataFrame()
+    base_team = base_team.set_index("team") if "team" in base_team.columns else pd.DataFrame()
 
     teams = sorted(set(cur.index) | set(base_team.index))
     rows = []
     for t in teams:
-        c = cur.loc[t] if t in cur.index else None
+        c = cur.loc[t] if (not cur.empty and t in cur.index) else None
         b = base_team.loc[t] if (not base_team.empty and t in base_team.index) else None
 
         rec: Dict[str, float | str] = {"team": t}
@@ -159,7 +184,7 @@ def fuse_current_with_baseline(cur: pd.DataFrame, base: pd.DataFrame, season: in
         stat_cols = [col for col in (list(c.index) if c is not None else []) if col not in ["games"]]
         for col in stat_cols:
             cur_val  = float(c[col]) if (c is not None and pd.notna(c[col])) else np.nan
-            base_val = float(b.get(f"base_{col}", np.nan)) if b is not None else np.nan
+            base_val = float(b.get(f"base_{col}", np.nan)) if (b is not None) else np.nan
             if pd.notna(cur_val) and pd.notna(base_val):
                 val = w * cur_val + (1 - w) * base_val
             elif pd.notna(cur_val):
@@ -184,15 +209,24 @@ def team_strength_table(stats_csv: Path, season: int, years_back: int = 20) -> p
       3) fusing the two
       4) standardizing features and computing a composite 'rating'
     """
-    loaded = load_team_game_stats(stats_csv)
-    if not loaded:
+    wide, meta = load_team_game_stats(stats_csv)
+    if not isinstance(wide, pd.DataFrame) or wide.empty:
         return pd.DataFrame()
-    wide, meta = loaded
 
+    # Current season aggregates
     cur  = season_aggregates(wide, meta, lo=season, hi=season)
-    base = season_aggregates(wide, meta, lo=max(int(wide["season"].min()), season - years_back), hi=season - 1)
+    # Baseline aggregates (as much history as we have, capped to 20 years back)
+    try:
+        min_season = int(pd.to_numeric(wide["season"], errors="coerce").min())
+    except Exception:
+        min_season = season - years_back
+    base_lo = max(min_season, season - years_back)
+    base_hi = season - 1
+    base = season_aggregates(wide, meta, lo=base_lo, hi=base_hi)
 
     fused = fuse_current_with_baseline(cur, base, season=season)
+    if fused.empty:
+        return pd.DataFrame()
 
     # Standardize numeric cols and compute a composite rating
     num_cols = [c for c in fused.columns if c not in ["team","games","season"]]
@@ -200,7 +234,6 @@ def team_strength_table(stats_csv: Path, season: int, years_back: int = 20) -> p
     for c in num_cols:
         Z[c] = _z(Z[c])
 
-    # Offense-only proxy available universally; average the standardized features
     if num_cols:
         Z["rating"] = Z[num_cols].mean(axis=1)
     else:
@@ -208,7 +241,7 @@ def team_strength_table(stats_csv: Path, season: int, years_back: int = 20) -> p
 
     return Z[["team","rating","games"]].copy()
 
-# ---------- name resolution for user inputs ----------
+# ---------- name resolution ----------
 _STOP = {"THE","OF","UNIVERSITY","UNIV","U","STATE","ST","&","AND","AT"}
 def _canon_for_match(s: str) -> List[str]:
     s = s.upper()
@@ -243,6 +276,8 @@ def resolve_pairs_against_strength(pairs: List[tuple[str,str]], strength: pd.Dat
     """
     For each (away, home) input, fuzzy-resolve names to the strength table 'team' values.
     """
+    if strength.empty or "team" not in strength.columns:
+        return []
     teams = strength["team"].astype(str).tolist()
     out = []
     for away_in, home_in in pairs:
