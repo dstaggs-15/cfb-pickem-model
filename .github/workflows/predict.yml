@@ -27,10 +27,9 @@ permissions:
 jobs:
   build-and-predict:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     concurrency:
       group: build-predict-${{ github.ref }}
-      cancel-in-progress: false
-
     env:
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
       PYTHONUNBUFFERED: "1"
@@ -60,9 +59,57 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Build dataset
+      # ---------- DERIVED CACHE: restore if raw+code unchanged ----------
+      - name: Compute cache key
+        id: ck
+        run: |
+          echo "key=train-$(python - <<'PY'
+import hashlib, glob
+def hfile(p):
+  try:
+    with open(p,'rb') as f: return hashlib.sha256(f.read()).hexdigest()
+  except: return 'x'
+parts=[]
+for p in sorted(glob.glob('data/raw/cfbd/*.csv')): parts.append(hfile(p))
+for p in sorted(glob.glob('scripts/**/*.py', recursive=True)): parts.append(hfile(p))
+for p in ['requirements.txt']: parts.append(hfile(p))
+key=hashlib.sha256(('\n'.join(parts)).encode()).hexdigest()[:16]
+print(key)
+PY
+)"
+          echo "key=${key}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore derived cache
+        id: cache-derived
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/derived
+          key: ${{ steps.ck.outputs.key }}
+
+      - name: Check derived presence
+        id: has-derived
+        run: |
+          if [ -f data/derived/training.parquet ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ---------- Build dataset only on cache miss ----------
+      - name: Build dataset (chunked/streaming)
+        if: steps.has-derived.outputs.present == 'false'
         run: python -m scripts.build_dataset
 
+      - name: Save derived cache (after build)
+        if: steps.has-derived.outputs.present == 'false'
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/derived
+          key: ${{ steps.ck.outputs.key }}
+
+      # ---------- Train & Predict ----------
       - name: Train model
         run: python -m scripts.train_model
 
@@ -77,9 +124,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
           git add -A docs/data/predictions.json docs/data/train_meta.json
-
           if ! git diff --cached --quiet; then
             MSG="chore(predictions): update Week ${WEEK:-manual} $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             git commit -m "$MSG"
