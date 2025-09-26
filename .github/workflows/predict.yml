@@ -50,17 +50,17 @@ jobs:
             exit 1
           fi
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install deps
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      # ---------- Deterministic cache key for derived data ----------
+      # Compute a deterministic cache key from raw CSVs and scripts
       - name: Compute cache key
         id: ck
         shell: bash
@@ -80,6 +80,7 @@ jobs:
           echo "key=$key" >> "$GITHUB_OUTPUT"
           echo "Cache key: $key"
 
+      # Restore derived dataset from cache if possible
       - name: Restore derived cache
         id: cache-derived
         uses: actions/cache@v4
@@ -88,7 +89,7 @@ jobs:
             data/derived
           key: train-${{ steps.ck.outputs.key }}
 
-      - name: Check derived presence
+      - name: Check if derived exists
         id: has-derived
         shell: bash
         run: |
@@ -98,12 +99,13 @@ jobs:
             echo "present=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # ---------- Build dataset only if cache miss ----------
+      # Build dataset only if no cached version
       - name: Build dataset (chunked/streaming)
         if: steps.has-derived.outputs.present == 'false'
         run: python -m scripts.build_dataset
 
-      - name: Save derived cache (after build)
+      # Save derived dataset back to cache
+      - name: Save derived cache
         if: steps.has-derived.outputs.present == 'false'
         uses: actions/cache@v4
         with:
@@ -111,30 +113,27 @@ jobs:
             data/derived
           key: train-${{ steps.ck.outputs.key }}
 
-      # ---------- Train & Predict ----------
+      # Train the model
       - name: Train model
         run: python -m scripts.train_model
 
+      # Predict this week's games
       - name: Predict games for week
         run: |
           W="${WEEK:-5}"
           echo "Predicting Week ${W}"
           python -m scripts.predict --week "${W}"
 
-      - name: Commit & push predictions/meta
-        if: always()
+      # Always commit predictions.json and train_meta.json
+      - name: Commit and push predictions/meta
+        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A docs/data/predictions.json docs/data/train_meta.json
-          if ! git diff --cached --quiet; then
-            MSG="chore(predictions): update Week ${WEEK:-manual} $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-            git commit -m "$MSG"
-            TARGET_REF="${{ github.event.inputs.ref || github.ref_name }}"
-            git push origin "HEAD:${TARGET_REF}"
-          else
-            echo "No prediction output changes to commit."
-          fi
+          # Commit even if nothing changed; '|| true' prevents failure on no-op commit
+          git commit -m "chore(predictions): update Week ${WEEK}" || true
+          git push origin "${{ github.event.inputs.ref || github.ref_name }}"
 
-      - name: List outputs
+      - name: List outputs (for debugging)
         run: ls -l docs/data || true
