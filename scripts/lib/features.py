@@ -60,7 +60,7 @@ def _prep_schedule(df: pd.DataFrame) -> pd.DataFrame:
     for c in ["season", "week", "home_points", "away_points", "venue_id"]:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
-    # 🔧 KEY: unify to string game_id for all downstream merges
+    # Unify to string game_id for all downstream merges
     if "game_id" in df.columns:
         df["game_id"] = df["game_id"].astype(str)
     return df
@@ -106,10 +106,14 @@ def _prep_team_stats(schedule: pd.DataFrame, team_stats_raw: pd.DataFrame) -> pd
 
     # Attach home/away flag by joining schedule
     join = schedule[["game_id", "home_team", "away_team"]].drop_duplicates()
-    # join already has string game_id from _prep_schedule
+    # Merge (both sides have string game_id)
     out = team_long.merge(join, on="game_id", how="left")
-    out["home_away"] = np.where(out["team"].eq(out["home_team"]), "home",
-                         np.where(out["team"].eq(out["away_team"]), "away", np.nan))
+
+    # SAFE assignment using object dtype (avoids NumPy dtype promotion with NaN)
+    out["home_away"] = pd.Series(index=out.index, dtype="object")
+    out.loc[out["team"].eq(out["home_team"]), "home_away"] = "home"
+    out.loc[out["team"].eq(out["away_team"]), "home_away"] = "away"
+
     out = out.dropna(subset=["home_away"]).drop(columns=["home_team", "away_team"])
     return out
 
@@ -259,8 +263,6 @@ def create_feature_set(
         "home_points", "away_points"
     ]
     base = schedule[id_cols].drop_duplicates("game_id")
-
-    # Ensure base id types are sane before merges
     base["game_id"] = base["game_id"].astype(str)
 
     X = base
