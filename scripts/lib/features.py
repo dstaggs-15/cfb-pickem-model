@@ -229,4 +229,57 @@ def create_feature_set(
         for c in ["season", "week", "neutral_site", "home_points", "away_points"]:
             if c not in pred.columns:
                 pred[c] = 0
-        pred["date"] = pd.to_datetime(pred.get("date")_
+        pred["date"] = pd.to_datetime(pred.get("date"), errors="coerce", utc=True)
+        # Ensure string ids for predicted games too
+        if "game_id" in pred.columns:
+            pred["game_id"] = pred["game_id"].astype(str)
+        schedule = pd.concat([schedule, pred], ignore_index=True, sort=False)
+
+    # --------- Build per-module features ---------
+    # 1) Rolling advanced team stats (last 5), with previous-season padding for early weeks
+    sided = _prep_team_stats(schedule, stats_raw)
+    roll_feats = _team_rollup_features(schedule, sided, games_to_predict_df, last_n=5)
+
+    # 2) Market (median spread/OU)
+    market_feats = _market_features(lines_raw, manual_lines_raw)
+
+    # 3) Elo pre-game win prob (handles prior-season vs current-season logic)
+    elo_probs = elo_lib.pregame_probs(schedule=schedule, talent_df=talent_raw, predict_df=games_to_predict_df)
+
+    # 4) Context: rest, travel, bye, neutral/postseason
+    ctx = context_lib.rest_and_travel(schedule=schedule, teams_df=teams_raw, venues_df=venues_raw, predict_df=games_to_predict_df)
+
+    # 5) Talent differential
+    talent_feats = _talent_features(schedule, talent_raw)
+
+    # --------- Assemble master table ---------
+    id_cols = [
+        "game_id", "season", "week",
+        "home_team", "away_team", "neutral_site",
+        "home_points", "away_points"
+    ]
+    base = schedule[id_cols].drop_duplicates("game_id")
+
+    # Ensure base id types are sane before merges
+    base["game_id"] = base["game_id"].astype(str)
+
+    X = base
+    for part in (roll_feats, market_feats, elo_probs, ctx, talent_feats):
+        if not part.empty:
+            if "game_id" in part.columns:
+                part = part.copy()
+                part["game_id"] = part["game_id"].astype(str)
+            X = X.merge(part, on="game_id", how="left")
+
+    # Clean and select feature columns
+    feature_cols = [c for c in X.columns if c not in id_cols]
+    for c in feature_cols:
+        X[c] = pd.to_numeric(X[c], errors="coerce")
+
+    # Per-season mean imputation then global mean
+    for c in feature_cols:
+        X[c] = X.groupby("season")[c].transform(lambda s: s.fillna(s.mean()))
+        X[c] = X[c].fillna(X[c].mean())
+
+    kept = [c for c in feature_cols if X[c].notna().any()]
+    return X[id_cols + kept].copy(), kept
