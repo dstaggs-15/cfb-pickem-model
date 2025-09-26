@@ -12,6 +12,9 @@ on:
         required: false
         default: ""
 
+permissions:
+  contents: write
+
 jobs:
   build-and-predict:
     runs-on: ubuntu-latest
@@ -79,9 +82,8 @@ jobs:
         run: |
           W="${WEEK:-5}"
           echo "Predicting Week $W"
-          python -m scripts.predict --week "$W" || exit 1
+          python -m scripts.predict --week "$W"
 
-      # ALWAYS print the debug so we can see exactly why it didn't match
       - name: Print debug file
         run: |
           echo "----- DEBUG (docs/data/debug_predict.json) -----"
@@ -96,9 +98,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Stage all data artifacts we care about
           git add -A docs/data/predictions.json docs/data/train_meta.json docs/data/debug_predict.json
-          # If nothing staged, this will fail; make it non-fatal with '|| true'
           git commit -m "chore(predictions): update Week ${WEEK}" || true
-          # Push back to the same ref we ran on
           git push origin "${{ github.event.inputs.ref || github.ref_name }}"
