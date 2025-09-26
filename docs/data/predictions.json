@@ -1,3 +1,134 @@
 {
-  "games": []
+  "games": [
+    {
+      "home_team": "Illinois",
+      "away_team": "USC",
+      "neutral_site": false,
+      "model_prob_home": 0.2183,
+      "pick": "USC",
+      "explanation": [
+        "hypothetical_mode",
+        "talent_z_home=0.997",
+        "talent_z_away=1.997",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "home_team": "Arkansas",
+      "away_team": "Notre Dame",
+      "neutral_site": false,
+      "model_prob_home": 0.3774,
+      "pick": "Notre Dame",
+      "explanation": [
+        "hypothetical_mode",
+        "talent_z_home=1.407",
+        "talent_z_away=1.89",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "home_team": "Minnesota",
+      "away_team": "Rutgers",
+      "neutral_site": false,
+      "model_prob_home": 0.5644,
+      "pick": "Minnesota",
+      "explanation": [
+        "hypothetical_mode",
+        "talent_z_home=1.025",
+        "talent_z_away=1.002",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "home_team": "Kansas",
+      "away_team": "UCF",
+      "neutral_site": false,
+      "model_prob_home": 0.5019,
+      "pick": "Kansas",
+      "explanation": [
+        "hypothetical_mode",
+        "talent_z_home=0.865",
+        "talent_z_away=1.01",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "home_team": "Kansas",
+      "away_team": "Cincinnati",
+      "neutral_site": false,
+      "model_prob_home": 0.5262,
+      "pick": "Kansas",
+      "explanation": [
+        "hypothetical_mode",
+        "talent_z_home=0.865",
+        "talent_z_away=0.945",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "home_team": "Pittsburgh",
+      "away_team": "Louisville",
+      "neutral_site": false,
+      "model_prob_home": 0.5578,
+      "pick": "Pittsburgh",
+      "explanation": [
+        "hypothetical_mode",
+        "talent_z_home=1.186",
+        "talent_z_away=1.181",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "home_team": "Mississippi State",
+      "away_team": "LSU",
+      "neutral_site": false,
+      "model_prob_home": 0.3354,
+      "pick": "LSU",
+      "explanation": [
+        "hypothetical_mode",
+        "talent_z_home=1.405",
+        "talent_z_away=2.011",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "home_team": "Penn State",
+      "away_team": "Oregon",
+      "neutral_site": false,
+      "model_prob_home": 0.564,
+      "pick": "Penn State",
+      "explanation": [
+        "hypothetical_mode",
+        "talent_z_home=1.767",
+        "talent_z_away=1.745",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "home_team": "Georgia",
+      "away_team": "Alabama",
+      "neutral_site": false,
+      "model_prob_home": 0.5106,
+      "pick": "Georgia",
+      "explanation": [
+        "hypothetical_mode",
+        "talent_z_home=2.228",
+        "talent_z_away=2.35",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "home_team": "Colorado",
+      "away_team": "BYU",
+      "neutral_site": false,
+      "model_prob_home": 0.6659,
+      "pick": "Colorado",
+      "explanation": [
+        "hypothetical_mode",
+        "talent_z_home=1.079",
+        "talent_z_away=0.769",
+        "home_edge=0.15"
+      ]
+    }
+  ]
 }
