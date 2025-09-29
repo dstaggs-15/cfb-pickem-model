@@ -708,6 +708,7 @@ id,name,capacity,grass,dome,city,state,zip,countryCode,timezone,latitude,longitu
 3715,FAU Stadium,29419.0,False,False,Boca Raton,FL,33499,US,America/New_York,26.3763763,-80.1015759,3.613628864,2011.0
 6526,Hancock Whitney Stadium,25450.0,False,False,Mobile,AL,85329,US,,30.6943566,-88.0430541,,
 3700,Doyt L. Perry Stadium,24000.0,False,False,Bowling Green,OH,43403,US,America/New_York,41.3780114,-83.6225,205.9057465,1966.0
+3817,Malone Stadium,27617.0,False,False,Monroe,LA,71209,US,America/Chicago,32.5308089,-92.0660602,22.998209,1978.0
 3917,Sanford Stadium,92746.0,True,False,Athens,GA,30602,US,America/New_York,33.9498197,-83.3733813,186.1120758,1929.0
 7220,Clarence T.C. Ching Athletics Complex,9000.0,True,False,Honolulu,HI,96822,,,21.294294,-157.819338,20,
 3793,Kinnick Stadium,69250.0,False,False,Iowa City,IA,52242,US,America/Chicago,41.6586045,-91.5510829,220.6357727,1929.0
@@ -716,7 +717,6 @@ id,name,capacity,grass,dome,city,state,zip,countryCode,timezone,latitude,longitu
 3833,Memorial Stadium,47000.0,False,False,Lawrence,KS,66045,US,America/Chicago,38.9629418,-95.2463686,274.855957,1921.0
 3696,Dix Stadium,25319.0,False,False,Kent,OH,44242,US,America/New_York,41.1390935,-81.31346,321.3641663,1969.0
 3666,Cajun Field,41426.0,False,False,Lafayette,LA,70506,US,America/Chicago,30.2158434,-92.0417371,3.556508303,1971.0
-3817,Malone Stadium,30427.0,False,False,Monroe,LA,71209,US,America/Chicago,32.5308089,-92.0660602,22.998209,1978.0
 3776,Joe Aillet Stadium,28019.0,False,False,Ruston,LA,71272,US,America/Chicago,32.5321487,-92.6560019,72.87982941,1968.0
 3775,Joan C. Edwards Stadium,38016.0,False,False,Huntington,WV,25755,US,America/New_York,38.4247042,-82.4214412,163.7328186,1991.0
 3948,Hard Rock Stadium,64767.0,False,False,Miami Gardens,FL,33299,US,America/New_York,25.9579665,-80.2388604,2.624486446,1987.0
