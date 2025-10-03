@@ -28,6 +28,10 @@
     .ok { background:#15331a; }
     footer { margin-top:18px; color:var(--muted); font-size:0.85rem; }
     @media (max-width:900px) { .charts { grid-template-columns: 1fr; } }
+    /* simple styling for summary stats */
+    .summary { background:var(--card); border-radius:12px; padding:12px; margin-top:18px; box-shadow:0 8px 24px rgba(0,0,0,0.4); }
+    .summary ul { list-style:none; padding-left:0; margin:8px 0 0; }
+    .summary li { margin-bottom:4px; color:var(--fg); }
   </style>
 </head>
 <body>
@@ -83,7 +87,6 @@
         <h3 class="small">Cumulative Accuracy</h3>
         <canvas id="chartCum" height="220"></canvas>
       </div>
-
       <div>
         <h3 class="small">Calibration (prob bins)</h3>
         <canvas id="chartCal" height="220"></canvas>
@@ -92,6 +95,12 @@
         <h3 class="small">Model Probability Distribution</h3>
         <canvas id="chartDist" height="220"></canvas>
       </div>
+    </div>
+
+    <!-- summary stats panel -->
+    <div class="summary">
+      <h3 class="small">Summary Statistics</h3>
+      <ul id="statsList" class="small"></ul>
     </div>
 
     <div class="note">
@@ -111,7 +120,8 @@
     // localStorage key
     const STORAGE_KEY = 'cfb_results_v1';
     // default columns
-    const COLUMNS = ["season","week","home_team","away_team","home_points","away_points","model_pick","model_prob_home","notes"];
+    const COLUMNS = ["season","week","home_team","away_team","home_points",
+                     "away_points","model_pick","model_prob_home","notes"];
     // DOM refs
     const tbody = document.querySelector('#resultsTable tbody');
     const fileImport = document.getElementById('fileImport');
@@ -147,6 +157,44 @@
       return s;
     }
 
+    // summary stats helper
+    function renderSummaryStats(rows) {
+      const statsList = document.getElementById('statsList');
+      if (!statsList) return;
+
+      let totalCorrect = 0, totalGames = 0;
+      rows.forEach(r => {
+        const pHome = parseFloat(r.model_prob_home);
+        const hp = Number(r.home_points);
+        const ap = Number(r.away_points);
+        if (!isNaN(pHome) && !isNaN(hp) && !isNaN(ap)) {
+          totalGames++;
+          const predHomeWin = pHome >= 0.5;
+          const actualHomeWin = hp > ap;
+          if (predHomeWin === actualHomeWin) totalCorrect++;
+        }
+      });
+      const overallAcc = totalGames ? (totalCorrect / totalGames) * 100 : 0;
+
+      let sumProb = 0, probCount = 0;
+      rows.forEach(r => {
+        const p = parseFloat(r.model_prob_home);
+        if (!isNaN(p)) { sumProb += p; probCount++; }
+      });
+      const avgProb = probCount ? (sumProb / probCount) : 0;
+
+      statsList.innerHTML = '';
+      const addItem = (label, value) => {
+        const li = document.createElement('li');
+        li.textContent = `${label}: ${value}`;
+        statsList.appendChild(li);
+      };
+      addItem('Total games', totalGames);
+      addItem('Correct picks', totalCorrect);
+      addItem('Overall accuracy', overallAcc.toFixed(1) + '%');
+      addItem('Average model probability (home win)', avgProb.toFixed(2));
+    }
+
     // table rendering
     function renderTable() {
       const rows = loadData();
@@ -160,7 +208,6 @@
           input.style.width = '100%';
           input.addEventListener('change', (ev) => {
             r[col] = ev.target.value;
-            // keep numeric types numeric where sensible
             if (col==='season'||col==='week' || col==='home_points' || col==='away_points') {
               const n = parseInt(r[col]);
               r[col] = Number.isFinite(n) ? n : null;
@@ -171,12 +218,12 @@
             }
             saveData(rows);
             updateCharts();
+            renderSummaryStats(rows);
           });
           td.appendChild(input);
           tr.appendChild(td);
         });
 
-        // actions
         const act = document.createElement('td');
         act.style.textAlign = 'center';
         const del = document.createElement('button');
@@ -186,12 +233,14 @@
           saveData(rows);
           renderTable();
           updateCharts();
+          renderSummaryStats(rows);
         });
         act.appendChild(del);
         tr.appendChild(act);
 
         tbody.appendChild(tr);
       });
+      renderSummaryStats(rows);
     }
 
     function addRow(obj) {
@@ -202,11 +251,11 @@
       saveData(rows);
       renderTable();
       updateCharts();
+      renderSummaryStats(rows);
     }
 
-    // CSV import helper (simple)
+    // CSV import helper
     function parseCSV(text) {
-      // naive CSV -> array of objects using first header row as keys
       const lines = text.split(/\r?\n/).filter(l => l.trim().length>0);
       if (!lines.length) return [];
       const hdr = lines.shift().split(',').map(h => h.trim());
@@ -218,7 +267,6 @@
       });
     }
 
-    // import file handler
     fileImport.addEventListener('change', (ev) => {
       const f = ev.target.files[0];
       if (!f) return;
@@ -235,7 +283,6 @@
             } else alert('JSON must be an array of rows');
           } catch (err) { alert('Invalid JSON file'); }
         } else {
-          // CSV
           try {
             const arr = parseCSV(txt);
             arr.forEach(a => addRow(a));
@@ -246,7 +293,6 @@
       reader.readAsText(f);
     });
 
-    // download / export JSON & CSV
     btnDownloadJSON.addEventListener('click', () => {
       const rows = loadData();
       download('results.json', JSON.stringify(rows, null, 2));
@@ -258,16 +304,15 @@
       download('results.csv', [hdr].concat(lines).join('\n'));
     });
 
-    // Add / Clear / Example
     btnAdd.addEventListener('click', () => addRow());
     btnClear.addEventListener('click', () => {
       if (!confirm('Clear all rows from the local table?')) return;
       localStorage.removeItem(STORAGE_KEY);
       renderTable();
       updateCharts();
+      renderSummaryStats([]);
     });
     btnLoadExample.addEventListener('click', () => {
-      // small example with the games you showed
       const EX = [
         { season:2025, week:3, home_team:"Georgia Tech", away_team:"Clemson", home_points:21, away_points:28, model_pick:"Clemson", model_prob_home:0.42, notes:"example" },
         { season:2025, week:3, home_team:"Troy", away_team:"Memphis", home_points:14, away_points:21, model_pick:"Memphis", model_prob_home:0.35, notes:"example" }
@@ -275,19 +320,15 @@
       EX.forEach(e => addRow(e));
     });
 
-    // Apply to site: prepare commit-ready JSON and download it named docs_data_results.json
     btnApplyToSite.addEventListener('click', () => {
       const rows = loadData();
-      // default output file path expected by site: docs/data/results.json
       const out = { updated: new Date().toISOString(), rows: rows };
       download('docs_data_results.json', JSON.stringify(out, null, 2));
       alert('Downloaded docs_data_results.json. Commit/rename to docs/data/results.json to publish it to the site.');
     });
 
-    // CHART HELPERS
+    // metrics and charts
     function calcMetrics(rows) {
-      // rows: array of objects. Returns per-week metrics and cumulative
-      // define canonical names
       const cleaned = rows.map(r => ({
         season: r.season ? Number(r.season):null,
         week: r.week ? Number(r.week):null,
@@ -298,7 +339,6 @@
         p_home: (r.model_prob_home!==null && r.model_prob_home!==undefined) ? Number(r.model_prob_home) : null,
       })).filter(r=> r.season && r.week && (r.home_points!==null && r.away_points!==null) && (r.p_home!==null));
 
-      // group by season-week
       const byWeek = {};
       cleaned.forEach(r => {
         const key = `${r.season}__${r.week}`;
@@ -321,26 +361,21 @@
         return { season: g.season, week: g.week, wins, losses: total - wins, total, rows: g.rows };
       });
 
-      // cumulative acc series
       let cumCorrect = 0, cumTotal = 0;
       const cumSeries = weekly.map(wk => {
         cumCorrect += wk.wins; cumTotal += wk.total;
         return { season: wk.season, week: wk.week, cumAcc: (cumTotal? cumCorrect/cumTotal:0), cumCorrect, cumTotal };
       });
 
-      // calibration bins across all cleaned rows
       const bins = Array.from({length:10}).map((_,i)=>({low:i*0.1, high:(i+1)*0.1, n:0, correct:0}));
       cleaned.forEach(r => {
         const p = Math.max(0, Math.min(0.999999, r.p_home));
         const bin = Math.min(9, Math.floor(p*10));
         const homeWin = r.home_points > r.away_points;
         bins[bin].n += 1;
-        bins[bin].correct += (homeWin ? 1 : 0) * 1 * (r.p_home>=0.5||r.p_home<0.5 ? 1:0); // homeWin counts toward calibration
+        bins[bin].correct += (homeWin ? 1 : 0);
       });
-
       const binSeries = bins.map(b => ({ label: `${(b.low*100).toFixed(0)}-${(b.high*100).toFixed(0)}%`, n:b.n, frac: b.n? b.correct/b.n : null }));
-
-      // probability distribution
       const probs = cleaned.map(r => r.p_home);
       return { weekly, cumSeries, binSeries, probs };
     }
@@ -349,7 +384,6 @@
       const rows = loadData();
       const metrics = calcMetrics(rows);
 
-      // Weekly chart
       const labels = metrics.weekly.map(w => `S${w.season}W${w.week}`);
       const wins = metrics.weekly.map(w => w.wins);
       const totals = metrics.weekly.map(w => w.total);
@@ -366,7 +400,6 @@
         chartWeekly.update();
       }
 
-      // Cumulative accuracy line
       const cumLabels = metrics.cumSeries.map(c => `S${c.season}W${c.week}`);
       const cumAcc = metrics.cumSeries.map(c => (c.cumAcc*100).toFixed(2));
       if (!chartCum) {
@@ -381,7 +414,6 @@
         chartCum.update();
       }
 
-      // Calibration bins (show percent correct per bin)
       const binLabels = metrics.binSeries.map(b => b.label);
       const binVals = metrics.binSeries.map(b => b.n? (b.frac*100).toFixed(1) : null);
       if (!chartCal) {
@@ -396,7 +428,6 @@
         chartCal.update();
       }
 
-      // Distribution of predicted probabilities
       const distBins = Array.from({length:10}).map(_=>0);
       metrics.probs.forEach(p => {
         if (p === null || p === undefined) return;
@@ -415,17 +446,17 @@
         chartDist.data.datasets[0].data = distBins;
         chartDist.update();
       }
+
+      renderSummaryStats(rows);
     }
 
     // init
     renderTable();
     updateCharts();
-
     // expose for debugging
     window.__cfb_results = {
       loadData, saveData, renderTable, updateCharts
     };
-
   })();
   </script>
 </body>
