@@ -1,66 +1,100 @@
-/*
- * Front-end script for the CFB Pick'em site.
- * This version targets the correct container (predictions-container), binds the
- * search box (filterInput), and uses Week 6 matchups and colors.
+/* docs/app.js
+ * Renders prediction cards (your model) + ESPN FPI overlay.
+ * - Loads docs/data/predictions.json (model output)
+ * - Loads docs/data/fpi.json (ESPN ranks/FPI values)
+ * - Accepts BOTH FPI JSON formats:
+ *      { "data": [ { "name":"Alabama","rank":2,"fpi":27.1 }, ... ] }
+ *   or { "teams": { "Alabama": { "rank":2,"fpi":27.1 }, ... }, "meta": {...} }
+ * - Adds AGREE/DISAGREE (FPI vs model pick)
+ * - Cache-busts fetches to beat GH Pages caching
  */
 
 (async function () {
-  // URLs for data
-  const PRED_URL = "data/predictions.json";
-  const FPI_URL = "data/fpi.json";
+  const PRED_URL = 'data/predictions.json';
+  const FPI_URL  = 'data/fpi.json';
   const cacheBust = () => `?v=${Date.now()}`;
 
-  // ==== 1) Custom order (Away @ Home) — Week 6 ====
+  // ==== YOUR ORDER (Away, Home) — WEEK SPECIFIC ====
+  // Only these render (set ONLY_USE_DESIRED = true).
   const DESIRED_ORDER = [
-    ["Iowa State",     "Cincinnati"],
-    ["Kansas State",   "Baylor"],
-    ["Vanderbilt",     "Alabama"],
-    ["Texas",          "Florida"],
-    ["Virginia",       "Louisville"],
-    ["Washington",     "Maryland"],
-    ["UNLV",           "Wyoming"],
-    ["Miami",          "Florida State"],
-    ["Kansas",         "UCF"],
-    ["Duke",           "California"],
+    ["Iowa State", "Cincinnati"],
+    ["Kansas State", "Baylor"],
+    ["Vanderbilt", "Alabama"],
+    ["Texas", "Florida"],
+    ["Virginia", "Louisville"],
+    ["Washington", "Maryland"],
+    ["UNLV", "Wyoming"],
+    ["Miami", "Florida State"],
+    ["Kansas", "UCF"],
+    ["Duke", "California"]
   ];
-  // Render only the games specified in DESIRED_ORDER
   const ONLY_USE_DESIRED = true;
 
-  // ==== 2) Baked-in team colors (primary) — updated/extended ====
+  // ==== TEAM COLORS (primary) — minimal set; unknowns get hash color ====
   const TEAM_COLORS = {
-    "Iowa State":    "#C8102E", // cardinal red
-    "Cincinnati":    "#D40026",
-    "Kansas State":  "#512888", // purple
-    "Baylor":        "#004834",
-    "Vanderbilt":    "#B3A369",
-    "Alabama":       "#9D2235",
-    "Texas":         "#BF5700", // burnt orange
-    "Florida":       "#0021A5",
-    "Virginia":      "#E57200",
-    "Louisville":    "#AD0C00",
-    "Washington":    "#4B2E83",
-    "Maryland":      "#E03A3E",
-    "UNLV":          "#C2002F",
-    "Wyoming":       "#FFC72C",
-    "Miami":         "#F47321",
+    "Alabama": "#9E1B32",
+    "Baylor": "#004834",
+    "California": "#003262",
+    "Cincinnati": "#E00122",
+    "Duke": "#003087",
+    "Florida": "#0021A5",
     "Florida State": "#782F40",
-    "Kansas":        "#0051BA",
-    "UCF":           "#BA9B37",
-    "Duke":          "#003087",
-    "California":    "#003262",
-    // keep any other teams you may have had previously…
+    "Iowa State": "#A71930",
+    "Kansas": "#0051BA",
+    "Kansas State": "#512888",
+    "Louisville": "#AD0000",
+    "Maryland": "#E03A3E",
+    "Miami": "#F47321",
+    "Texas": "#BF5700",
+    "UCF": "#BA9B37",
+    "UNLV": "#CC0000",
+    "Vanderbilt": "#866D4B",
+    "Washington": "#4B2E83",
+    "Wyoming": "#492F24"
   };
 
   // ---------- helpers ----------
+  const $  = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
   const normalize = (s) =>
-    String(s || "")
+    String(s || '')
       .toLowerCase()
-      .replace(/&/g, "and")
-      .replace(/[^a-z0-9 ]+/g, " ")
-      .replace(/\s+/g, " ")
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9 ]+/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim();
 
-  // Build rank map for ordering (both orientations)
+  // ESPN naming aliases → align to your display names / schedule
+  // Works even if ESPN includes nicknames like "ucf knights" / "cal golden bears".
+  const ALIASES = new Map([
+    ["usc", "southern california"],
+    ["ole miss", "mississippi"],
+    ["ucf", "central florida"],
+    ["byu", "brigham young"],
+    ["lsu", "louisiana state"],
+    ["miami fl", "miami"],
+    ["cal", "california"],
+    ["kansas st", "kansas state"],
+    ["iowa st", "iowa state"]
+  ]);
+
+  const stripParens = (s) => s.replace(/\s*\(.*?\)\s*/g, ' ').trim();
+
+  const normalizeWithAliases = (s) => {
+    let n = normalize(stripParens(String(s || '')));
+    // direct alias
+    if (ALIASES.has(n)) return ALIASES.get(n);
+    // partial alias (e.g., "ucf knights", "cal golden bears")
+    for (const [k, v] of ALIASES.entries()) {
+      if (n === k || n.startsWith(k + ' ') || n.endsWith(' ' + k) || n.includes(' ' + k + ' ')) {
+        return v;
+      }
+    }
+    return n;
+  };
+
+  // build rank map for ordering (both orientations)
   const RANK = new Map();
   DESIRED_ORDER.forEach((pair, idx) => {
     const [away, home] = pair;
@@ -69,72 +103,39 @@
   });
 
   function pickTextColor(hex) {
-    if (!hex || typeof hex !== "string") return "#fff";
-    const h = hex.replace("#", "");
-    if (h.length !== 6) return "#fff";
-    const r = parseInt(h.slice(0, 2), 16) / 255;
-    const g = parseInt(h.slice(2, 4), 16) / 255;
-    const b = parseInt(h.slice(4, 6), 16) / 255;
-    const lin = (v) =>
-      v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-    const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-    return L >= 0.6 ? "#000" : "#fff";
+    if (!hex || typeof hex !== 'string') return '#fff';
+    const h = hex.replace('#', '');
+    if (h.length !== 6) return '#fff';
+    const r = parseInt(h.slice(0,2),16)/255;
+    const g = parseInt(h.slice(2,4),16)/255;
+    const b = parseInt(h.slice(4,6),16)/255;
+    const lin = (v)=> (v<=0.04045 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4));
+    const L = 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b);
+    return L >= 0.6 ? '#000' : '#fff';
   }
-
   function colorFromName(name) {
-    const str = String(name || "");
+    const str = String(name || '');
     let hash = 0;
-    for (let i = 0; i < str.length; i++)
-      hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
-    const hue = hash % 360,
-      s = 62,
-      l = 38;
+    for (let i=0;i<str.length;i++) hash = (hash*31 + str.charCodeAt(i)) >>> 0;
+    const hue = hash % 360, s = 62, l = 38;
     return hslToHex(hue, s, l);
   }
-
   function hslToHex(h, s, l) {
-    s /= 100;
-    l /= 100;
-    const c = (1 - Math.abs(2 * l - 1)) * s,
-      x = c * (1 - Math.abs(((h / 60) % 2) - 1)),
-      m = l - c / 2;
-    let r = 0,
-      g = 0,
-      b = 0;
-    if (0 <= h && h < 60) {
-      r = c;
-      g = x;
-      b = 0;
-    } else if (60 <= h && h < 120) {
-      r = x;
-      g = c;
-      b = 0;
-    } else if (120 <= h && h < 180) {
-      r = 0;
-      g = c;
-      b = x;
-    } else if (180 <= h && h < 240) {
-      r = 0;
-      g = x;
-      b = c;
-    } else if (240 <= h && h < 300) {
-      r = x;
-      g = 0;
-      b = c;
-    } else {
-      r = 0;
-      g = 0;
-      b = x;
-    }
-    const toHex = (v) =>
-      ("0" + Math.round((v + m) * 255).toString(16)).slice(-2);
+    s/=100; l/=100;
+    const c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs(((h/60)%2)-1)), m=l-c/2;
+    let r=0,g=0,b=0;
+    if (0<=h && h<60){r=c;g=x;b=0;}
+    else if (60<=h && h<120){r=x;g=c;b=0;}
+    else if (120<=h && h<180){r=0;g=c;b=x;}
+    else if (180<=h && h<240){r=0;g=x;b=c;}
+    else if (240<=h && h<300){r=x;g=0;b=c;}
+    else {r=0;g=0;b=x;}
+    const toHex = (v)=> ('0'+Math.round((v+m)*255).toString(16)).slice(-2);
     return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
   }
-
   function teamColor(team) {
     const exact = TEAM_COLORS[team];
     if (exact) return exact;
-    // Normalize match
     const n = normalize(team);
     for (const k of Object.keys(TEAM_COLORS)) {
       if (normalize(k) === n) return TEAM_COLORS[k];
@@ -148,263 +149,186 @@
       const key = `${g.home_team}__${g.away_team}`;
       byKey[key] = { ...g, _order: i };
     });
-    return Object.values(byKey).sort((a, b) => a._order - b._order);
+    return Object.values(byKey).sort((a,b)=>a._order-b._order);
   }
 
   function orderGames(games) {
-    const withRank = games.map((g) => ({
+    const withRank = games.map(g => ({
       ...g,
-      _rank:
-        RANK.get(`${normalize(g.home_team)}__${normalize(g.away_team)}`) ??
-        Number.POSITIVE_INFINITY,
+      _rank: RANK.get(`${normalize(g.home_team)}__${normalize(g.away_team)}`) ?? Number.POSITIVE_INFINITY
     }));
     let list = withRank;
-    if (ONLY_USE_DESIRED) {
-      list = withRank.filter(
-        (g) => g._rank !== Number.POSITIVE_INFINITY
-      );
-    }
-    return list.sort(
-      (a, b) => a._rank - b._rank || a._order - b._order
-    );
+    if (ONLY_USE_DESIRED) list = withRank.filter(g => g._rank !== Number.POSITIVE_INFINITY);
+    return list.sort((a,b)=> (a._rank - b._rank) || (a._order - b._order));
   }
 
-  // ---- load data (with cache-busting) ----
+  function injectFPIStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+      .fpi-wrap{margin-top:10px;padding-top:10px;border-top:1px dashed rgba(255,255,255,.08);}
+      .fpi-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+      .fpi-side{display:flex;flex-direction:column;gap:2px;color:#d6d6d6;}
+      .fpi-side.right{text-align:right;align-items:flex-end;}
+      .fpi-team{font-weight:800;}
+      .fpi-meta{font-size:.9rem;color:#a9b0b6;}
+      .fpi-vs{color:#9aa0a6;font-weight:800;}
+      .fpi-fav{margin-top:6px;color:#cfd2d6;font-weight:700;}
+      .fpi-badge{margin-left:8px;padding:2px 8px;border-radius:999px;font-size:.75rem;font-weight:900;}
+      .fpi-badge.agree{background:#1f6f3f;color:#eaf7ee;}
+      .fpi-badge.disagree{background:#6f1f1f;color:#fde8e8;}
+      @media (max-width:640px){ .fpi-meta{font-size:.85rem;} }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // ---------- load predictions ----------
   let preds = [];
   try {
-    const res = await fetch(PRED_URL + cacheBust(), { cache: "no-store" });
+    const res = await fetch(PRED_URL + cacheBust(), { cache: 'no-store' });
     const json = await res.json();
-    preds = Array.isArray(json) ? json : json.games || [];
+    preds = Array.isArray(json) ? json : (json.games || []);
   } catch (e) {
-    console.error("Failed to load predictions.json", e);
+    console.error('Failed to load predictions.json', e);
     preds = [];
   }
 
-  // FPI map
+  // ---------- load FPI (robust to both formats) ----------
   let fpiMap = new Map();
   let fpiMeta = null;
   try {
-    const res = await fetch(FPI_URL + cacheBust(), { cache: "no-store" });
+    const res = await fetch(FPI_URL + cacheBust(), { cache: 'no-store' });
     const json = await res.json();
-    if (json && Array.isArray(json.data)) {
-      fpiMeta = json.meta || null;
-      json.data.forEach((item) => {
-        const n = normalize(item.name);
-        fpiMap.set(n, item);
-      });
+    fpiMeta = json.meta || null;
+
+    const put = (name, obj) => {
+      const item = {
+        name,
+        rank: (obj && Number.isFinite(Number(obj.rank))) ? Number(obj.rank) : null,
+        fpi:  (obj && Number.isFinite(Number(obj.fpi)))  ? Number(obj.fpi)  : null
+      };
+      fpiMap.set(normalizeWithAliases(name), item);
+    };
+
+    if (Array.isArray(json.data)) {
+      json.data.forEach(it => put(it.name, it));
+    } else if (json.teams && typeof json.teams === 'object') {
+      Object.entries(json.teams).forEach(([name, obj]) => put(name, obj));
     }
   } catch (e) {
-    console.warn("No FPI data available", e);
+    console.warn('No FPI data available', e);
     fpiMap = new Map();
   }
 
-  // Prepare predictions
-  const deduped = dedupe(preds);
-  const ordered = orderGames(deduped);
+  // ---------- build UI ----------
+  injectFPIStyles();
 
-  // ---- render ----
-  // Target the correct container instead of document.body
-  const container =
-    document.getElementById("predictions-container") || document.body;
-  container.innerHTML = "";
+  const container = $('#predictions-container');
+  container.innerHTML = ''; // clear "Loading..."
 
-  const percent = (x) =>
-    `${(Math.max(0, Math.min(1, Number(x))) * 100).toFixed(1)}%`;
-
-  function fpiEntry(team) {
-    return fpiMap.get(normalize(team)) || null;
+  const base = dedupe(preds);
+  const games = orderGames(base);
+  if (!games.length) {
+    container.innerHTML = `<div class="status-message">No predictions found.</div>`;
+    return;
   }
 
-  function favoredByFPI(home, away) {
-    const H = fpiEntry(home),
-      A = fpiEntry(away);
-    if (!H && !A) return null;
-    if (H && A) {
-      if (typeof H.fpi === "number" && typeof A.fpi === "number") {
-        if (H.fpi > A.fpi) return home;
-        if (A.fpi > H.fpi) return away;
+  games.forEach(g => {
+    const home = g.home_team;
+    const away = g.away_team;
+
+    const homeColor = teamColor(home);
+    const awayColor = teamColor(away);
+    const homeText  = pickTextColor(homeColor);
+    const awayText  = pickTextColor(awayColor);
+
+    const pHome = Number(g.model_prob_home ?? g.prob_home ?? 0.5);
+    const pAway = 1 - pHome;
+    const pick  = g.pick || (pHome >= 0.5 ? home : away);
+
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    // header
+    const hdr = document.createElement('div');
+    hdr.className = 'row hdr';
+    hdr.innerHTML = `
+      <div class="team" style="background:${homeColor};color:${homeText};">${home}</div>
+      <div class="vs">vs</div>
+      <div class="team" style="background:${awayColor};color:${awayText};">${away}</div>
+    `;
+    card.appendChild(hdr);
+
+    // model block
+    const body = document.createElement('div');
+    body.className = 'row body';
+    body.innerHTML = `
+      <div class="metric">
+        <div class="label">Model P(Home)</div>
+        <div class="value">${(pHome*100).toFixed(1)}%</div>
+      </div>
+      <div class="metric">
+        <div class="label">Model P(Away)</div>
+        <div class="value">${(pAway*100).toFixed(1)}%</div>
+      </div>
+      <div class="pick">Pick: <strong>${pick}</strong></div>
+    `;
+    card.appendChild(body);
+
+    // ----- FPI overlay -----
+    const fHome = fpiMap.get(normalizeWithAliases(home));
+    const fAway = fpiMap.get(normalizeWithAliases(away));
+
+    // who FPI favors?
+    let fpiFav = null;
+    if (fHome && fAway) {
+      if (Number.isFinite(fHome.fpi) && Number.isFinite(fAway.fpi)) {
+        fpiFav = fHome.fpi > fAway.fpi ? home : (fAway.fpi > fHome.fpi ? away : null);
       }
-      if (typeof H.rank === "number" && typeof A.rank === "number") {
-        if (H.rank < A.rank) return home;
-        if (A.rank < H.rank) return away;
+      if (!fpiFav && Number.isFinite(fHome.rank) && Number.isFinite(fAway.rank)) {
+        fpiFav = fHome.rank < fAway.rank ? home : (fAway.rank < fHome.rank ? away : null);
       }
-      return null;
+    } else if (fHome && !fAway) {
+      fpiFav = home;
+    } else if (!fHome && fAway) {
+      fpiFav = away;
     }
-    return H ? home : away;
-  }
 
-  function renderFPI(card, home, away, modelPick) {
-    const H = fpiEntry(home),
-      A = fpiEntry(away);
-    if (!H && !A) return;
+    const agree = fpiFav && pick ? (normalize(fpiFav) === normalize(pick)) : null;
 
-    const fav = favoredByFPI(home, away);
-    const agree =
-      fav && modelPick
-        ? normalize(fav) === normalize(modelPick)
-        : null;
-
-    const wrap = document.createElement("div");
-    wrap.className = "fpi-wrap";
-    wrap.innerHTML = `
+    const fpiWrap = document.createElement('div');
+    fpiWrap.className = 'fpi-wrap';
+    fpiWrap.innerHTML = `
       <div class="fpi-row">
         <div class="fpi-side">
           <span class="fpi-team">${home}</span>
-          <span class="fpi-meta">${
-            H ? `FPI ${H.fpi ?? "—"} · #${H.rank ?? "—"}` : "FPI —"
-          }</span>
+          <span class="fpi-meta">${fHome ? `FPI ${fHome.fpi ?? '—'}  ·  #${fHome.rank ?? '—'}` : 'FPI —'}</span>
         </div>
         <div class="fpi-vs">FPI</div>
         <div class="fpi-side right">
           <span class="fpi-team">${away}</span>
-          <span class="fpi-meta">${
-            A ? `FPI ${A.fpi ?? "—"} · #${A.rank ?? "—"}` : "FPI —"
-          }</span>
+          <span class="fpi-meta">${fAway ? `FPI ${fAway.fpi ?? '—'}  ·  #${fAway.rank ?? '—'}` : 'FPI —'}</span>
         </div>
       </div>
       <div class="fpi-fav">
-        ${
-          fav
-            ? `FPI favors: <strong>${fav}</strong>`
-            : "FPI favors: <strong>—</strong>"
-        }
-        ${
-          agree === true
-            ? '<span class="fpi-badge agree">AGREE</span>'
-            : ""
-        }
-        ${
-          agree === false
-            ? '<span class="fpi-badge disagree">DISAGREE</span>'
-            : ""
-        }
-        ${
-          fpiMeta && fpiMeta.updated
-            ? `<span class="fpi-stamp">(${fpiMeta.source || "FPI"} · ${
-                fpiMeta.updated
-              })</span>`
-            : ""
-        }
+        ${fpiFav ? `FPI favors: <strong>${fpiFav}</strong>` : 'FPI favors: <strong>—</strong>'}
+        ${agree === true  ? `<span class="fpi-badge agree">AGREE</span>` : ''}
+        ${agree === false ? `<span class="fpi-badge disagree">DISAGREE</span>` : ''}
       </div>
     `;
-    card.appendChild(wrap);
-  }
+    card.appendChild(fpiWrap);
 
-  function renderOne(g) {
-    const home = String(g.home_team || "");
-    const away = String(g.away_team || "");
-    const pHome = Number(
-      g.model_prob_home || g.model_prob_home_raw || 0.5
-    );
-    const pAway = 1 - pHome;
+    container.appendChild(card);
+  });
 
-    const homeColor = teamColor(home);
-    const awayColor = teamColor(away);
-    const homeText = pickTextColor(homeColor);
-    const awayText = pickTextColor(awayColor);
-
-    const card = document.createElement("div");
-    card.className = "card";
-
-    const hdr = document.createElement("div");
-    hdr.className = "row hdr";
-    hdr.innerHTML = `
-      <div class="team left">${home}</div>
-      <div class="at">@</div>
-      <div class="team right">${away}</div>
-    `;
-
-    const barWrap = document.createElement("div");
-    barWrap.className = "bar-wrap";
-    const left = document.createElement("div");
-    left.className = "bar left";
-    left.style.width = `${(pHome * 100).toFixed(1)}%`;
-    left.style.background = homeColor;
-    left.style.color = homeText;
-    left.textContent = percent(pHome);
-
-    const right = document.createElement("div");
-    right.className = "bar right";
-    right.style.width = `${(pAway * 100).toFixed(1)}%`;
-    right.style.background = awayColor;
-    right.style.color = awayText;
-    right.textContent = percent(pAway);
-
-    barWrap.append(left, right);
-
-    const pickLine = document.createElement("div");
-    pickLine.className = "pick";
-    const pickTeam = pHome >= 0.5 ? home : away;
-    pickLine.innerHTML = `<span class="label">PICK:</span> <span class="value">${pickTeam}</span>`;
-
-    card.append(hdr, barWrap, pickLine);
-
-    // Attach FPI overlay (if available)
-    renderFPI(card, home, away, pickTeam);
-
-    return card;
-  }
-
-  function render(list) {
-    container.innerHTML = "";
-    list.forEach((g) => container.appendChild(renderOne(g)));
-  }
-
-  // Initial render
-  render(ordered);
-
-  // Inject CSS rules for cards and FPI block (same as before)
-  const style = document.createElement("style");
-  style.textContent = `
-    .card {
-      background:#171717; border-radius:14px; padding:16px 18px; margin:18px auto;
-      max-width:860px; box-shadow:0 6px 18px rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.06);
-    }
-    .row.hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-    .row.hdr .team { font-weight:700; font-size:1.15rem; color:#eaeaea; }
-    .row.hdr .at { color:#bdbdbd; font-weight:700; }
-    .bar-wrap { display:flex; width:100%; height:28px; background:#2a2a2a; border-radius:8px; overflow:hidden; }
-    .bar { display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.9rem; }
-    .bar.left { border-right:1px solid rgba(0,0,0,.25); }
-    .pick { margin-top:10px; color:#bdbdbd; font-weight:700; }
-    .pick .label { color:#9aa0a6; margin-right:8px; }
-    .pick .value { color:#eaeaea; }
-    .fpi-wrap{ margin-top:10px; padding-top:10px; border-top:1px dashed rgba(255,255,255,.08); }
-    .fpi-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
-    .fpi-side{ display:flex; flex-direction:column; gap:2px; color:#d6d6d6; }
-    .fpi-side.right{ text-align:right; align-items:flex-end; }
-    .fpi-team{ font-weight:800; }
-    .fpi-meta{ font-size:.9rem; color:#a9b0b6; }
-    .fpi-vs{ color:#9aa0a6; font-weight:800; }
-    .fpi-fav{ margin-top:6px; color:#cfd2d6; font-weight:700; }
-    .fpi-badge{ margin-left:8px; padding:2px 8px; border-radius:999px; font-size:.75rem; font-weight:900; }
-    .fpi-badge.agree{ background:#1f6f3f; color:#eaf7ee; }
-    .fpi-badge.disagree{ background:#6f1f1f; color:#fde8e8; }
-    .fpi-stamp{ margin-left:8px; color:#8d94a1; font-weight:600; font-size:.8rem; }
-    @media (max-width:640px){
-      .card{ margin:14px 12px; }
-      .row.hdr .team{ font-size:1rem; }
-      .bar-wrap{ height:24px; }
-      .bar{ font-size:.85rem; }
-      .fpi-meta{ font-size:.85rem; }
-    }
-  `;
-  document.head.appendChild(style);
-
-  // Bind search to the correct input field
-  const search = document.getElementById("filterInput");
-  if (search) {
-    search.addEventListener("input", () => {
-      const q = normalize(search.value || "");
-      if (!q) {
-        return render(ordered);
-      }
-      const filtered = ordered.filter(
-        (g) =>
-          normalize(g.home_team).includes(q) ||
-          normalize(g.away_team).includes(q)
-      );
-      render(filtered);
+  // ---------- filter box ----------
+  const filterInput = $('#filterInput');
+  if (filterInput) {
+    filterInput.addEventListener('input', () => {
+      const q = normalize(filterInput.value || '');
+      $$('.card').forEach(card => {
+        const txt = normalize(card.textContent || '');
+        card.style.display = q && !txt.includes(q) ? 'none' : '';
+      });
     });
   }
 })();
