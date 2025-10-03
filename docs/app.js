@@ -1,12 +1,10 @@
 /* docs/app.js
- * Renders prediction cards (your model) + ESPN FPI overlay.
- * - Loads docs/data/predictions.json (model output)
- * - Loads docs/data/fpi.json (ESPN ranks/FPI values)
- * - Accepts BOTH FPI JSON formats:
- *      { "data": [ { "name":"Alabama","rank":2,"fpi":27.1 }, ... ] }
- *   or { "teams": { "Alabama": { "rank":2,"fpi":27.1 }, ... }, "meta": {...} }
- * - Adds AGREE/DISAGREE (FPI vs model pick)
- * - Cache-busts fetches to beat GH Pages caching
+ * MODEL bars + pick (your UI)  +  ESPN FPI overlay underneath with AGREE/DISAGREE.
+ * Expects:
+ *   - docs/data/predictions.json  -> { "games": [ ... ] }  (array also ok)
+ *   - docs/data/fpi.json          -> either:
+ *        { "data":  [ { "name":"Alabama","rank":2,"fpi":27.1 }, ... ] }
+ *      or{ "teams": { "Alabama": { "rank":2,"fpi":27.1 }, ... }, "meta": {...} }
  */
 
 (async function () {
@@ -14,8 +12,7 @@
   const FPI_URL  = 'data/fpi.json';
   const cacheBust = () => `?v=${Date.now()}`;
 
-  // ==== YOUR ORDER (Away, Home) — WEEK SPECIFIC ====
-  // Only these render (set ONLY_USE_DESIRED = true).
+  // ---- games you want to show (Away, Home) — this week ----
   const DESIRED_ORDER = [
     ["Iowa State", "Cincinnati"],
     ["Kansas State", "Baylor"],
@@ -30,7 +27,7 @@
   ];
   const ONLY_USE_DESIRED = true;
 
-  // ==== TEAM COLORS (primary) — minimal set; unknowns get hash color ====
+  // ---- optional team colors for the bars; unknowns get hashed colors ----
   const TEAM_COLORS = {
     "Alabama": "#9E1B32",
     "Baylor": "#004834",
@@ -65,8 +62,7 @@
       .replace(/\s+/g, ' ')
       .trim();
 
-  // ESPN naming aliases → align to your display names / schedule
-  // Works even if ESPN includes nicknames like "ucf knights" / "cal golden bears".
+  // alias ESPN names → your displayed names (and strip (FL)/(OH) etc.)
   const ALIASES = new Map([
     ["usc", "southern california"],
     ["ole miss", "mississippi"],
@@ -78,23 +74,17 @@
     ["kansas st", "kansas state"],
     ["iowa st", "iowa state"]
   ]);
-
-  const stripParens = (s) => s.replace(/\s*\(.*?\)\s*/g, ' ').trim();
-
-  const normalizeWithAliases = (s) => {
-    let n = normalize(stripParens(String(s || '')));
-    // direct alias
+  const stripParens = (s) => String(s || '').replace(/\s*\(.*?\)\s*/g, ' ').trim();
+  const normAlias = (s) => {
+    let n = normalize(stripParens(s));
     if (ALIASES.has(n)) return ALIASES.get(n);
-    // partial alias (e.g., "ucf knights", "cal golden bears")
-    for (const [k, v] of ALIASES.entries()) {
-      if (n === k || n.startsWith(k + ' ') || n.endsWith(' ' + k) || n.includes(' ' + k + ' ')) {
-        return v;
-      }
+    for (const [k,v] of ALIASES.entries()) {
+      if (n === k || n.startsWith(k+' ') || n.endsWith(' '+k) || n.includes(' '+k+' ')) return v;
     }
     return n;
   };
 
-  // build rank map for ordering (both orientations)
+  // order by your list
   const RANK = new Map();
   DESIRED_ORDER.forEach((pair, idx) => {
     const [away, home] = pair;
@@ -104,19 +94,18 @@
 
   function pickTextColor(hex) {
     if (!hex || typeof hex !== 'string') return '#fff';
-    const h = hex.replace('#', '');
+    const h = hex.replace('#','');
     if (h.length !== 6) return '#fff';
     const r = parseInt(h.slice(0,2),16)/255;
     const g = parseInt(h.slice(2,4),16)/255;
     const b = parseInt(h.slice(4,6),16)/255;
-    const lin = (v)=> (v<=0.04045 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4));
-    const L = 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b);
+    const lin = (v)=> (v<=0.04045? v/12.92 : Math.pow((v+0.055)/1.055,2.4));
+    const L = 0.2126*lin(r)+0.7152*lin(g)+0.0722*lin(b);
     return L >= 0.6 ? '#000' : '#fff';
   }
   function colorFromName(name) {
     const str = String(name || '');
-    let hash = 0;
-    for (let i=0;i<str.length;i++) hash = (hash*31 + str.charCodeAt(i)) >>> 0;
+    let hash = 0; for (let i=0;i<str.length;i++) hash = (hash*31 + str.charCodeAt(i)) >>> 0;
     const hue = hash % 360, s = 62, l = 38;
     return hslToHex(hue, s, l);
   }
@@ -137,21 +126,15 @@
     const exact = TEAM_COLORS[team];
     if (exact) return exact;
     const n = normalize(team);
-    for (const k of Object.keys(TEAM_COLORS)) {
-      if (normalize(k) === n) return TEAM_COLORS[k];
-    }
+    for (const k of Object.keys(TEAM_COLORS)) if (normalize(k) === n) return TEAM_COLORS[k];
     return colorFromName(team);
   }
 
   function dedupe(games) {
     const byKey = {};
-    games.forEach((g, i) => {
-      const key = `${g.home_team}__${g.away_team}`;
-      byKey[key] = { ...g, _order: i };
-    });
+    games.forEach((g, i) => { byKey[`${g.home_team}__${g.away_team}`] = { ...g, _order: i }; });
     return Object.values(byKey).sort((a,b)=>a._order-b._order);
   }
-
   function orderGames(games) {
     const withRank = games.map(g => ({
       ...g,
@@ -163,9 +146,8 @@
   }
 
   function injectFPIStyles() {
-    const style = document.createElement('style');
-    style.textContent = `
-      .fpi-wrap{margin-top:10px;padding-top:10px;border-top:1px dashed rgba(255,255,255,.08);}
+    const css = `
+      .fpi-wrap{margin-top:10px;padding-top:10px;border-top:1px dashed rgba(255,255,255,.12);}
       .fpi-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
       .fpi-side{display:flex;flex-direction:column;gap:2px;color:#d6d6d6;}
       .fpi-side.right{text-align:right;align-items:flex-end;}
@@ -178,10 +160,11 @@
       .fpi-badge.disagree{background:#6f1f1f;color:#fde8e8;}
       @media (max-width:640px){ .fpi-meta{font-size:.85rem;} }
     `;
-    document.head.appendChild(style);
+    const style = document.createElement('style');
+    style.textContent = css; document.head.appendChild(style);
   }
 
-  // ---------- load predictions ----------
+  // ---------- load predictions (your model) ----------
   let preds = [];
   try {
     const res = await fetch(PRED_URL + cacheBust(), { cache: 'no-store' });
@@ -192,28 +175,23 @@
     preds = [];
   }
 
-  // ---------- load FPI (robust to both formats) ----------
+  // ---------- load FPI (support both formats) ----------
   let fpiMap = new Map();
   let fpiMeta = null;
   try {
     const res = await fetch(FPI_URL + cacheBust(), { cache: 'no-store' });
     const json = await res.json();
     fpiMeta = json.meta || null;
-
     const put = (name, obj) => {
       const item = {
         name,
         rank: (obj && Number.isFinite(Number(obj.rank))) ? Number(obj.rank) : null,
         fpi:  (obj && Number.isFinite(Number(obj.fpi)))  ? Number(obj.fpi)  : null
       };
-      fpiMap.set(normalizeWithAliases(name), item);
+      fpiMap.set(normAlias(name), item);
     };
-
-    if (Array.isArray(json.data)) {
-      json.data.forEach(it => put(it.name, it));
-    } else if (json.teams && typeof json.teams === 'object') {
-      Object.entries(json.teams).forEach(([name, obj]) => put(name, obj));
-    }
+    if (Array.isArray(json.data)) json.data.forEach(it => put(it.name, it));
+    else if (json.teams && typeof json.teams === 'object') Object.entries(json.teams).forEach(([n,o])=>put(n,o));
   } catch (e) {
     console.warn('No FPI data available', e);
     fpiMap = new Map();
@@ -221,9 +199,8 @@
 
   // ---------- build UI ----------
   injectFPIStyles();
-
   const container = $('#predictions-container');
-  container.innerHTML = ''; // clear "Loading..."
+  container.innerHTML = '';
 
   const base = dedupe(preds);
   const games = orderGames(base);
@@ -245,40 +222,38 @@
     const pAway = 1 - pHome;
     const pick  = g.pick || (pHome >= 0.5 ? home : away);
 
+    // ---- CARD ----
     const card = document.createElement('div');
     card.className = 'card';
 
-    // header
+    // Header (your look: team labels with @ between)
     const hdr = document.createElement('div');
     hdr.className = 'row hdr';
     hdr.innerHTML = `
       <div class="team" style="background:${homeColor};color:${homeText};">${home}</div>
-      <div class="vs">vs</div>
+      <div class="vs">@</div>
       <div class="team" style="background:${awayColor};color:${awayText};">${away}</div>
     `;
     card.appendChild(hdr);
 
-    // model block
+    // MODEL BARS + PICK (your style)
     const body = document.createElement('div');
     body.className = 'row body';
     body.innerHTML = `
-      <div class="metric">
-        <div class="label">Model P(Home)</div>
-        <div class="value">${(pHome*100).toFixed(1)}%</div>
+      <div class="bar-wrap">
+        <div class="bar left"  style="width:${(pHome*100).toFixed(1)}%; background:${homeColor};"></div>
+        <div class="bar right" style="width:${(pAway*100).toFixed(1)}%; background:${awayColor};"></div>
       </div>
-      <div class="metric">
-        <div class="label">Model P(Away)</div>
-        <div class="value">${(pAway*100).toFixed(1)}%</div>
+      <div class="meta-line">
+        <span class="label">PICK:</span> <strong>${pick}</strong>
       </div>
-      <div class="pick">Pick: <strong>${pick}</strong></div>
     `;
     card.appendChild(body);
 
-    // ----- FPI overlay -----
-    const fHome = fpiMap.get(normalizeWithAliases(home));
-    const fAway = fpiMap.get(normalizeWithAliases(away));
+    // ---- FPI OVERLAY (underneath) ----
+    const fHome = fpiMap.get(normAlias(home)) || null;
+    const fAway = fpiMap.get(normAlias(away)) || null;
 
-    // who FPI favors?
     let fpiFav = null;
     if (fHome && fAway) {
       if (Number.isFinite(fHome.fpi) && Number.isFinite(fAway.fpi)) {
@@ -287,11 +262,8 @@
       if (!fpiFav && Number.isFinite(fHome.rank) && Number.isFinite(fAway.rank)) {
         fpiFav = fHome.rank < fAway.rank ? home : (fAway.rank < fHome.rank ? away : null);
       }
-    } else if (fHome && !fAway) {
-      fpiFav = home;
-    } else if (!fHome && fAway) {
-      fpiFav = away;
-    }
+    } else if (fHome && !fAway) fpiFav = home;
+    else if (!fHome && fAway) fpiFav = away;
 
     const agree = fpiFav && pick ? (normalize(fpiFav) === normalize(pick)) : null;
 
@@ -320,7 +292,7 @@
     container.appendChild(card);
   });
 
-  // ---------- filter box ----------
+  // Filter box you already have
   const filterInput = $('#filterInput');
   if (filterInput) {
     filterInput.addEventListener('input', () => {
