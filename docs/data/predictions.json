@@ -1,3 +1,184 @@
 {
-  "games": []
+  "games": [
+    {
+      "id": "2025-Cincinnati-vs-Iowa_State-HYP",
+      "season": 2025,
+      "week": 0,
+      "home_team": "Cincinnati",
+      "away_team": "Iowa State",
+      "neutral_site": false,
+      "model_prob_home": 0.8221,
+      "prob_home": 0.8221,
+      "prob_away": 0.1779,
+      "pick": "Cincinnati",
+      "explanation": [
+        "hypothetical_stats_mode",
+        "rating_home=1.589",
+        "rating_away=0.719",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "id": "2025-Baylor-vs-Kansas_State-HYP",
+      "season": 2025,
+      "week": 0,
+      "home_team": "Baylor",
+      "away_team": "Kansas State",
+      "neutral_site": false,
+      "model_prob_home": 0.7788,
+      "prob_home": 0.7788,
+      "prob_away": 0.2212,
+      "pick": "Baylor",
+      "explanation": [
+        "hypothetical_stats_mode",
+        "rating_home=0.972",
+        "rating_away=0.283",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "id": "2025-Alabama-vs-Vanderbilt-HYP",
+      "season": 2025,
+      "week": 0,
+      "home_team": "Alabama",
+      "away_team": "Vanderbilt",
+      "neutral_site": false,
+      "model_prob_home": 0.3807,
+      "prob_home": 0.3807,
+      "prob_away": 0.6193,
+      "pick": "Vanderbilt",
+      "explanation": [
+        "hypothetical_stats_mode",
+        "rating_home=1.163",
+        "rating_away=1.638",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "id": "2025-Florida-vs-Texas-HYP",
+      "season": 2025,
+      "week": 0,
+      "home_team": "Florida",
+      "away_team": "Texas",
+      "neutral_site": false,
+      "model_prob_home": 0.4338,
+      "prob_home": 0.4338,
+      "prob_away": 0.5662,
+      "pick": "Texas",
+      "explanation": [
+        "hypothetical_stats_mode",
+        "rating_home=0.424",
+        "rating_away=0.752",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "id": "2025-Louisville-vs-Virginia-HYP",
+      "season": 2025,
+      "week": 0,
+      "home_team": "Louisville",
+      "away_team": "Virginia",
+      "neutral_site": false,
+      "model_prob_home": 0.3915,
+      "prob_home": 0.3915,
+      "prob_away": 0.6085,
+      "pick": "Virginia",
+      "explanation": [
+        "hypothetical_stats_mode",
+        "rating_home=0.796",
+        "rating_away=1.24",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "id": "2025-Maryland-vs-Washington-HYP",
+      "season": 2025,
+      "week": 0,
+      "home_team": "Maryland",
+      "away_team": "Washington",
+      "neutral_site": false,
+      "model_prob_home": 0.1004,
+      "prob_home": 0.1004,
+      "prob_away": 0.8996,
+      "pick": "Washington",
+      "explanation": [
+        "hypothetical_stats_mode",
+        "rating_home=-0.102",
+        "rating_away=1.51",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "id": "2025-Wyoming-vs-UNLV-HYP",
+      "season": 2025,
+      "week": 0,
+      "home_team": "Wyoming",
+      "away_team": "UNLV",
+      "neutral_site": false,
+      "model_prob_home": 0.2727,
+      "prob_home": 0.2727,
+      "prob_away": 0.7273,
+      "pick": "UNLV",
+      "explanation": [
+        "hypothetical_stats_mode",
+        "rating_home=0.042",
+        "rating_away=0.846",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "id": "2025-Florida_State-vs-Miami-HYP",
+      "season": 2025,
+      "week": 0,
+      "home_team": "Florida State",
+      "away_team": "Miami",
+      "neutral_site": false,
+      "model_prob_home": 0.7558,
+      "prob_home": 0.7558,
+      "prob_away": 0.2442,
+      "pick": "Florida State",
+      "explanation": [
+        "hypothetical_stats_mode",
+        "rating_home=1.73",
+        "rating_away=1.127",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "id": "2025-UCF-vs-Kansas-HYP",
+      "season": 2025,
+      "week": 0,
+      "home_team": "UCF",
+      "away_team": "Kansas",
+      "neutral_site": false,
+      "model_prob_home": 0.648,
+      "prob_home": 0.648,
+      "prob_away": 0.352,
+      "pick": "UCF",
+      "explanation": [
+        "hypothetical_stats_mode",
+        "rating_home=1.036",
+        "rating_away=0.78",
+        "home_edge=0.15"
+      ]
+    },
+    {
+      "id": "2025-California-vs-Duke-HYP",
+      "season": 2025,
+      "week": 0,
+      "home_team": "California",
+      "away_team": "Duke",
+      "neutral_site": false,
+      "model_prob_home": 0.2975,
+      "prob_home": 0.2975,
+      "prob_away": 0.7025,
+      "pick": "Duke",
+      "explanation": [
+        "hypothetical_stats_mode",
+        "rating_home=0.065",
+        "rating_away=0.788",
+        "home_edge=0.15"
+      ]
+    }
+  ]
 }

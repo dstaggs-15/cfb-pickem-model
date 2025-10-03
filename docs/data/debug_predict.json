@@ -1,4 +1,146 @@
 {
   "mode": "HYPOTHETICAL",
-  "error": "no_stats_loaded"
+  "season": 2025,
+  "resolved": [
+    {
+      "input": {
+        "away": "Iowa State",
+        "home": "Cincinnati"
+      },
+      "resolved": {
+        "away": "Iowa State",
+        "home": "Cincinnati"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    },
+    {
+      "input": {
+        "away": "Kansas State",
+        "home": "Baylor"
+      },
+      "resolved": {
+        "away": "Kansas State",
+        "home": "Baylor"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    },
+    {
+      "input": {
+        "away": "Vanderbilt",
+        "home": "Alabama"
+      },
+      "resolved": {
+        "away": "Vanderbilt",
+        "home": "Alabama"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    },
+    {
+      "input": {
+        "away": "Texas",
+        "home": "Florida"
+      },
+      "resolved": {
+        "away": "Texas",
+        "home": "Florida"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    },
+    {
+      "input": {
+        "away": "Virginia",
+        "home": "Louisville"
+      },
+      "resolved": {
+        "away": "Virginia",
+        "home": "Louisville"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    },
+    {
+      "input": {
+        "away": "Washington",
+        "home": "Maryland"
+      },
+      "resolved": {
+        "away": "Washington",
+        "home": "Maryland"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    },
+    {
+      "input": {
+        "away": "UNLV",
+        "home": "Wyoming"
+      },
+      "resolved": {
+        "away": "UNLV",
+        "home": "Wyoming"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    },
+    {
+      "input": {
+        "away": "Miami",
+        "home": "Florida State"
+      },
+      "resolved": {
+        "away": "Miami",
+        "home": "Florida State"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    },
+    {
+      "input": {
+        "away": "Kansas",
+        "home": "UCF"
+      },
+      "resolved": {
+        "away": "Kansas",
+        "home": "UCF"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    },
+    {
+      "input": {
+        "away": "Duke",
+        "home": "California"
+      },
+      "resolved": {
+        "away": "Duke",
+        "home": "California"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    }
+  ]
 }
