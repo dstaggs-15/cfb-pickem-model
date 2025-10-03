@@ -1,7 +1,7 @@
 /* docs/app.js
- * Keep the model UI (bars, @ header, % inside bars) and add an ESPN FPI row under it.
+ * Bubble cards + pill bars (with % inside) + FPI row (rank, FPI, favors, AGREE/DISAGREE).
  * Inputs:
- *   docs/data/predictions.json -> { "games":[...] } or [ ... ]
+ *   docs/data/predictions.json -> { "games":[...] }  (array also ok)
  *   docs/data/fpi.json         -> { "data":[{name,rank,fpi},...] }  OR  { "teams":{ name:{rank,fpi} } }
  */
 
@@ -23,9 +23,9 @@
     ["Kansas", "UCF"],
     ["Duke", "California"]
   ];
-  const ONLY_USE_DESIRED = true; // set false to show all
+  const ONLY_USE_DESIRED = true;
 
-  // Minimal colors (unknowns get hashed colors that still look good on dark)
+  // Team colors (fallback → hashed color)
   const TEAM_COLORS = {
     "Alabama":"#9E1B32","Baylor":"#004834","California":"#003262","Cincinnati":"#E00122",
     "Duke":"#003087","Florida":"#0021A5","Florida State":"#782F40","Iowa State":"#A71930",
@@ -46,7 +46,6 @@
       .replace(/\s+/g, ' ')
       .trim();
 
-  // ESPN name normalization (handles “Cal”, “Miami (FL)”, etc.)
   const ALIASES = new Map([
     ["usc","southern california"],["ole miss","mississippi"],["ucf","central florida"],
     ["byu","brigham young"],["lsu","louisiana state"],["miami fl","miami"],
@@ -62,7 +61,6 @@
     return n;
   };
 
-  // Order mapping
   const RANK = new Map();
   DESIRED_ORDER.forEach((pair, i) => {
     const [away, home] = pair;
@@ -70,16 +68,16 @@
     RANK.set(`${normalize(away)}__${normalize(home)}`, i);
   });
 
-  function pickTextColor(hex) {
-    if (!hex) return '#fff';
-    const h = hex.replace('#',''); if (h.length!==6) return '#fff';
+  function pickTextColor(hex){
+    if(!hex) return '#fff';
+    const h=hex.replace('#',''); if(h.length!==6) return '#fff';
     const r=parseInt(h.slice(0,2),16)/255, g=parseInt(h.slice(2,4),16)/255, b=parseInt(h.slice(4,6),16)/255;
     const lin = (v)=> v<=0.04045? v/12.92 : Math.pow((v+0.055)/1.055,2.4);
     const L = 0.2126*lin(r)+0.7152*lin(g)+0.0722*lin(b);
     return L >= 0.6 ? '#000' : '#fff';
   }
-  function colorFromName(name) {
-    let hash=0; for (let i=0;i<String(name).length;i++) hash=(hash*31+String(name).charCodeAt(i))>>>0;
+  function colorFromName(name){
+    let hash=0; for(let i=0;i<String(name).length;i++) hash=(hash*31+String(name).charCodeAt(i))>>>0;
     const hue=hash%360, s=62, l=38;
     return hslToHex(hue,s,l);
   }
@@ -103,33 +101,16 @@
     return list.sort((a,b)=>(a._rank-b._rank)||(a._order-b._order));
   }
 
-  // FPI styles (tiny, won’t change your existing look)
-  (function injectFPIStyles(){
-    const style=document.createElement('style');
-    style.textContent=`
-      .fpi-wrap{margin-top:10px;padding-top:10px;border-top:1px dashed rgba(255,255,255,.12);}
-      .fpi-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
-      .fpi-side{display:flex;flex-direction:column;gap:2px;color:#d6d6d6;}
-      .fpi-side.right{text-align:right;align-items:flex-end;}
-      .fpi-team{font-weight:800;}
-      .fpi-meta{font-size:.9rem;color:#a9b0b6;}
-      .fpi-vs{color:#9aa0a6;font-weight:800;}
-      .fpi-fav{margin-top:6px;color:#cfd2d6;font-weight:700;}
-      .fpi-badge{margin-left:8px;padding:2px 8px;border-radius:999px;font-size:.75rem;font-weight:900;}
-      .fpi-badge.agree{background:#1f6f3f;color:#eaf7ee;}
-      .fpi-badge.disagree{background:#6f1f1f;color:#fde8e8;}
-      @media (max-width:640px){ .fpi-meta{font-size:.85rem;} }
-    `;
-    document.head.appendChild(style);
-  })();
-
-  // ---------- load model preds ----------
+  // ---------- load predictions ----------
   let preds=[];
   try{
     const r=await fetch(PRED_URL+cacheBust(),{cache:'no-store'});
     const j=await r.json();
     preds=Array.isArray(j)? j : (j.games||[]);
-  }catch(e){ console.error('predictions.json load failed',e); preds=[]; }
+  }catch(e){
+    console.error('predictions.json load failed',e);
+    preds=[];
+  }
 
   // ---------- load FPI ----------
   let fpiMap=new Map();
@@ -138,13 +119,17 @@
     const j=await r.json();
     const put=(name,obj)=>{
       fpiMap.set(normAlias(name),{
-        name, rank:(obj&&Number.isFinite(Number(obj.rank)))?Number(obj.rank):null,
-              fpi: (obj&&Number.isFinite(Number(obj.fpi))) ?Number(obj.fpi) :null
+        name,
+        rank:(obj && Number.isFinite(Number(obj.rank))) ? Number(obj.rank) : null,
+        fpi: (obj && Number.isFinite(Number(obj.fpi)))  ? Number(obj.fpi)  : null
       });
     };
     if (Array.isArray(j.data)) j.data.forEach(it=>put(it.name,it));
     else if (j.teams && typeof j.teams==='object') Object.entries(j.teams).forEach(([n,o])=>put(n,o));
-  }catch(e){ console.warn('fpi.json load failed',e); fpiMap=new Map(); }
+  }catch(e){
+    console.warn('fpi.json load failed',e);
+    fpiMap=new Map();
+  }
 
   // ---------- build UI ----------
   const container = $('#predictions-container');
@@ -174,7 +159,7 @@
     const card = document.createElement('div');
     card.className = 'card';
 
-    // Header: team boxes + "@"
+    // Header chips and "@"
     const hdr = document.createElement('div');
     hdr.className = 'row hdr';
     hdr.innerHTML = `
@@ -184,7 +169,7 @@
     `;
     card.appendChild(hdr);
 
-    // Bars + % inside (left/right) + PICK line
+    // Bars (pill) with % inside + PICK line
     const body = document.createElement('div');
     body.className = 'row body';
     body.innerHTML = `
@@ -200,11 +185,10 @@
     `;
     card.appendChild(body);
 
-    // -------- FPI row UNDER the bars ----------
+    // ----- FPI (underneath) -----
     const fHome = fpiMap.get(normAlias(home));
     const fAway = fpiMap.get(normAlias(away));
 
-    // Who FPI favors?
     let fpiFav = null;
     if (fHome && fAway) {
       if (Number.isFinite(fHome.fpi) && Number.isFinite(fAway.fpi)) {
@@ -243,7 +227,7 @@
     container.appendChild(card);
   });
 
-  // existing filter box support
+  // Filter support
   const filterInput = $('#filterInput');
   if (filterInput) {
     filterInput.addEventListener('input', () => {
