@@ -5,6 +5,8 @@ from typing import Dict, List, Tuple, Optional
 import pandas as pd
 import numpy as np
 import re
+import ast
+import json
 
 CHUNKSIZE = 200_000
 
@@ -33,6 +35,79 @@ def _canon_team(s: str) -> str:
     return re.sub(r"\s+", " ", s.strip())
 
 # ---------- load & pivot team-game stats ----------
+def _maybe_literal_eval(val):
+    if isinstance(val, str):
+        val = val.strip()
+        if not val:
+            return {}
+        try:
+            return ast.literal_eval(val)
+        except Exception:
+            try:
+                return json.loads(val)
+            except Exception:
+                return {}
+    if isinstance(val, dict):
+        return val
+    return {}
+
+def _flatten_off_def(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """Handle the newer CFBD format where offense/defense columns contain nested dicts."""
+    need_cols = {"game_id", "season", "team", "offense", "defense"}
+    if not need_cols.issubset(df.columns):
+        return pd.DataFrame(), {}
+
+    rows: list[dict] = []
+    for _, row in df.iterrows():
+        try:
+            off = _maybe_literal_eval(row["offense"])
+            deff = _maybe_literal_eval(row["defense"])
+        except Exception:
+            continue
+
+        rec: dict = {
+            "game_id": str(row.get("game_id", "")),
+            "season": row.get("season"),
+            "team": _canon_team(row.get("team", "")),
+        }
+
+        def grab(src: dict, key: str, dest: str):
+            if isinstance(src, dict) and key in src:
+                rec[dest] = src[key]
+
+        grab(off, "ppa", "off_ppa")
+        grab(off, "successRate", "off_sr")
+        grab(off, "explosiveness", "off_explosiveness")
+
+        rushing = off.get("rushingPlays") if isinstance(off, dict) else {}
+        passing = off.get("passingPlays") if isinstance(off, dict) else {}
+        grab(rushing or {}, "ppa", "rush_ppa")
+        grab(passing or {}, "ppa", "pass_ppa")
+
+        grab(deff, "ppa", "def_ppa")
+        grab(deff, "successRate", "def_sr")
+        grab(deff, "explosiveness", "def_explosiveness")
+
+        rows.append(rec)
+
+    if not rows:
+        return pd.DataFrame(), {}
+
+    wide = pd.DataFrame(rows)
+    for col in ["season"]:
+        if col in wide.columns:
+            wide[col] = pd.to_numeric(wide[col], errors="coerce")
+    for col in wide.columns:
+        if col not in {"game_id", "season", "team"}:
+            wide[col] = pd.to_numeric(wide[col], errors="coerce")
+
+    meta = {
+        "pts_off": "off_ppa",
+        "ypp_off": "rush_ppa",
+        "sr_off": "off_sr",
+    }
+    return wide, meta
+
 def load_team_game_stats(stats_csv: Path) -> tuple[pd.DataFrame, dict]:
     """
     Load CFBD team-game stats flexibly; pivot to wide per game per team.
@@ -83,6 +158,9 @@ def load_team_game_stats(stats_csv: Path) -> tuple[pd.DataFrame, dict]:
 
     need = {"game_id","season","team","stat","value"}
     if not need.issubset(df.columns):
+        wide_alt, meta_alt = _flatten_off_def(df)
+        if not wide_alt.empty:
+            return wide_alt, meta_alt
         return pd.DataFrame(), {}
 
     # Keep frequent stats to reduce noise
@@ -181,10 +259,16 @@ def fuse_current_with_baseline(cur: pd.DataFrame, base: pd.DataFrame, season: in
         gp = float(c["games"]) if (c is not None and "games" in c) else 0.0
         w  = gp / (gp + 3.0) if (gp + 3.0) > 0 else 0.0
 
-        stat_cols = [col for col in (list(c.index) if c is not None else []) if col not in ["games"]]
+        cur_cols = [col for col in (list(c.index) if c is not None else []) if col not in ["games"]]
+        base_cols = []
+        if b is not None:
+            base_cols = [col.removeprefix("base_") for col in b.index if col.startswith("base_")]
+        stat_cols = sorted(set(cur_cols) | set(base_cols))
+
         for col in stat_cols:
-            cur_val  = float(c[col]) if (c is not None and pd.notna(c[col])) else np.nan
-            base_val = float(b.get(f"base_{col}", np.nan)) if (b is not None) else np.nan
+            cur_val  = float(c[col]) if (c is not None and col in c.index and pd.notna(c[col])) else np.nan
+            base_key = f"base_{col}"
+            base_val = float(b.get(base_key, np.nan)) if (b is not None and base_key in b.index) else np.nan
             if pd.notna(cur_val) and pd.notna(base_val):
                 val = w * cur_val + (1 - w) * base_val
             elif pd.notna(cur_val):
@@ -225,7 +309,7 @@ def team_strength_table(stats_csv: Path, season: int, years_back: int = 20) -> p
     base = season_aggregates(wide, meta, lo=base_lo, hi=base_hi)
 
     fused = fuse_current_with_baseline(cur, base, season=season)
-    if fused.empty:
+    if fused.empty():
         return pd.DataFrame()
 
     # Standardize numeric cols and compute a composite rating
@@ -242,7 +326,7 @@ def team_strength_table(stats_csv: Path, season: int, years_back: int = 20) -> p
     return Z[["team","rating","games"]].copy()
 
 # ---------- name resolution ----------
-_STOP = {"THE","OF","UNIVERSITY","UNIV","U","STATE","ST","&","AND","AT"}
+_STOP = {"THE","OF","UNIVERSITY","UNIV","U","ST","&","AND","AT"}
 def _canon_for_match(s: str) -> List[str]:
     s = s.upper()
     s = s.replace("&", " AND ").replace("A&M", "A AND M")
