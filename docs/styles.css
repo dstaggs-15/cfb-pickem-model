@@ -1,190 +1,60 @@
 :root {
-    --background-color: #121212;
-    --card-background: #1e1e1e;
-    --border-color: #333;
-    --text-color: #e0e0e0;
-    --text-secondary: #a0a0a0;
-    --accent-color: #bb86fc;
+  --background-color: #121212;
+  --card-background: #1e1e1e;
+  --border-color: #333;
+  --text-color: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --accent-color: #bb86fc;
 }
 
 * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-    font-family: 'Inter', sans-serif;
-    background-color: var(--background-color);
-    color: var(--text-color);
-    padding: 20px;
+  font-family: "Inter", sans-serif;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  padding: 20px;
 }
 
 .container {
-    max-width: 800px;
-    margin: 0 auto;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 header {
-    text-align: center;
-    margin-bottom: 30px;
+  text-align: center;
+  margin-bottom: 30px;
 }
 
 header h1 {
-    font-size: 2.5em;
-    margin-bottom: 20px;
-    color: #fff;
+  font-size: 2.5em;
+  margin-bottom: 20px;
+  color: #fff;
 }
 
 #filterInput {
-    width: 100%;
-    padding: 12px;
-    background-color: var(--card-background);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    color: var(--text-color);
-    font-size: 1em;
+  width: 100%;
+  padding: 12px;
+  background-color: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-color);
+  font-size: 1em;
 }
 
 #filterInput::placeholder {
-    color: var(--text-secondary);
+  color: var(--text-secondary);
 }
 
 .status-message {
-    text-align: center;
-    padding: 40px;
-    background-color: var(--card-background);
-    border-radius: 12px;
+  text-align: center;
+  padding: 40px;
+  background-color: var(--card-background);
+  border-radius: 12px;
 }
 
-.game-card {
-    background-color: var(--card-background);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    margin-bottom: 15px;
-    cursor: pointer;
-    overflow: hidden;
-    transition: all 0.3s ease;
-}
-
-.game-card:hover {
-    border-color: var(--accent-color);
-    transform: translateY(-3px);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-}
-
-.game-summary {
-    padding: 20px;
-}
-
-.teams {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 1.4em;
-    font-weight: 600;
-    margin-bottom: 15px;
-}
-
-.team-name.away { text-align: left; }
-.team-name.home { text-align: right; }
-.vs { color: var(--text-secondary); }
-
-.probability-bar-container {
-    display: flex;
-    height: 30px;
-    border-radius: 6px;
-    overflow: hidden;
-    font-size: 0.9em;
-    font-weight: bold;
-}
-
-.probability-bar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
-    transition: width 0.5s ease-in-out;
-}
-
-.pick-container {
-    text-align: center;
-    margin-top: 15px;
-    font-weight: 600;
-}
-
-.pick-label {
-    color: var(--text-secondary);
-    margin-right: 8px;
-}
-
-.explanation-details {
-    max-height: 0;
-    opacity: 0;
-    overflow: hidden;
-    transition: max-height 0.5s ease-in-out, opacity 0.5s ease-in-out, padding 0.5s ease-in-out;
-    border-top: 1px solid var(--border-color);
-    padding: 0 20px;
-}
-
-.game-card.expanded .explanation-details {
-    max-height: 500px; /* Adjust as needed */
-    opacity: 1;
-    padding: 20px 20px;
-}
-
-.explanation-details h4 {
-    text-align: center;
-    margin-bottom: 15px;
-    font-size: 1.1em;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.factor-row {
-    margin-bottom: 12px;
-    font-size: 0.9em;
-}
-
-.factor-label {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 4px;
-    color: #ccc;
-}
-
-.factor-name {
-    font-weight: bold;
-}
-
-.factor-meter {
-    width: 100%;
-    background-color: #333;
-    border-radius: 4px;
-    height: 20px;
-    overflow: hidden;
-}
-
-.meter-bar {
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    color: #fff;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
-    transition: width 0.5s ease-in-out;
-}
-
-.game-card.hidden {
-    display: none;
-}
-
-footer {
-    text-align: center;
-    margin-top: 40px;
-    color: var(--text-secondary);
-    font-size: 0.9em;
-}
+/* Styles added by JavaScript (for cards, FPI, etc.) will be injected at runtime */
