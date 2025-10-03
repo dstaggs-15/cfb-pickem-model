@@ -1,8 +1,7 @@
 /*
  * Front-end script for the CFB Pick'em site.
- * This version fixes the bug where the page would go blank because the script
- * cleared the entire <body>. It now targets the correct container element
- * (`predictions-container`) and binds the search box to the `filterInput` ID.
+ * This version targets the correct container (predictions-container), binds the
+ * search box (filterInput), and uses Week 6 matchups and colors.
  */
 
 (async function () {
@@ -11,44 +10,45 @@
   const FPI_URL = "data/fpi.json";
   const cacheBust = () => `?v=${Date.now()}`;
 
-  // ==== 1) Custom order (Away @ Home) — adjust as needed ====
+  // ==== 1) Custom order (Away @ Home) — Week 6 ====
   const DESIRED_ORDER = [
-    ["Texas Tech", "Utah"],
-    ["Arkansas", "Memphis"],
-    ["SMU", "TCU"],
-    ["Michigan", "Nebraska"],
-    ["North Carolina", "UCF"],
-    ["NC State", "Duke"],
-    ["Florida", "Miami"],
-    ["Illinois", "Indiana"],
-    ["Arizona State", "Baylor"],
-    ["BYU", "East Carolina"],
+    ["Iowa State",     "Cincinnati"],
+    ["Kansas State",   "Baylor"],
+    ["Vanderbilt",     "Alabama"],
+    ["Texas",          "Florida"],
+    ["Virginia",       "Louisville"],
+    ["Washington",     "Maryland"],
+    ["UNLV",           "Wyoming"],
+    ["Miami",          "Florida State"],
+    ["Kansas",         "UCF"],
+    ["Duke",           "California"],
   ];
   // Render only the games specified in DESIRED_ORDER
   const ONLY_USE_DESIRED = true;
 
-  // ==== 2) Baked-in team colors (primary) — extend as needed ====
+  // ==== 2) Baked-in team colors (primary) — updated/extended ====
   const TEAM_COLORS = {
-    "Texas Tech": "#CC0000",
-    Utah: "#CC0000",
-    Arkansas: "#9D2235",
-    Memphis: "#003DA5",
-    SMU: "#C41230",
-    TCU: "#4D1979",
-    Michigan: "#00274C",
-    Nebraska: "#E41C38",
-    "North Carolina": "#7BAFD4",
-    UCF: "#BA9B37",
-    "NC State": "#CC0000",
-    Duke: "#003087",
-    Florida: "#0021A5",
-    Miami: "#F47321",
-    Illinois: "#13294B",
-    Indiana: "#990000",
-    "Arizona State": "#8C1D40",
-    Baylor: "#004834",
-    BYU: "#002E5D",
-    "East Carolina": "#592A8A",
+    "Iowa State":    "#C8102E", // cardinal red
+    "Cincinnati":    "#D40026",
+    "Kansas State":  "#512888", // purple
+    "Baylor":        "#004834",
+    "Vanderbilt":    "#B3A369",
+    "Alabama":       "#9D2235",
+    "Texas":         "#BF5700", // burnt orange
+    "Florida":       "#0021A5",
+    "Virginia":      "#E57200",
+    "Louisville":    "#AD0C00",
+    "Washington":    "#4B2E83",
+    "Maryland":      "#E03A3E",
+    "UNLV":          "#C2002F",
+    "Wyoming":       "#FFC72C",
+    "Miami":         "#F47321",
+    "Florida State": "#782F40",
+    "Kansas":        "#0051BA",
+    "UCF":           "#BA9B37",
+    "Duke":          "#003087",
+    "California":    "#003262",
+    // keep any other teams you may have had previously…
   };
 
   // ---------- helpers ----------
@@ -203,7 +203,7 @@
   const ordered = orderGames(deduped);
 
   // ---- render ----
-  // FIX: target the correct container instead of document.body
+  // Target the correct container instead of document.body
   const container =
     document.getElementById("predictions-container") || document.body;
   container.innerHTML = "";
@@ -353,7 +353,7 @@
   // Initial render
   render(ordered);
 
-  // Inject CSS rules for cards and FPI block (mirrored from original script)
+  // Inject CSS rules for cards and FPI block (same as before)
   const style = document.createElement("style");
   style.textContent = `
     .card {
