@@ -51,6 +51,7 @@ def _maybe_literal_eval(val):
         return val
     return {}
 
+
 def _flatten_off_def(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     """Handle the newer CFBD format where offense/defense columns contain nested dicts."""
     need_cols = {"game_id", "season", "team", "offense", "defense"}
@@ -107,6 +108,7 @@ def _flatten_off_def(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         "sr_off": "off_sr",
     }
     return wide, meta
+
 
 def load_team_game_stats(stats_csv: Path) -> tuple[pd.DataFrame, dict]:
     """
@@ -309,7 +311,7 @@ def team_strength_table(stats_csv: Path, season: int, years_back: int = 20) -> p
     base = season_aggregates(wide, meta, lo=base_lo, hi=base_hi)
 
     fused = fuse_current_with_baseline(cur, base, season=season)
-    if fused.empty():
+    if not isinstance(fused, pd.DataFrame) or fused.empty:
         return pd.DataFrame()
 
     # Standardize numeric cols and compute a composite rating
