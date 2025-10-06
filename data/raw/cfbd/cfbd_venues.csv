@@ -8,6 +8,7 @@ id,name,capacity,grass,dome,city,state,zip,countryCode,timezone,latitude,longitu
 11589,Hinchliffe Stadium,,,True,Paterson,NJ,,US,,,,,
 6043,Bethpage Federal Credit Union Stadium,6000.0,False,False,Brookville,NY,11545,US,America/New_York,40.816284,-73.589546,236,1966.0
 11539,Charlotte & Gordon Hansen Stadium,,,False,Jamestown,ND,,US,,,,,
+11488,Centreville Bank Stadium,,True,,Pawtucket,RI,,USA,,,,,
 5096,Toyota Stadium,5000.0,,False,Georgetown,KY,40324,US,,38.204444,-84.545556,270.7148743,1997.0
 3926,Setzler Field,4000.0,,False,Newberry,SC,29108,US,,34.286133,-81.622539,160.5950775,1922.0
 5015,Turner Stadium,4400.0,,False,Upland,IN,92602,US,,40.456862,-85.501228,282.0275574,2015.0
