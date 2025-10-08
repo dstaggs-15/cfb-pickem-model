@@ -4,12 +4,68 @@
   "resolved": [
     {
       "input": {
+        "away": "Alabama",
+        "home": "Missouri"
+      },
+      "resolved": {
+        "away": "Alabama",
+        "home": "Missouri"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    },
+    {
+      "input": {
+        "away": "Indiana",
+        "home": "Oregon"
+      },
+      "resolved": {
+        "away": "Indiana",
+        "home": "Oregon"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    },
+    {
+      "input": {
+        "away": "Oklahoma",
+        "home": "Texas"
+      },
+      "resolved": {
+        "away": "Oklahoma",
+        "home": "Texas"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    },
+    {
+      "input": {
+        "away": "TCU",
+        "home": "Kansas State"
+      },
+      "resolved": {
+        "away": "TCU",
+        "home": "Kansas State"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    },
+    {
+      "input": {
         "away": "Iowa State",
-        "home": "Cincinnati"
+        "home": "Colorado"
       },
       "resolved": {
         "away": "Iowa State",
-        "home": "Cincinnati"
+        "home": "Colorado"
       },
       "scores": {
         "away": 1.0,
@@ -18,67 +74,11 @@
     },
     {
       "input": {
-        "away": "Kansas State",
-        "home": "Baylor"
-      },
-      "resolved": {
-        "away": "Kansas State",
-        "home": "Baylor"
-      },
-      "scores": {
-        "away": 1.0,
-        "home": 1.0
-      }
-    },
-    {
-      "input": {
-        "away": "Vanderbilt",
-        "home": "Alabama"
-      },
-      "resolved": {
-        "away": "Vanderbilt",
-        "home": "Alabama"
-      },
-      "scores": {
-        "away": 1.0,
-        "home": 1.0
-      }
-    },
-    {
-      "input": {
-        "away": "Texas",
-        "home": "Florida"
-      },
-      "resolved": {
-        "away": "Texas",
-        "home": "Florida"
-      },
-      "scores": {
-        "away": 1.0,
-        "home": 1.0
-      }
-    },
-    {
-      "input": {
-        "away": "Virginia",
-        "home": "Louisville"
-      },
-      "resolved": {
-        "away": "Virginia",
-        "home": "Louisville"
-      },
-      "scores": {
-        "away": 1.0,
-        "home": 1.0
-      }
-    },
-    {
-      "input": {
-        "away": "Washington",
+        "away": "Nebraska",
         "home": "Maryland"
       },
       "resolved": {
-        "away": "Washington",
+        "away": "Nebraska",
         "home": "Maryland"
       },
       "scores": {
@@ -88,12 +88,12 @@
     },
     {
       "input": {
-        "away": "UNLV",
-        "home": "Wyoming"
+        "away": "Georgia",
+        "home": "Auburn"
       },
       "resolved": {
-        "away": "UNLV",
-        "home": "Wyoming"
+        "away": "Georgia",
+        "home": "Auburn"
       },
       "scores": {
         "away": 1.0,
@@ -102,12 +102,12 @@
     },
     {
       "input": {
-        "away": "Miami",
-        "home": "Florida State"
+        "away": "Michigan",
+        "home": "USC"
       },
       "resolved": {
-        "away": "Miami",
-        "home": "Florida State"
+        "away": "Michigan",
+        "home": "USC"
       },
       "scores": {
         "away": 1.0,
@@ -116,12 +116,12 @@
     },
     {
       "input": {
-        "away": "Kansas",
-        "home": "UCF"
+        "away": "BYU",
+        "home": "Arizona"
       },
       "resolved": {
-        "away": "Kansas",
-        "home": "UCF"
+        "away": "BYU",
+        "home": "Arizona"
       },
       "scores": {
         "away": 1.0,
@@ -130,12 +130,12 @@
     },
     {
       "input": {
-        "away": "Duke",
-        "home": "California"
+        "away": "Arizona State",
+        "home": "Utah"
       },
       "resolved": {
-        "away": "Duke",
-        "home": "California"
+        "away": "Arizona State",
+        "home": "Utah"
       },
       "scores": {
         "away": 1.0,
