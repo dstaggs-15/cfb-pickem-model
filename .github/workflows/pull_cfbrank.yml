@@ -1,0 +1,53 @@
+name: Pull CFB Rank JSON from cfbranking (manual)
+
+on:
+  workflow_dispatch: {}   # manual only
+
+permissions:
+  contents: write
+
+jobs:
+  pull-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pickem repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Fetch rankings.json from cfbranking (public raw)
+        run: |
+          set -euo pipefail
+          mkdir -p tmp
+          curl -fsSL \
+            https://raw.githubusercontent.com/dstaggs-15/cfbranking/main/docs/data/rankings.json \
+            -o tmp/rankings.json
+          echo "Fetched rankings.json:"
+          head -n 20 tmp/rankings.json || true
+
+      - name: Build cfbrank.json (Top-25 → compact payload)
+        run: |
+          jq '{
+                season: .season,
+                last_build_utc: .last_build_utc,
+                ranks: (.top25 | map({team: .team, rank: .rank})),
+                teams: (.top25 | map({key: .team, value: .rank}) | from_entries)
+              }' tmp/rankings.json > docs/data/cfbrank.json
+          echo "Built docs/data/cfbrank.json:"
+          head -n 30 docs/data/cfbrank.json || true
+
+      - name: Commit & push if changed
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/data/cfbrank.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "chore(rank): pull cfbrank.json from cfbranking ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+          git push
