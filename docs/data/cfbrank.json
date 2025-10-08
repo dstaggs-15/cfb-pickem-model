@@ -1,0 +1,133 @@
+{
+  "season": 2025,
+  "last_build_utc": "2025-10-06T20:57:17.584580",
+  "ranks": [
+    {
+      "team": "Indiana",
+      "rank": 1
+    },
+    {
+      "team": "Ohio State",
+      "rank": 2
+    },
+    {
+      "team": "Miami",
+      "rank": 3
+    },
+    {
+      "team": "Oklahoma",
+      "rank": 4
+    },
+    {
+      "team": "Ole Miss",
+      "rank": 5
+    },
+    {
+      "team": "Texas A&M",
+      "rank": 6
+    },
+    {
+      "team": "Alabama",
+      "rank": 7
+    },
+    {
+      "team": "Texas Tech",
+      "rank": 8
+    },
+    {
+      "team": "Illinois",
+      "rank": 9
+    },
+    {
+      "team": "Cincinnati",
+      "rank": 10
+    },
+    {
+      "team": "LSU",
+      "rank": 11
+    },
+    {
+      "team": "Michigan",
+      "rank": 12
+    },
+    {
+      "team": "Georgia Tech",
+      "rank": 13
+    },
+    {
+      "team": "Virginia",
+      "rank": 14
+    },
+    {
+      "team": "Georgia",
+      "rank": 15
+    },
+    {
+      "team": "Tennessee",
+      "rank": 16
+    },
+    {
+      "team": "Nebraska",
+      "rank": 17
+    },
+    {
+      "team": "Washington",
+      "rank": 18
+    },
+    {
+      "team": "Missouri",
+      "rank": 19
+    },
+    {
+      "team": "BYU",
+      "rank": 20
+    },
+    {
+      "team": "Oregon",
+      "rank": 21
+    },
+    {
+      "team": "Arizona State",
+      "rank": 22
+    },
+    {
+      "team": "North Texas",
+      "rank": 23
+    },
+    {
+      "team": "Florida State",
+      "rank": 24
+    },
+    {
+      "team": "Vanderbilt",
+      "rank": 25
+    }
+  ],
+  "teams": {
+    "Indiana": 1,
+    "Ohio State": 2,
+    "Miami": 3,
+    "Oklahoma": 4,
+    "Ole Miss": 5,
+    "Texas A&M": 6,
+    "Alabama": 7,
+    "Texas Tech": 8,
+    "Illinois": 9,
+    "Cincinnati": 10,
+    "LSU": 11,
+    "Michigan": 12,
+    "Georgia Tech": 13,
+    "Virginia": 14,
+    "Georgia": 15,
+    "Tennessee": 16,
+    "Nebraska": 17,
+    "Washington": 18,
+    "Missouri": 19,
+    "BYU": 20,
+    "Oregon": 21,
+    "Arizona State": 22,
+    "North Texas": 23,
+    "Florida State": 24,
+    "Vanderbilt": 25
+  }
+}
