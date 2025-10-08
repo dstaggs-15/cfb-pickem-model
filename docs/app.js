@@ -1,14 +1,16 @@
 /* docs/app.js
- * Bubble cards + pill bars (with % inside) + FPI row (rank, FPI, favors, AGREE/DISAGREE).
+ * Bubble cards + pill bars (with % inside) + FPI row (rank, FPI, favors, AGREE/DISAGREE) + CFB Ranking badges (#N TeamName).
  * Inputs:
  *   docs/data/predictions.json -> { "games":[...] }  (array also ok)
  *   docs/data/fpi.json         -> { "data":[{name,rank,fpi},...] }  OR  { "teams":{ name:{rank,fpi} } }
+ *   docs/data/cfbrank.json     -> { "ranks":[{team,rank},...] } OR { "teams": { team: rank } } (Top-25 okay)
  */
 
 (async function () {
-  const PRED_URL = 'data/predictions.json';
-  const FPI_URL  = 'data/fpi.json';
-  const cacheBust = () => `?v=${Date.now()}`;
+  const PRED_URL   = 'data/predictions.json';
+  const FPI_URL    = 'data/fpi.json';
+  const RANKS_URL  = 'data/cfbrank.json';
+  const cacheBust  = () => `?v=${Date.now()}`;
 
   // === This week’s 10 (Away, Home) — EXACT ORDER YOU ASKED ===
   const DESIRED_ORDER = [
@@ -25,41 +27,16 @@
   ];
   const ONLY_USE_DESIRED = true;
 
-  // Team colors (fallback → hashed color). Added all new teams.
+  // Team colors (fallback → hashed color).
   const TEAM_COLORS = {
-    "Alabama":"#9E1B32",
-    "Auburn":"#0C2340",
-    "Arizona":"#AB0520",
-    "Arizona State":"#8C1D40",
-    "Baylor":"#004834",
-    "BYU":"#0D254C",
-    "California":"#003262",
-    "Colorado":"#CFB87C",
-    "Cincinnati":"#E00122",
-    "Duke":"#003087",
-    "Florida":"#0021A5",
-    "Florida State":"#782F40",
-    "Georgia":"#BA0C2F",
-    "Indiana":"#990000",
-    "Iowa State":"#A71930",
-    "Kansas":"#0051BA",
-    "Kansas State":"#512888",
-    "Louisville":"#AD0000",
-    "Maryland":"#E03A3E",
-    "Michigan":"#00274C",
-    "Missouri":"#F1B82D",
-    "Nebraska":"#E41C38",
-    "Oklahoma":"#841617",
-    "Oregon":"#004F27",
-    "TCU":"#4D1979",
-    "Texas":"#BF5700",
-    "UCF":"#BA9B37",
-    "UNLV":"#CC0000",
-    "USC":"#990000",
-    "Utah":"#CC0000",
-    "Vanderbilt":"#866D4B",
-    "Washington":"#4B2E83",
-    "Wyoming":"#492F24"
+    "Alabama":"#9E1B32","Auburn":"#0C2340","Arizona":"#AB0520","Arizona State":"#8C1D40",
+    "Baylor":"#004834","BYU":"#0D254C","California":"#003262","Colorado":"#CFB87C",
+    "Cincinnati":"#E00122","Duke":"#003087","Florida":"#0021A5","Florida State":"#782F40",
+    "Georgia":"#BA0C2F","Indiana":"#990000","Iowa State":"#A71930","Kansas":"#0051BA",
+    "Kansas State":"#512888","Louisville":"#AD0000","Maryland":"#E03A3E","Michigan":"#00274C",
+    "Missouri":"#F1B82D","Nebraska":"#E41C38","Oklahoma":"#841617","Oregon":"#004F27",
+    "TCU":"#4D1979","Texas":"#BF5700","UCF":"#BA9B37","UNLV":"#CC0000","USC":"#990000",
+    "Utah":"#CC0000","Vanderbilt":"#866D4B","Washington":"#4B2E83","Wyoming":"#492F24"
   };
 
   // ---------- helpers ----------
@@ -178,6 +155,27 @@
     fpiMap=new Map();
   }
 
+  // ---------- load CFB Ranking (Top-25) ----------
+  let rankMap = new Map();
+  try{
+    const r=await fetch(RANKS_URL+cacheBust(),{cache:'no-store'});
+    if (r.ok) {
+      const j=await r.json();
+      if (Array.isArray(j?.ranks)) {
+        j.ranks.forEach(({team,rank})=>{
+          if (team && Number.isFinite(Number(rank))) rankMap.set(normAlias(team), Number(rank));
+        });
+      } else if (j?.teams && typeof j.teams === 'object') {
+        Object.entries(j.teams).forEach(([team,rank])=>{
+          if (team && Number.isFinite(Number(rank))) rankMap.set(normAlias(team), Number(rank));
+        });
+      }
+    }
+  }catch(e){
+    console.warn('cfbrank.json load failed', e);
+    rankMap = new Map();
+  }
+
   // ---------- build UI ----------
   const container = document.getElementById('predictions-container') || document.body;
   container.innerHTML = '';
@@ -189,7 +187,11 @@
     return;
   }
 
-  function pct(x){ return (Number(x)*100).toFixed(1) + '%'; }
+  const pct = (x) => (Number(x)*100).toFixed(1) + '%';
+  const showName = (team) => {
+    const r = rankMap.get(normAlias(team));
+    return (Number.isFinite(r) ? `#${r} ` : '') + team;
+  };
 
   games.forEach(g=>{
     const home = g.home_team;
@@ -212,9 +214,9 @@
     const hdr = document.createElement('div');
     hdr.className = 'row hdr';
     hdr.innerHTML = `
-      <div class="team" style="background:${homeColor};color:${homeText};">${home}</div>
+      <div class="team" style="background:${homeColor};color:${homeText};">${showName(home)}</div>
       <div class="vs">@</div>
-      <div class="team" style="background:${awayColor};color:${awayText};">${away}</div>
+      <div class="team" style="background:${awayColor};color:${awayText};">${showName(away)}</div>
     `;
     card.appendChild(hdr);
 
@@ -230,7 +232,7 @@
           <span class="pct">${pct(pAway)}</span>
         </div>
       </div>
-      <div class="meta-line"><span class="label">PICK:</span> <strong>${pick}</strong></div>
+      <div class="meta-line"><span class="label">PICK:</span> <strong>${showName(pick)}</strong></div>
     `;
     card.appendChild(body);
 
@@ -256,17 +258,17 @@
     fpiWrap.innerHTML = `
       <div class="fpi-row">
         <div class="fpi-side">
-          <span class="fpi-team">${home}</span>
+          <span class="fpi-team">${showName(home)}</span>
           <span class="fpi-meta">${fHome ? `FPI ${fHome.fpi ?? '—'}  ·  #${fHome.rank ?? '—'}` : 'FPI —'}</span>
         </div>
         <div class="fpi-vs">FPI</div>
         <div class="fpi-side right">
-          <span class="fpi-team">${away}</span>
+          <span class="fpi-team">${showName(away)}</span>
           <span class="fpi-meta">${fAway ? `FPI ${fAway.fpi ?? '—'}  ·  #${fAway.rank ?? '—'}` : 'FPI —'}</span>
         </div>
       </div>
       <div class="fpi-fav">
-        ${fpiFav ? `FPI favors: <strong>${fpiFav}</strong>` : 'FPI favors: <strong>—</strong>'}
+        ${fpiFav ? `FPI favors: <strong>${showName(fpiFav)}</strong>` : 'FPI favors: <strong>—</strong>'}
         ${agree === true  ? `<span class="fpi-badge agree">AGREE</span>` : ''}
         ${agree === false ? `<span class="fpi-badge disagree">DISAGREE</span>` : ''}
       </div>
