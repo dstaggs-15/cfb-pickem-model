@@ -7,9 +7,6 @@ on:
         description: "Branch or ref to commit to (default: current)"
         required: false
         default: ""
-  schedule:
-    # Daily at 08:00 UTC (adjust if you want)
-    - cron: "0 8 * * *"
 
 permissions:
   contents: write
@@ -29,7 +26,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # IMPORTANT: fetch full history so we can commit back cleanly
           fetch-depth: 0
           ref: ${{ github.event.inputs.ref || github.ref }}
 
@@ -52,25 +48,31 @@ jobs:
       - name: Show what changed
         run: |
           echo "Changed files:"
-          git status --porcelain
+          git status --porcelain || true
+          echo "Listing data/raw/cfbd:"
           ls -l data/raw/cfbd || true
 
       - name: Commit & push raw data
         if: always()
         run: |
+          set -euo pipefail
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Stage only the raw data (and any new dirs)
-          git add -A data/raw/cfbd
+          # Only try to add if there are files to add
+          if [ -d data/raw/cfbd ] && [ -n "$(find data/raw/cfbd -type f -name '*.csv' -print -quit)" ]; then
+            git add -A data/raw/cfbd
+          else
+            echo "No CFBD CSV files to commit under data/raw/cfbd; skipping."
+            exit 0
+          fi
 
-          # Only commit if there are changes
           if ! git diff --cached --quiet; then
             MSG="chore(data): CFBD refresh $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             git commit -m "$MSG"
-            # Push back to the same branch/ref
             TARGET_REF="${{ github.event.inputs.ref || github.ref_name }}"
             git push origin "HEAD:${TARGET_REF}"
           else
-            echo "No changes in data/raw/cfbd; nothing to commit."
+            echo "No staged changes; nothing to commit."
           fi
