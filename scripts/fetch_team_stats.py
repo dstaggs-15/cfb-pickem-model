@@ -6,25 +6,30 @@ and write them to docs/data/team_stats.json.
 Env:
   CFBD_API_KEY = your RAW CFBD key (no 'Bearer', no '***').
 
-Auth detail:
-  CFBD now requires the header "Authorization: Bearer ***<KEY>" (note the three asterisks).
+We talk directly to the HTTPS API with 'requests' to guarantee the header format.
+
+Endpoints used:
+  GET /teams?year=YYYY
+  GET /stats/season?year=YYYY&team=TEAM
+  GET /stats/season/advanced?year=YYYY&team=TEAM
+  GET /ratings/fpi?year=YYYY
 """
 
 import os
 import re
+import sys
 import json
 import argparse
-import sys
-import cfbd
-from cfbd.rest import ApiException
+from typing import Dict, List, Tuple
+import requests
 
-# ---------- paths ----------
+BASE = "https://api.collegefootballdata.com"
+
 GAMES_FILE = "docs/input/games.txt"
-OUT_JSON = "docs/data/team_stats.json"
+OUT_JSON   = "docs/data/team_stats.json"
 CFRANK_JSON = "docs/data/cfbrank.json"
 
 
-# ---------- utils ----------
 def mask_key(k: str) -> str:
     if not k:
         return ""
@@ -38,8 +43,37 @@ def die(msg: str, code: int = 1):
     sys.exit(code)
 
 
-def load_games(path: str):
-    """Scrape team tokens from games.txt lines like 'Texas vs Oklahoma | 9/7'."""
+def get_headers() -> Tuple[Dict[str, str], str]:
+    raw = os.environ.get("CFBD_API_KEY", "").strip()
+    if not raw:
+        die("[error] CFBD_API_KEY is missing. Set it to your RAW key (no 'Bearer', no '***').")
+    # CFBD requires three asterisks BEFORE the key value in the Bearer token
+    #   Authorization: Bearer ***<RAW>
+    token = f"***{raw}"
+    headers = {"Authorization": f"Bearer {token}"}
+    return headers, raw
+
+
+def http_get(path: str, headers: Dict[str, str], params: Dict = None) -> requests.Response:
+    url = f"{BASE}{path}"
+    r = requests.get(url, headers=headers, params=params or {}, timeout=30)
+    return r
+
+
+def sanity_check(headers: Dict[str, str], raw_key: str, year: int):
+    """Ping /teams to confirm 200 before doing any work."""
+    r = http_get("/teams", headers, {"year": year})
+    if r.status_code == 200:
+        print("[ok] CFBD auth sanity check passed (GET /teams returned 200).")
+        return
+    # Make the failure crystal clear
+    print(f"[debug] Outbound Authorization header sent: {headers.get('Authorization')[:35]}... (masked)")
+    die(f"[error] CFBD sanity check failed: HTTP {r.status_code} from /teams. "
+        "CFBD still thinks you're unauthorized. If this is in GitHub Actions, "
+        "ensure the secret is the RAW key and the job has env: CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}", 4)
+
+
+def load_games(path: str) -> List[str]:
     if not os.path.exists(path):
         return []
     teams = set()
@@ -51,16 +85,13 @@ def load_games(path: str):
                 continue
             parts = [p.strip() for p in splitter.split(raw) if p.strip()]
             for p in parts:
-                # skip obvious date/score fragments
                 if re.fullmatch(r"[0-9/:\-\s]+", p):
                     continue
                 teams.add(p)
     return sorted(teams)
 
 
-# ---------- cfbrank loader (robust to dict or list shapes) ----------
-def load_cfbrank(path: str) -> dict:
-    """Returns {team_name: rank} or {}."""
+def load_cfbrank(path: str) -> Dict[str, int]:
     if not os.path.exists(path):
         return {}
     try:
@@ -69,8 +100,6 @@ def load_cfbrank(path: str) -> dict:
         return {}
 
     ranks = {}
-
-    # Case A: dict with possible "ranks" sub-dict or numeric keys
     if isinstance(data, dict):
         if "ranks" in data and isinstance(data["ranks"], dict):
             for rk, tm in data["ranks"].items():
@@ -78,7 +107,6 @@ def load_cfbrank(path: str) -> dict:
                     ranks[str(tm)] = int(rk)
                 except Exception:
                     pass
-        # also support {"1":"Georgia","2":"Michigan",...} or {"1":{"team":"..."}}
         for k, v in data.items():
             if str(k).isdigit():
                 if isinstance(v, str):
@@ -93,8 +121,6 @@ def load_cfbrank(path: str) -> dict:
                             ranks[str(tm)] = int(k)
                         except Exception:
                             pass
-
-    # Case B: list of objects like [{"rank":1,"team":"..."}, ...]
     elif isinstance(data, list):
         for obj in data:
             if isinstance(obj, dict):
@@ -105,174 +131,142 @@ def load_cfbrank(path: str) -> dict:
                         ranks[str(tm)] = int(rk)
                     except Exception:
                         pass
-
     return ranks
 
 
-# ---------- CFBD client ----------
-def make_cfbd_client():
-    """
-    Build an authorized cfbd.ApiClient that sends:
-        Authorization: Bearer ***<KEY>
-    where CFBD_API_KEY env var is the RAW key (no 'Bearer', no '***').
-    """
-    raw_key = os.environ.get("CFBD_API_KEY", "").strip()
-    if not raw_key:
-        die("[error] CFBD_API_KEY is missing. Set it to your RAW key (no 'Bearer', no '***').")
-
-    cfg = cfbd.Configuration()
-    # New requirement: three asterisks prefix lives in the api_key value
-    cfg.api_key["Authorization"] = f"***{raw_key}"
-    cfg.api_key_prefix["Authorization"] = "Bearer"
-
-    print(f"[debug] CFBD_API_KEY present: True len={len(raw_key)} value(masked)={mask_key(raw_key)}")
-    return cfbd.ApiClient(cfg)
-
-
-# ---------- team normalization ----------
-def build_name_map(teams_api, year: int):
-    """Return {alias_lower: canonical_school_name} so 'OU' → 'Oklahoma' etc."""
+def get_team_list(headers: Dict[str, str], year: int) -> Dict[str, str]:
+    """Return {alias_lower: canonical_school} mapping for normalization."""
+    r = http_get("/teams", headers, {"year": year})
+    r.raise_for_status()
     mapping = {}
-    try:
-        teams = teams_api.get_teams(year=year)
-    except ApiException as e:
-        print(f"[warn] get_teams failed: {e}")
-        return mapping
-
-    for t in teams or []:
-        aliases = {t.school}
-        for alt in (t.abbreviation, t.alt_name_1, t.alt_name_2, t.alt_name_3):
-            if alt:
-                aliases.add(alt)
-        for a in aliases:
-            mapping[a.lower()] = t.school
+    for t in r.json():
+        school = t.get("school")
+        aliases = {school, t.get("abbreviation"), t.get("alt_name_1"),
+                   t.get("alt_name_2"), t.get("alt_name_3")}
+        for a in [x for x in aliases if x]:
+            mapping[a.lower()] = school
     return mapping
 
 
-def normalize_team(name_map: dict, raw: str) -> str:
+def normalize_team(name_map: Dict[str, str], raw: str) -> str:
     return name_map.get(raw.lower().strip(), raw.strip())
 
 
-# ---------- fetchers ----------
-def fetch_team(stats_api, ratings_api, team: str, year: int):
-    """Return (record_dict, unauthorized_flag)."""
-    rec = {"team": team, "year": year, "simple": {}, "advanced": {}, "fpi": None}
-    unauthorized = False
-
-    # basic team stats
-    try:
-        rows = stats_api.get_team_stats(year=year, team=team)
-        for item in rows or []:
-            cat = (item.category or "overall").lower()
-            stat = (item.stat_name or "").lower().replace(" ", "_")
-            key = f"{cat}__{stat}"
-            try:
-                val = float(item.stat_value)
-            except Exception:
-                val = item.stat_value
-            rec["simple"][key] = val
-    except ApiException as e:
-        if e.status == 401:
-            unauthorized = True
-        print(f"[warn] team_stats failed for {team}: {e}")
-
-    # advanced season stats
-    try:
-        advs = stats_api.get_advanced_season_stats(year=year, team=team)
-        if advs:
-            adv = advs[0]
-
-            def flatten(prefix, node):
-                out = {}
-                if not node:
-                    return out
-                d = node.to_dict()
-                for k, v in d.items():
-                    if isinstance(v, dict):
-                        for sk, sv in v.items():
-                            out[f"{prefix}__{k}__{sk}"] = sv
-                    else:
-                        out[f"{prefix}__{k}"] = v
-                return out
-
-            rec["advanced"].update(flatten("offense", adv.offense))
-            rec["advanced"].update(flatten("defense", adv.defense))
-    except ApiException as e:
-        if e.status == 401:
-            unauthorized = True
-        print(f"[warn] advanced stats failed for {team}: {e}")
-
-    # FPI (ratings)
-    try:
-        fpi_rows = ratings_api.get_fpi(year=year)
-        for row in fpi_rows or []:
-            if row.team == team:
-                rec["fpi"] = {
-                    "fpi": row.fpi,
-                    "ranking": row.rank,
-                    "resume_rank": getattr(row, "resume_rank", None),
-                }
-                break
-    except ApiException as e:
-        if e.status == 401:
-            unauthorized = True
-        print(f"[warn] FPI failed for {team}: {e}")
-
-    return rec, unauthorized
+def fetch_basic(headers: Dict[str, str], team: str, year: int) -> Dict:
+    r = http_get("/stats/season", headers, {"year": year, "team": team})
+    if r.status_code == 401:
+        raise PermissionError("401 basic")
+    r.raise_for_status()
+    simple = {}
+    for row in r.json():
+        cat = (row.get("category") or "overall").lower()
+        stat = (row.get("statName") or "").lower().replace(" ", "_")
+        key = f"{cat}__{stat}"
+        val = row.get("statValue")
+        try:
+            val = float(val)
+        except Exception:
+            pass
+        simple[key] = val
+    return simple
 
 
-# ---------- main ----------
+def fetch_advanced(headers: Dict[str, str], team: str, year: int) -> Dict:
+    r = http_get("/stats/season/advanced", headers, {"year": year, "team": team})
+    if r.status_code == 401:
+        raise PermissionError("401 advanced")
+    r.raise_for_status()
+    arr = r.json()
+    return arr[0] if arr else {}
+
+
+def fetch_fpi(headers: Dict[str, str], team: str, year: int):
+    r = http_get("/ratings/fpi", headers, {"year": year})
+    if r.status_code == 401:
+        raise PermissionError("401 fpi")
+    r.raise_for_status()
+    for row in r.json():
+        if row.get("team") == team:
+            return {
+                "fpi": row.get("fpi"),
+                "ranking": row.get("rank"),
+                "resume_rank": row.get("resumeRank"),
+            }
+    return None
+
+
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--year", type=int, required=True)
-    args = parser.parse_args()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--year", type=int, required=True)
+    args = ap.parse_args()
+
+    headers, raw_key = get_headers()
+    print(f"[debug] CFBD_API_KEY present: True len={len(raw_key)} value(masked)={mask_key(raw_key)}")
 
     teams_raw = load_games(GAMES_FILE)
     if not teams_raw:
         die(f"[error] No teams found in {GAMES_FILE}.", 2)
-
     print(f"[info] discovered {len(teams_raw)} team tokens from {GAMES_FILE}")
 
-    client = make_cfbd_client()
-    stats_api = cfbd.StatsApi(client)
-    ratings_api = cfbd.RatingsApi(client)
-    teams_api = cfbd.TeamsApi(client)
+    # hard auth sanity check before we do the whole run
+    sanity_check(headers, raw_key, args.year)
 
-    # normalize team names to CFBD canonical form
-    name_map = build_name_map(teams_api, args.year)
+    # normalize names
+    name_map = get_team_list(headers, args.year)
     teams = sorted({normalize_team(name_map, t) for t in teams_raw})
     print(f"[info] normalized to {len(teams)} CFBD team names")
     for t in teams:
-        print(f"  - {t}")
+        print("  -", t)
 
-    # optional model ranks
     ranks = load_cfbrank(CFRANK_JSON)
 
     out = []
-    unauthorized_count = 0
-    nonempty_count = 0
+    unauthorized = 0
+    nonempty = 0
 
     for team in teams:
         print(f"[info] fetching {team} ({args.year})")
-        rec, unauth = fetch_team(stats_api, ratings_api, team, args.year)
-        if unauth:
-            unauthorized_count += 1
-        if rec["simple"] or rec["advanced"] or rec["fpi"]:
-            nonempty_count += 1
+        rec = {"team": team, "year": args.year, "simple": {}, "advanced": {}, "fpi": None}
+
+        try:
+            rec["simple"] = fetch_basic(headers, team, args.year)
+        except PermissionError as e:
+            unauthorized += 1
+            print(f"[warn] basic stats unauthorized for {team}: {e}")
+        except Exception as e:
+            print(f"[warn] basic stats failed for {team}: {e}")
+
+        try:
+            rec["advanced"] = fetch_advanced(headers, team, args.year)
+        except PermissionError as e:
+            unauthorized += 1
+            print(f"[warn] advanced stats unauthorized for {team}: {e}")
+        except Exception as e:
+            print(f"[warn] advanced stats failed for {team}: {e}")
+
+        try:
+            rec["fpi"] = fetch_fpi(headers, team, args.year)
+        except PermissionError as e:
+            unauthorized += 1
+            print(f"[warn] fpi unauthorized for {team}: {e}")
+        except Exception as e:
+            print(f"[warn] fpi failed for {team}: {e}")
+
         if team in ranks:
             rec["model_rank"] = ranks[team]
+
+        if rec["simple"] or rec["advanced"] or rec["fpi"]:
+            nonempty += 1
         out.append(rec)
 
-    if unauthorized_count == len(teams):
-        die("[error] All requests returned 401 Unauthorized. Your CFBD API key is missing/invalid or formatted incorrectly. In GitHub Secrets store the RAW key (no 'Bearer').", 4)
-    if nonempty_count == 0:
+    if nonempty == 0:
         die("[error] No data returned for any team. Aborting to avoid writing [].", 5)
 
     os.makedirs(os.path.dirname(OUT_JSON), exist_ok=True)
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2)
 
-    print(f"[ok] wrote {OUT_JSON} with {len(out)} teams ({nonempty_count} with real data)")
+    print(f"[ok] wrote {OUT_JSON} with {len(out)} teams ({nonempty} with real data)")
 
 
 if __name__ == "__main__":
