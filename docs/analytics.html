@@ -73,11 +73,7 @@
       font-size:13px; padding:6px 10px; border-radius:999px; background:var(--chip); color:#cbd5e1; border:1px solid var(--ring)
     }
 
-    /* layout blocks */
-    .grid{
-      display:grid; gap:16px;
-      grid-template-columns: repeat(12, 1fr);
-    }
+    .grid{display:grid; gap:16px; grid-template-columns: repeat(12, 1fr);}
     .card{
       background:linear-gradient(180deg, var(--panel) 0%, var(--card) 100%);
       border:1px solid var(--border);
@@ -85,12 +81,9 @@
       box-shadow:var(--shadow);
       padding:16px;
     }
-    .card h3{
-      margin:0 0 12px; font-size:16px; font-weight:700; letter-spacing:.2px
-    }
+    .card h3{margin:0 0 12px; font-size:16px; font-weight:700; letter-spacing:.2px}
     .card .muted{color:var(--muted); font-size:13px}
 
-    /* summary stat tiles */
     .stats{display:grid; grid-template-columns:repeat(6,1fr); gap:12px}
     @media (max-width:1100px){ .stats{grid-template-columns:repeat(3,1fr)} }
     @media (max-width:680px){ .stats{grid-template-columns:repeat(2,1fr)} }
@@ -104,7 +97,6 @@
     .stat .trend{font-size:12px; margin-top:6px}
     .good{color:var(--ok)} .bad{color:var(--danger)} .neutral{color:var(--muted)}
 
-    /* compare table */
     .compare-grid{display:grid; grid-template-columns:1.2fr .9fr .9fr .5fr; gap:10px; align-items:center}
     .compare-grid.header{color:#a8b3c7; font-size:12px}
     .row{
@@ -116,11 +108,9 @@
     .adv.b{background:rgba(123,255,189,.12); color:#cdfde8; border:1px solid rgba(123,255,189,.35)}
     .adv.tie{background:rgba(156,163,175,.18); color:#d1d5db; border:1px solid rgba(156,163,175,.25)}
 
-    /* chart canvas wrapper */
     .canvas-wrap{height:340px; position:relative}
     canvas{width:100% !important; height:100% !important}
 
-    /* footnote */
     .foot{color:#94a3b8; font-size:12px; margin-top:12px}
     .rank-pill{background:#19233a; border:1px solid #23314d; padding:4px 8px; border-radius:999px; font-weight:700; color:#dbeafe}
     .flex{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
@@ -129,7 +119,6 @@
 <body>
   <div class="container">
 
-    <!-- Rankings notice -->
     <div class="notice">
       <span class="badge">🏈 Model Top 25 Rankings</span>
       <span>Rankings shown here are from Daniel Staggs’ custom BCS-style model — not AP or CFP.</span>
@@ -149,14 +138,12 @@
       </div>
     </header>
 
-    <!-- Summary metric cards -->
     <section class="card">
       <h3>Snapshot</h3>
       <div id="stats" class="stats"></div>
-      <div class="foot">Note: Higher is better for PPG, Yards/Play, Success Rate, Explosiveness, and PPA (offense). For defense, lower allowed values are better.</div>
+      <div class="foot">Higher is better for PPG, Yards/Play, Success Rate, Explosiveness, and Off PPA. For defense, lower allowed values are better.</div>
     </section>
 
-    <!-- Charts -->
     <section class="grid" style="margin-top:16px">
       <div class="card" style="grid-column:span 6;">
         <h3>Offensive Profile (Radar)</h3>
@@ -168,7 +155,6 @@
       </div>
     </section>
 
-    <!-- Compare tool -->
     <section class="card" style="margin-top:16px">
       <div class="flex" style="justify-content:space-between">
         <h3>Compare Teams</h3>
@@ -182,7 +168,7 @@
         <div>Metric</div><div id="cmpATitle">Team A</div><div id="cmpBTitle">Team B</div><div>Edge</div>
       </div>
       <div id="cmpRows" style="display:grid; gap:10px; margin-top:8px"></div>
-      <div class="foot">Values shown use offense (per-game / per-play) and defense allowed where available. Edges determined by directionality of the metric.</div>
+      <div class="foot">Edges are based on the metric’s direction (higher vs lower is better).</div>
     </section>
 
   </div>
@@ -191,11 +177,6 @@
 /* ---------------------
    CONFIG / KEY MAPPING
 ----------------------*/
-
-// These are the metric keys we look for in each team object. The array items include:
-// - label shown to users
-// - list of candidate keys to pull from your JSON (we'll pick the first that exists)
-// - better: 'higher' or 'lower' to determine who has the edge in comparisons
 const METRICS = [
   { id:'off_ppg',      label:'Off PPG',           keys:['off_ppg','ppg','points_per_game','off_points_per_game'], better:'higher', dp:2 },
   { id:'off_ypp',      label:'Off Yards/Play',    keys:['off_ypp','yards_per_play','off_yards_per_play'],         better:'higher', dp:2 },
@@ -209,13 +190,9 @@ const METRICS = [
   { id:'def_expl',     label:'Def Explosive Rate',keys:['def_explosiveness','explosiveness_allowed','def_expl'],     better:'lower', dp:3 },
   { id:'def_ppa',      label:'Def PPA Allowed',   keys:['def_ppa','predicted_points_added_allowed','def_ppa_allowed'], better:'lower', dp:3 },
 ];
-
 const RADAR_OFF_KEYS = ['off_ppg','off_ypp','off_success','off_expl','off_ppa'];
 const BAR_KEYS       = ['off_ppa','def_ppa','off_success','def_success','off_ypp','def_ypp'];
 
-/* ---------------------
-   UTILITIES
-----------------------*/
 const $ = sel => document.querySelector(sel);
 const el = (tag, cls, txt) => { const n=document.createElement(tag); if(cls) n.className=cls; if(txt!==undefined) n.textContent=txt; return n; };
 const fmt = (v, dp=2) => (v==null || isNaN(v)) ? '—' : Number(v).toFixed(dp);
@@ -223,7 +200,6 @@ const numberOrNull = v => (v==null || isNaN(+v)) ? null : +v;
 
 function byKeyCandidates(obj, candidates){
   for(const k of candidates){ if(k in obj && obj[k] != null) return numberOrNull(obj[k]); }
-  // also look inside nested objects if present (common shapes: obj.offense.ppa)
   for(const k of candidates){
     const parts = k.split('.');
     if(parts.length>1){
@@ -234,46 +210,37 @@ function byKeyCandidates(obj, candidates){
   }
   return null;
 }
-
 function extractMetrics(team){
   const out = {};
   for(const m of METRICS){ out[m.id] = byKeyCandidates(team, m.keys); }
-  // FPI / Elo style number if present
   out.fpi = byKeyCandidates(team, ['fpi','espn_fpi','FPI','rating','elo']);
   return out;
 }
-
-function normalize(values){ // min-max to 0-1, ignore null
+function normalize(values){
   const xs = values.filter(v => v!=null);
   if(!xs.length) return values.map(()=>0);
   const min = Math.min(...xs), max = Math.max(...xs);
   if(min===max) return values.map(v => v==null ? 0 : .5);
   return values.map(v => v==null ? 0 : (v-min)/(max-min));
 }
-
-function cmpEdge(a, b, better){ // returns 'a' | 'b' | 'tie'
+function cmpEdge(a, b, better){
   if(a==null && b==null) return 'tie';
   if(a==null) return 'b';
   if(b==null) return 'a';
   if (Math.abs(a-b) < 1e-9) return 'tie';
   return (better==='higher') ? (a>b?'a':'b') : (a<b?'a':'b');
 }
-
 function teamLabel(teamObj, rankMap){
   const name = teamObj.team ?? teamObj.name ?? teamObj.Team ?? 'Unknown';
   const r = rankMap[name];
   return (r ? `#${r} ${name}` : name);
 }
 
-/* ---------------------
-   STATE
-----------------------*/
+/* STATE */
 let TEAMS=[], TEAM_BY_NAME={}, METRIC_CACHE={}, RANKS={}, TEAMS_SORTED=[];
 let radarChart=null, barChart=null;
 
-/* ---------------------
-   RENDER
-----------------------*/
+/* RENDER */
 function renderTeamOptions(){
   const sel = $('#teamSelect');
   const a = $('#cmpA'); const b = $('#cmpB');
@@ -287,35 +254,24 @@ function renderTeamOptions(){
       s.appendChild(opt);
     }
   }
-  // default selections
   if (TEAMS_SORTED.length){
     sel.value = TEAMS_SORTED[0].team ?? TEAMS_SORTED[0].name ?? TEAMS_SORTED[0].Team;
     a.value   = TEAMS_SORTED[0].team ?? TEAMS_SORTED[0].name ?? TEAMS_SORTED[0].Team;
     if(TEAMS_SORTED[1]) b.value = TEAMS_SORTED[1].team ?? TEAMS_SORTED[1].name ?? TEAMS_SORTED[1].Team;
   }
 }
-
 function buildHeadline(teamObj){
   const name = teamObj.team ?? teamObj.name ?? teamObj.Team;
   const r = RANKS[name];
   const chips = $('#headlineChips'); chips.innerHTML='';
-
-  $('#teamHeadline').innerHTML = `
-    <span class="rank-pill">${r?`#${r}`:'NR'}</span>
-    <strong style="margin-left:6px">${name}</strong>
-  `;
-
+  $('#teamHeadline').innerHTML = `<span class="rank-pill">${r?`#${r}`:'NR'}</span><strong style="margin-left:6px">${name}</strong>`;
   const metrics = METRIC_CACHE[name];
-  if(metrics && metrics.fpi!=null){
-    chips.appendChild(el('span','chip',`FPI: ${fmt(metrics.fpi,2)}`));
-  }
+  if(metrics && metrics.fpi!=null){ chips.appendChild(el('span','chip',`FPI: ${fmt(metrics.fpi,2)}`)); }
 }
-
 function renderStats(teamObj){
   const name = teamObj.team ?? teamObj.name ?? teamObj.Team;
   const m = METRIC_CACHE[name] || {};
   const holder = $('#stats'); holder.innerHTML='';
-
   const defs = [
     {label:'Off PPG',       val:m.off_ppg, dp:2},
     {label:'Off Yds/Play',  val:m.off_ypp, dp:2},
@@ -329,63 +285,42 @@ function renderStats(teamObj){
     {label:'Def PPA (A)',   val:m.def_ppa, dp:3},
     {label:'FPI',           val:m.fpi, dp:2},
   ];
-
   defs.forEach(d=>{
     const card = el('div','stat');
-    const lab  = el('div','label',d.label);
-    const val  = el('div','value',fmt(d.val,d.dp));
-    card.append(lab,val);
+    card.append(el('div','label',d.label), el('div','value',fmt(d.val,d.dp)));
     holder.appendChild(card);
   });
 }
-
 function renderCharts(teamObj){
   const ctxR = $('#radar');
   const ctxB = $('#bars');
   const name = teamObj.team ?? teamObj.name ?? teamObj.Team;
   const m = METRIC_CACHE[name];
-
-  // Radar: normalize each radar metric across all teams
   const allForKey = k => TEAMS.map(t=>{
     const n=t.team??t.name??t.Team; return (METRIC_CACHE[n]||{})[k] ?? null;
   });
-
   const radarLabels = ['PPG','Yds/Play','Success','Explosive','PPA'];
   const radarValues = RADAR_OFF_KEYS.map(k=>{
     const norm = normalize(allForKey(k));
     const idx = TEAMS.findIndex(t=>(t.team??t.name??t.Team)===name);
     return norm[idx] ?? 0;
   });
-
   if(radarChart){ radarChart.destroy(); }
   radarChart = new Chart(ctxR, {
     type:'radar',
-    data:{
-      labels:radarLabels,
-      datasets:[{
-        label:'Offense (normalized)',
-        data:radarValues,
-        fill:true,
-      }]
-    },
+    data:{ labels:radarLabels, datasets:[{ label:'Offense (normalized)', data:radarValues, fill:true }] },
     options:{
       responsive:true,
       scales:{ r:{ grid:{color:'#203049'}, angleLines:{color:'#203049'}, pointLabels:{color:'#aab7cc'}, suggestedMin:0, suggestedMax:1 } },
       plugins:{ legend:{labels:{color:'#d6e1f2'}} }
     }
   });
-
-  // Bar: off/def efficiency trio
   const barLabels = ['Off PPA','Def PPA (A)','Off Success','Def Success','Off YPP','Def YPP'];
   const barValues = BAR_KEYS.map(k => (m?.[k] ?? 0));
-
   if(barChart){ barChart.destroy(); }
   barChart = new Chart(ctxB, {
     type:'bar',
-    data:{
-      labels:barLabels,
-      datasets:[{ label:name, data:barValues }]
-    },
+    data:{ labels:barLabels, datasets:[{ label:name, data:barValues }] },
     options:{
       responsive:true,
       scales:{
@@ -396,7 +331,6 @@ function renderCharts(teamObj){
     }
   });
 }
-
 function renderCompare(){
   const aName = $('#cmpA').value;
   const bName = $('#cmpB').value;
@@ -404,14 +338,11 @@ function renderCompare(){
   const bObj = TEAM_BY_NAME[bName];
   $('#cmpATitle').textContent = teamLabel(aObj, RANKS);
   $('#cmpBTitle').textContent = teamLabel(bObj, RANKS);
-
   const rows = $('#cmpRows'); rows.innerHTML='';
-
   for(const m of METRICS){
     const av = METRIC_CACHE[aName]?.[m.id] ?? null;
     const bv = METRIC_CACHE[bName]?.[m.id] ?? null;
     const edge = cmpEdge(av, bv, m.better);
-
     const row = el('div','row compare-grid');
     row.append(
       el('div',null,m.label),
@@ -428,39 +359,30 @@ function renderCompare(){
   }
 }
 
-/* ---------------------
-   BOOTSTRAP
-----------------------*/
+/* BOOTSTRAP */
 async function loadJSON(path){
   const res = await fetch(path, {cache:'no-store'});
   if(!res.ok) throw new Error(`${path} ${res.status}`);
   return res.json();
 }
-
 async function init(){
   try{
     const [teamStats, cfbrank] = await Promise.all([
       loadJSON('./data/team_stats.json'),
       loadJSON('./data/cfbrank.json')
     ]);
-
-    // Ranks: prefer cfbrank.teams map (fast lookup), otherwise build from ranks list
     RANKS = cfbrank?.teams ?? {};
     if(!Object.keys(RANKS).length && Array.isArray(cfbrank?.ranks)){
       for(const r of cfbrank.ranks){ RANKS[r.team] = r.rank; }
     }
-
     TEAMS = Array.isArray(teamStats) ? teamStats : (teamStats?.teams ?? []);
     if(!Array.isArray(TEAMS) || !TEAMS.length) throw new Error('No teams found in team_stats.json');
 
-    // Normalize name + cache metrics
     TEAMS.forEach(t=>{
       const name = t.team ?? t.name ?? t.Team;
       TEAM_BY_NAME[name] = t;
       METRIC_CACHE[name] = extractMetrics(t);
     });
-
-    // Sort options by model rank first, then name
     TEAMS_SORTED = [...TEAMS].sort((a,b)=>{
       const an = a.team ?? a.name ?? a.Team, bn = b.team ?? b.name ?? b.Team;
       const ar = RANKS[an] ?? 999, br = RANKS[bn] ?? 999;
@@ -470,14 +392,12 @@ async function init(){
 
     renderTeamOptions();
 
-    // initial render
     const first = TEAMS_SORTED[0];
     buildHeadline(first);
     renderStats(first);
     renderCharts(first);
     renderCompare();
 
-    // listeners
     $('#teamSelect').addEventListener('change', e=>{
       const sel = e.target.value;
       const obj = TEAM_BY_NAME[sel];
@@ -501,7 +421,6 @@ async function init(){
       </div>`;
   }
 }
-
 init();
 </script>
 </body>
