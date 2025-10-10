@@ -12,7 +12,8 @@ jobs:
   fetch-team-stats:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # needed to push the updated JSON back to the repo
+      contents: write  # required to push changes back to the repo
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,12 +23,16 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install deps
+      - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
           pip install cfbd
 
-      - name: Run fetch script
+      - name: Ensure data directory exists
+        run: |
+          mkdir -p docs/data
+
+      - name: Fetch CFBD team stats
         env:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
         run: |
@@ -35,11 +40,29 @@ jobs:
 
       - name: Commit updated data
         run: |
-          if git diff --quiet docs/data/team_stats.json; then
-            echo "No changes in docs/data/team_stats.json"
+          # Configure committer identity
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # First-run: file may not exist in history yet
+          if [ ! -f docs/data/team_stats.json ]; then
+            echo "ERROR: docs/data/team_stats.json was not created by the script."
+            exit 1
+          fi
+
+          # If the file isn't tracked yet, add and commit
+          if ! git ls-files --error-unmatch docs/data/team_stats.json >/dev/null 2>&1; then
+            echo "Adding team_stats.json (first run)"
+            git add docs/data/team_stats.json
+            git commit -m "Add team_stats.json (first run for ${{ github.event.inputs.year }})"
+            git push
+            exit 0
+          fi
+
+          # If it's tracked, commit only when changed
+          if git diff --quiet -- docs/data/team_stats.json; then
+            echo "No changes detected in docs/data/team_stats.json"
           else
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
             git add docs/data/team_stats.json
             git commit -m "Update team_stats.json for ${{ github.event.inputs.year }}"
             git push
