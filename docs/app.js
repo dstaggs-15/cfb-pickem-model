@@ -1,293 +1,308 @@
-/* docs/app.js
- * Bubble cards + pill bars (with % inside) + FPI row (rank, FPI, favors, AGREE/DISAGREE) + CFB Ranking badges (#N TeamName).
- * Inputs:
- *   docs/data/predictions.json -> { "games":[...] }  (array also ok)
- *   docs/data/fpi.json         -> { "data":[{name,rank,fpi},...] }  OR  { "teams":{ name:{rank,fpi} } }
- *   docs/data/cfbrank.json     -> { "ranks":[{team,rank},...] } OR { "teams": { team: rank } } (Top-25 okay)
- */
+/* globals Chart */
+const DATA_URL = 'docs/data/team_stats.json';
+const RANK_URL = 'docs/data/cfbrank.json';
 
-(async function () {
-  const PRED_URL   = 'data/predictions.json';
-  const FPI_URL    = 'data/fpi.json';
-  const RANKS_URL  = 'data/cfbrank.json';
-  const cacheBust  = () => `?v=${Date.now()}`;
+// The metrics we show + how to pull them + whether higher is better
+const METRICS = [
+  { key: 'ppg',          label: 'Points / Game (PPG)',       pathOff: ['offense.ppg','off_ppg','ppg_off'], pathDef: ['defense.ppg','def_ppg','ppg_def'], higherIsBetter: true,  decimals: 1 },
+  { key: 'yards_pg',     label: 'Yards / Game',              pathOff: ['offense.yards_per_game','off_yards_per_game','yards_off_g'], pathDef: ['defense.yards_per_game','def_yards_per_game','yards_def_g'], higherIsBetter: true,  decimals: 1 },
+  { key: 'success_rate', label: 'Success Rate',              pathOff: ['offense.success_rate','off_success_rate'], pathDef: ['defense.success_rate','def_success_rate'], higherIsBetter: true,  decimals: 3 },
+  { key: 'explosive',    label: 'Explosiveness',             pathOff: ['offense.explosiveness','off_explosiveness'], pathDef: ['defense.explosiveness','def_explosiveness'], higherIsBetter: true,  decimals: 3 },
+  { key: 'ppa',          label: 'PPA (Pred. Points Added)',  pathOff: ['offense.ppa','off_ppa'], pathDef: ['defense.ppa','def_ppa'], higherIsBetter: true,  decimals: 3 },
+];
+const EXTRA = [
+  { key: 'fpi', label: 'ESPN FPI', path: ['fpi','espn_fpi'], decimals: 2, higherIsBetter: true }
+];
 
-  // === This week’s 10 (Away, Home) — EXACT ORDER YOU ASKED ===
-  const DESIRED_ORDER = [
-    ["Alabama", "Missouri"],
-    ["Indiana", "Oregon"],
-    ["Oklahoma", "Texas"],
-    ["TCU", "Kansas State"],
-    ["Iowa State", "Colorado"],
-    ["Nebraska", "Maryland"],
-    ["Georgia", "Auburn"],
-    ["Michigan", "USC"],
-    ["BYU", "Arizona"],
-    ["Arizona State", "Utah"]
-  ];
-  const ONLY_USE_DESIRED = true;
+let rawTeams = [];
+let rankMap = new Map(); // Team -> rank #
+let teamsByName = new Map(); // Team -> object
+let radarChart, effBarChart;
 
-  // Team colors (fallback → hashed color).
-  const TEAM_COLORS = {
-    "Alabama":"#9E1B32","Auburn":"#0C2340","Arizona":"#AB0520","Arizona State":"#8C1D40",
-    "Baylor":"#004834","BYU":"#0D254C","California":"#003262","Colorado":"#CFB87C",
-    "Cincinnati":"#E00122","Duke":"#003087","Florida":"#0021A5","Florida State":"#782F40",
-    "Georgia":"#BA0C2F","Indiana":"#990000","Iowa State":"#A71930","Kansas":"#0051BA",
-    "Kansas State":"#512888","Louisville":"#AD0000","Maryland":"#E03A3E","Michigan":"#00274C",
-    "Missouri":"#F1B82D","Nebraska":"#E41C38","Oklahoma":"#841617","Oregon":"#004F27",
-    "TCU":"#4D1979","Texas":"#BF5700","UCF":"#BA9B37","UNLV":"#CC0000","USC":"#990000",
-    "Utah":"#CC0000","Vanderbilt":"#866D4B","Washington":"#4B2E83","Wyoming":"#492F24"
-  };
+init().catch(console.error);
 
-  // ---------- helpers ----------
-  const $  = (sel) => document.querySelector(sel);
-  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
-
-  const normalize = (s) =>
-    String(s || '')
-      .toLowerCase()
-      .replace(/&/g, 'and')
-      .replace(/[^a-z0-9 ]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-  const stripParens = (s) => String(s||'').replace(/\s*\(.*?\)\s*/g,' ').trim();
-
-  // Expanded aliases for robustness
-  const ALIASES = new Map([
-    ["usc","southern california"],
-    ["ole miss","mississippi"],
-    ["ucf","central florida"],
-    ["byu","brigham young"],
-    ["lsu","louisiana state"],
-    ["miami fl","miami"],
-    ["cal","california"],
-    ["kansas st","kansas state"],
-    ["iowa st","iowa state"],
-    ["asu","arizona state"],
-    ["ariz st","arizona state"],
-    ["okla","oklahoma"],
-    ["ou","oklahoma"],
-    ["uga","georgia"],
-    ["bama","alabama"],
-    ["mizzou","missouri"],
-    ["kansas st.","kansas state"]
+async function init(){
+  const [teamRes, rankRes] = await Promise.all([
+    fetch(DATA_URL, {cache:'no-store'}),
+    fetch(RANK_URL, {cache:'no-store'})
   ]);
+  rawTeams = await teamRes.json();
+  const rankJson = await rankRes.json().catch(()=>({teams:{}}));
+  rankMap = new Map(Object.entries(rankJson.teams || {}));
 
-  const normAlias = (s) => {
-    let n = normalize(stripParens(s));
-    if (ALIASES.has(n)) return ALIASES.get(n);
-    for (const [k,v] of ALIASES.entries()) {
-      if (n===k || n.startsWith(k+' ') || n.endsWith(' '+k) || n.includes(' '+k+' ')) return v;
-    }
-    return n;
-  };
+  // Make lookup by normalized name
+  teamsByName = new Map(rawTeams.map(t => [norm(t.team || t.name), t]));
 
-  const RANK = new Map();
-  DESIRED_ORDER.forEach((pair, i) => {
-    const [away, home] = pair;
-    RANK.set(`${normalize(home)}__${normalize(away)}`, i);
-    RANK.set(`${normalize(away)}__${normalize(home)}`, i);
+  // Compute per-stat ranks across all teams
+  computeAllRanks();
+
+  // Build selects
+  buildTeamSelects();
+
+  // Render default team (first in ranked list if present)
+  const first = document.querySelector('#teamSelect option')?.value;
+  if (first){
+    document.getElementById('teamSelect').value = first;
+    renderTeam(first);
+  }
+
+  // Compare handler
+  document.getElementById('compareBtn').addEventListener('click', () => {
+    const a = document.getElementById('teamA').value;
+    const b = document.getElementById('teamB').value;
+    renderCompare(a, b);
   });
 
-  function pickTextColor(hex){
-    if(!hex) return '#fff';
-    const h=hex.replace('#',''); if(h.length!==6) return '#fff';
-    const r=parseInt(h.slice(0,2),16)/255, g=parseInt(h.slice(2,4),16)/255, b=parseInt(h.slice(4,6),16)/255;
-    const lin = (v)=> v<=0.04045? v/12.92 : Math.pow((v+0.055)/1.055,2.4);
-    const L = 0.2126*lin(r)+0.7152*lin(g)+0.0722*lin(b);
-    return L >= 0.6 ? '#000' : '#fff';
-  }
-  function hslToHex(h,s,l){s/=100;l/=100;const c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs(((h/60)%2)-1)),m=l-c/2;
-    let r=0,g=0,b=0;
-    if(h<60){r=c;g=x;}else if(h<120){r=x;g=c;}else if(h<180){g=c;b=x;}else if(h<240){g=x;b=c;}
-    else if(h<300){r=x;b=c;}else{b=x;}
-    const to=(v)=>('0'+Math.round((v+m)*255).toString(16)).slice(-2);
-    return `#${to(r)}${to(g)}${to(b)}`;}
-  function colorFromName(name){
-    let hash=0; for(let i=0;i<String(name).length;i++) hash=(hash*31+String(name).charCodeAt(i))>>>0;
-    const hue=hash%360, s=62, l=38;
-    return hslToHex(hue,s,l);
-  }
-  function teamColor(t){
-    return TEAM_COLORS[t] || (()=>{const n=Object.keys(TEAM_COLORS).find(k=>normalize(k)===normalize(t));return n?TEAM_COLORS[n]:colorFromName(t);})();
-  }
+  // Change team
+  document.getElementById('teamSelect').addEventListener('change', (e)=>{
+    renderTeam(e.target.value);
+  });
+}
 
-  function dedupe(games){
-    const seen={};
-    games.forEach((g,i)=>{ seen[`${g.home_team}__${g.away_team}`]={...g,_order:i}; });
-    return Object.values(seen).sort((a,b)=>a._order-b._order);
-  }
-  function orderGames(games){
-    const withRank=games.map(g=>({...g,_rank:RANK.get(`${normalize(g.home_team)}__${normalize(g.away_team)}`)??Infinity}));
-    let list=withRank;
-    if(ONLY_USE_DESIRED) list=withRank.filter(g=>g._rank!==Infinity);
-    return list.sort((a,b)=>(a._rank-b._rank)||(a._order-b._order));
-  }
+function norm(s){ return (s||'').trim(); }
 
-  // ---------- load predictions ----------
-  let preds=[];
-  try{
-    const r=await fetch(PRED_URL+cacheBust(),{cache:'no-store'});
-    const j=await r.json();
-    preds=Array.isArray(j)? j : (j.games||[]);
-  }catch(e){
-    console.error('predictions.json load failed',e);
-    preds=[];
-  }
-
-  // ---------- load FPI ----------
-  let fpiMap=new Map();
-  try{
-    const r=await fetch(FPI_URL+cacheBust(),{cache:'no-store'});
-    const j=await r.json();
-    const put=(name,obj)=>{
-      fpiMap.set(normAlias(name),{
-        name,
-        rank:(obj && Number.isFinite(Number(obj.rank))) ? Number(obj.rank) : null,
-        fpi: (obj && Number.isFinite(Number(obj.fpi)))  ? Number(obj.fpi)  : null
-      });
-    };
-    if (Array.isArray(j.data)) j.data.forEach(it=>put(it.name,it));
-    else if (j.teams && typeof j.teams==='object') Object.entries(j.teams).forEach(([n,o])=>put(n,o));
-  }catch(e){
-    console.warn('fpi.json load failed',e);
-    fpiMap=new Map();
-  }
-
-  // ---------- load CFB Ranking (Top-25) ----------
-  let rankMap = new Map();
-  try{
-    const r=await fetch(RANKS_URL+cacheBust(),{cache:'no-store'});
-    if (r.ok) {
-      const j=await r.json();
-      if (Array.isArray(j?.ranks)) {
-        j.ranks.forEach(({team,rank})=>{
-          if (team && Number.isFinite(Number(rank))) rankMap.set(normAlias(team), Number(rank));
-        });
-      } else if (j?.teams && typeof j.teams === 'object') {
-        Object.entries(j.teams).forEach(([team,rank])=>{
-          if (team && Number.isFinite(Number(rank))) rankMap.set(normAlias(team), Number(rank));
-        });
-      }
-    }
-  }catch(e){
-    console.warn('cfbrank.json load failed', e);
-    rankMap = new Map();
-  }
-
-  // ---------- build UI ----------
-  const container = document.getElementById('predictions-container') || document.body;
-  container.innerHTML = '';
-
-  const base = dedupe(preds);
-  const games = orderGames(base);
-  if (!games.length){
-    container.innerHTML = `<div class="status-message">No predictions found.</div>`;
-    return;
-  }
-
-  const pct = (x) => (Number(x)*100).toFixed(1) + '%';
-  const showName = (team) => {
-    const r = rankMap.get(normAlias(team));
-    return (Number.isFinite(r) ? `#${r} ` : '') + team;
-  };
-
-  games.forEach(g=>{
-    const home = g.home_team;
-    const away = g.away_team;
-
-    const homeColor = teamColor(home);
-    const awayColor = teamColor(away);
-    const homeText  = pickTextColor(homeColor);
-    const awayText  = pickTextColor(awayColor);
-
-    const pHome = Number(g.model_prob_home ?? g.prob_home ?? 0.5);
-    const pAway = 1 - pHome;
-    const pick  = g.pick || (pHome >= 0.5 ? home : away);
-
-    // ---- CARD ----
-    const card = document.createElement('div');
-    card.className = 'card';
-
-    // Header chips and "@"
-    const hdr = document.createElement('div');
-    hdr.className = 'row hdr';
-    hdr.innerHTML = `
-      <div class="team" style="background:${homeColor};color:${homeText};">${showName(home)}</div>
-      <div class="vs">@</div>
-      <div class="team" style="background:${awayColor};color:${awayText};">${showName(away)}</div>
-    `;
-    card.appendChild(hdr);
-
-    // Bars (pill) with % inside + PICK line
-    const body = document.createElement('div');
-    body.className = 'row body';
-    body.innerHTML = `
-      <div class="bar-wrap">
-        <div class="bar left"  style="width:${(pHome*100).toFixed(1)}%; background:${homeColor};">
-          <span class="pct">${pct(pHome)}</span>
-        </div>
-        <div class="bar right" style="width:${(pAway*100).toFixed(1)}%; background:${awayColor};">
-          <span class="pct">${pct(pAway)}</span>
-        </div>
-      </div>
-      <div class="meta-line"><span class="label">PICK:</span> <strong>${showName(pick)}</strong></div>
-    `;
-    card.appendChild(body);
-
-    // ----- FPI (underneath) -----
-    const fHome = fpiMap.get(normAlias(home));
-    const fAway = fpiMap.get(normAlias(away));
-
-    let fpiFav = null;
-    if (fHome && fAway) {
-      if (Number.isFinite(fHome.fpi) && Number.isFinite(fAway.fpi)) {
-        fpiFav = fHome.fpi > fAway.fpi ? home : (fAway.fpi > fHome.fpi ? away : null);
-      }
-      if (!fpiFav && Number.isFinite(fHome.rank) && Number.isFinite(fAway.rank)) {
-        fpiFav = fHome.rank < fAway.rank ? home : (fAway.rank < fHome.rank ? away : null);
-      }
-    } else if (fHome && !fAway) fpiFav = home;
-    else if (!fHome && fAway)   fpiFav = away;
-
-    const agree = fpiFav && pick ? (normalize(fpiFav) === normalize(pick)) : null;
-
-    const fpiWrap = document.createElement('div');
-    fpiWrap.className = 'fpi-wrap';
-    fpiWrap.innerHTML = `
-      <div class="fpi-row">
-        <div class="fpi-side">
-          <span class="fpi-team">${showName(home)}</span>
-          <span class="fpi-meta">${fHome ? `FPI ${fHome.fpi ?? '—'}  ·  #${fHome.rank ?? '—'}` : 'FPI —'}</span>
-        </div>
-        <div class="fpi-vs">FPI</div>
-        <div class="fpi-side right">
-          <span class="fpi-team">${showName(away)}</span>
-          <span class="fpi-meta">${fAway ? `FPI ${fAway.fpi ?? '—'}  ·  #${fAway.rank ?? '—'}` : 'FPI —'}</span>
-        </div>
-      </div>
-      <div class="fpi-fav">
-        ${fpiFav ? `FPI favors: <strong>${showName(fpiFav)}</strong>` : 'FPI favors: <strong>—</strong>'}
-        ${agree === true  ? `<span class="fpi-badge agree">AGREE</span>` : ''}
-        ${agree === false ? `<span class="fpi-badge disagree">DISAGREE</span>` : ''}
-      </div>
-    `;
-    card.appendChild(fpiWrap);
-
-    container.appendChild(card);
+function buildTeamSelects(){
+  // Sort by rank first, then A->Z
+  const sorted = [...teamsByName.values()].sort((a,b)=>{
+    const ra = rankMap.get(norm(a.team || a.name)) || 9999;
+    const rb = rankMap.get(norm(b.team || b.name)) || 9999;
+    if (ra !== rb) return ra - rb;
+    return norm(a.team||a.name).localeCompare(norm(b.team||b.name));
   });
 
-  // Filter box support (optional element with id="filterInput")
-  const filterInput = document.getElementById('filterInput');
-  if (filterInput) {
-    const normalizeAll = (s)=>normalize(String(s||''));
-    filterInput.addEventListener('input', () => {
-      const q = normalizeAll(filterInput.value || '');
-      $$('.card').forEach(card => {
-        const txt = normalizeAll(card.textContent || '');
-        card.style.display = q && !txt.includes(q) ? 'none' : '';
-      });
-    });
+  const mainSel = document.getElementById('teamSelect');
+  const aSel    = document.getElementById('teamA');
+  const bSel    = document.getElementById('teamB');
+  [mainSel,aSel,bSel].forEach(sel => sel.innerHTML='');
+
+  for (const t of sorted){
+    const name = norm(t.team || t.name);
+    const rank = rankMap.get(name);
+    const fpi  = getVal(t, ['fpi','espn_fpi']);
+    const label = `${rank ? '#'+rank+' ' : ''}${name}${Number.isFinite(fpi) ? ` — FPI: ${fpi.toFixed(2)}`:''}`;
+    const opt1 = new Option(label, name);
+    const opt2 = new Option(label, name);
+    const opt3 = new Option(label, name);
+    mainSel.add(opt1);
+    aSel.add(opt2);
+    bSel.add(opt3);
   }
-})();
+}
+
+function getVal(obj, paths){
+  for (const p of paths){
+    const v = drill(obj, p);
+    if (v !== undefined && v !== null) return (typeof v === 'string') ? Number(v) : v;
+  }
+  return undefined;
+}
+function drill(o, path){ // 'a.b.c'
+  const parts = path.split('.');
+  let cur = o;
+  for (const k of parts){
+    if (cur && Object.prototype.hasOwnProperty.call(cur, k)){
+      cur = cur[k];
+    } else return undefined;
+  }
+  return cur;
+}
+
+function computeAllRanks(){
+  // Create arrays of values for each metric (offensive-side for ranks generally)
+  METRICS.forEach(m => {
+    const vals = [];
+    for (const t of teamsByName.values()){
+      const v = getVal(t, m.pathOff);
+      if (Number.isFinite(v)) vals.push(v);
+    }
+    // Rank: higher is better unless specified
+    const sorted = [...vals].sort((a,b) => m.higherIsBetter ? (b-a) : (a-b));
+    for (const t of teamsByName.values()){
+      const v = getVal(t, m.pathOff);
+      if (!Number.isFinite(v)) continue;
+      const r = sorted.findIndex(x => x === v) + 1;
+      t.__ranks = t.__ranks || {};
+      t.__ranks[m.key] = r || null;
+    }
+  });
+}
+
+function renderTeam(teamName){
+  const team = teamsByName.get(norm(teamName));
+  if (!team) return;
+
+  // header badge
+  const badge = document.getElementById('teamBadge');
+  const rank  = rankMap.get(norm(team.team || team.name));
+  const fpi   = getVal(team, EXTRA[0].path);
+  badge.textContent = `${rank ? '#'+rank+' ' : ''}${team.team || team.name}${Number.isFinite(fpi) ? ` — FPI: ${fpi.toFixed(EXTRA[0].decimals)}`:''}`;
+
+  // summary cards
+  const grid = document.getElementById('summaryGrid');
+  grid.innerHTML = '';
+  const cards = [];
+
+  // Offense cards
+  for (const m of METRICS){
+    const vOff = getVal(team, m.pathOff);
+    const vDef = getVal(team, m.pathDef);
+    cards.push(cardEl(`${m.label} — Offense`, formatVal(vOff,m), rankText(team.__ranks?.[m.key])));
+    cards.push(cardEl(`${m.label} — Defense`, formatVal(vDef,m)));
+  }
+  // Extra
+  cards.push(cardEl(EXTRA[0].label, Number.isFinite(fpi) ? fpi.toFixed(EXTRA[0].decimals) : '—'));
+
+  cards.forEach(c => grid.appendChild(c));
+
+  // charts
+  drawRadar(team);
+  drawEffBar(team);
+}
+
+function cardEl(label, value, sub){
+  const d = document.createElement('div');
+  d.className = 'card stat-card';
+  d.innerHTML = `
+    <div class="stat-label">${label}</div>
+    <div class="stat-value">${value ?? '—'}</div>
+    ${sub ? `<div class="stat-sub">${sub}</div>`:''}
+  `;
+  return d;
+}
+function rankText(rk){
+  return rk ? `Rank: ${rk}` : '';
+}
+function formatVal(v, meta){
+  if (!Number.isFinite(v)) return '—';
+  const d = Number.isFinite(meta.decimals) ? meta.decimals : 2;
+  return v.toFixed(d);
+}
+
+// Normalize to 0..1 for the radar
+function normalize(vals){
+  const finite = vals.filter(v => Number.isFinite(v));
+  const min = Math.min(...finite);
+  const max = Math.max(...finite);
+  return vals.map(v=>{
+    if (!Number.isFinite(v)) return 0;
+    if (max === min) return 0.5;
+    return (v - min) / (max - min);
+  });
+}
+
+function drawRadar(team){
+  const labels = METRICS.map(m => m.label.replace(/ \(.+?\)/,''));
+  const raw = METRICS.map(m => getVal(team, m.pathOff));
+  const data = normalize(raw);
+
+  const ctx = document.getElementById('radarChart');
+  if (radarChart) radarChart.destroy();
+  radarChart = new Chart(ctx, {
+    type:'radar',
+    data:{
+      labels,
+      datasets:[{
+        label:'Offense (norm.)',
+        data,
+        fill:true
+      }]
+    },
+    options:{
+      responsive:true,
+      scales:{ r:{ grid:{color:'#222'}, pointLabels:{color:'#b7bec6'} } },
+      plugins:{ legend:{ labels:{ color:'#b7bec6'} } }
+    }
+  });
+}
+
+function drawEffBar(team){
+  // Pick a few “efficiency-ish” stats: PPA, Success Rate, Explosiveness
+  const trio = ['ppa','success_rate','explosive'];
+  const labels = METRICS.filter(m => trio.includes(m.key)).map(m=>m.label);
+  const off = METRICS.filter(m => trio.includes(m.key)).map(m => getVal(team, m.pathOff) ?? 0);
+  const def = METRICS.filter(m => trio.includes(m.key)).map(m => getVal(team, m.pathDef) ?? 0);
+
+  const ctx = document.getElementById('effBarChart');
+  if (effBarChart) effBarChart.destroy();
+  effBarChart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        { label:'Offense', data: off },
+        { label:'Defense', data: def }
+      ]
+    },
+    options:{
+      responsive:true,
+      plugins:{ legend:{ labels:{ color:'#b7bec6'} } },
+      scales:{
+        x:{ ticks:{ color:'#b7bec6' }, grid:{ color:'#222' } },
+        y:{ ticks:{ color:'#b7bec6' }, grid:{ color:'#222' } }
+      }
+    }
+  });
+}
+
+// ===== Compare =====
+function renderCompare(nameA, nameB){
+  const tA = teamsByName.get(norm(nameA));
+  const tB = teamsByName.get(norm(nameB));
+  if (!tA || !tB) return;
+
+  document.getElementById('thA').textContent = displayName(tA);
+  document.getElementById('thB').textContent = displayName(tB);
+
+  const body = document.getElementById('compareBody');
+  body.innerHTML = '';
+
+  // For each stat: compute rank (already done for offense) and decide advantage
+  for (const m of METRICS){
+    const rkA = tA.__ranks?.[m.key] ?? null;
+    const rkB = tB.__ranks?.[m.key] ?? null;
+
+    const adv = decideAdvantage(rkA, rkB);
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${m.label} (Off.)</td>
+      <td>${rankCell(rkA)}</td>
+      <td>${rankCell(rkB)}</td>
+      <td>${advHtml(adv)}</td>
+    `;
+    body.appendChild(row);
+  }
+
+  // Extra: FPI head-to-head
+  const fpiA = getVal(tA, EXTRA[0].path);
+  const fpiB = getVal(tB, EXTRA[0].path);
+  const advF = Number.isFinite(fpiA) && Number.isFinite(fpiB)
+    ? (fpiA === fpiB ? 'tie' : (fpiA > fpiB ? 'A' : 'B')) : 'na';
+
+  const frow = document.createElement('tr');
+  frow.innerHTML = `
+    <td>${EXTRA[0].label}</td>
+    <td>${Number.isFinite(fpiA) ? fpiA.toFixed(EXTRA[0].decimals) : '—'}</td>
+    <td>${Number.isFinite(fpiB) ? fpiB.toFixed(EXTRA[0].decimals) : '—'}</td>
+    <td>${advHtml(advF)}</td>
+  `;
+  body.appendChild(frow);
+}
+
+function displayName(t){
+  const name = norm(t.team || t.name);
+  const rank = rankMap.get(name);
+  return rank ? `#${rank} ${name}` : name;
+}
+function rankCell(r){ return r ? `#${r}` : '—'; }
+function decideAdvantage(rA, rB){
+  if (!rA || !rB) return 'na';
+  if (rA === rB) return 'tie';
+  return (rA < rB) ? 'A' : 'B'; // smaller (closer to #1) is better
+}
+function advHtml(who){
+  if (who === 'na') return '<span class="badge-bad">n/a</span>';
+  if (who === 'tie') return '<span class="badge-good">Tie</span>';
+  return who === 'A'
+    ? '<span class="badge-good">Team A</span>'
+    : '<span class="badge-good">Team B</span>';
+}
