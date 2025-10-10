@@ -2,100 +2,507 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>CFB Pick'em — Team Dashboard</title>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
-
-  <link rel="stylesheet" href="styles.css"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CFB Analytics Dashboard</title>
 
   <!-- Chart.js (CDN) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b0e13;
+      --panel:#121722;
+      --panel-2:#0f1520;
+      --text:#e7ebf3;
+      --muted:#97a3b6;
+      --brand:#5aa7ff;
+      --brand-2:#7bffbd;
+      --danger:#ff6b6b;
+      --ok:#22c55e;
+      --warn:#f59e0b;
+      --chip:#1c2433;
+      --card:#0f1520;
+      --border:#1a2332;
+      --ring:#1f2b40;
+      --shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.02);
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 80% -10%, #142035 0%, transparent 60%) , var(--bg);
+      color:var(--text);
+      -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    }
+    .container{max-width:1200px; margin:32px auto; padding:0 16px}
+
+    .notice{
+      background:linear-gradient(180deg, #151c2b 0%, #0e1420 100%);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:12px 16px;
+      display:flex; gap:10px; align-items:center;
+      color:var(--muted);
+      box-shadow:var(--shadow);
+    }
+    .notice a{color:var(--brand); text-decoration:none; font-weight:600}
+    .badge{display:inline-flex; align-items:center; gap:8px; padding:6px 10px; background:var(--chip); border-radius:999px; font-weight:600; color:#cbd5e1}
+
+    header{
+      display:flex; align-items:end; justify-content:space-between; gap:16px;
+      margin:22px 0 14px;
+    }
+    h1{font-size:28px; margin:0; letter-spacing:.2px}
+    .sub{color:var(--muted); font-size:14px; margin-top:6px}
+
+    .toolbar{
+      display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+    }
+    .select, .search{
+      background:var(--panel);
+      border:1px solid var(--ring);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:10px;
+      outline:none;
+    }
+    .select{min-width:280px}
+    .chip{
+      font-size:13px; padding:6px 10px; border-radius:999px; background:var(--chip); color:#cbd5e1; border:1px solid var(--ring)
+    }
+
+    /* layout blocks */
+    .grid{
+      display:grid; gap:16px;
+      grid-template-columns: repeat(12, 1fr);
+    }
+    .card{
+      background:linear-gradient(180deg, var(--panel) 0%, var(--card) 100%);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:16px;
+    }
+    .card h3{
+      margin:0 0 12px; font-size:16px; font-weight:700; letter-spacing:.2px
+    }
+    .card .muted{color:var(--muted); font-size:13px}
+
+    /* summary stat tiles */
+    .stats{display:grid; grid-template-columns:repeat(6,1fr); gap:12px}
+    @media (max-width:1100px){ .stats{grid-template-columns:repeat(3,1fr)} }
+    @media (max-width:680px){ .stats{grid-template-columns:repeat(2,1fr)} }
+
+    .stat{
+      background:linear-gradient(180deg, #0e1420 0%, #0b1019 100%);
+      border:1px solid var(--ring); border-radius:14px; padding:12px 14px;
+    }
+    .stat .label{color:var(--muted); font-size:12px; letter-spacing:.35px}
+    .stat .value{font-size:22px; font-weight:800; margin-top:4px}
+    .stat .trend{font-size:12px; margin-top:6px}
+    .good{color:var(--ok)} .bad{color:var(--danger)} .neutral{color:var(--muted)}
+
+    /* compare table */
+    .compare-grid{display:grid; grid-template-columns:1.2fr .9fr .9fr .5fr; gap:10px; align-items:center}
+    .compare-grid.header{color:#a8b3c7; font-size:12px}
+    .row{
+      background:linear-gradient(180deg, #0c121d 0%, #0a0f18 100%);
+      border:1px solid var(--ring); border-radius:12px; padding:10px 12px; display:grid; gap:10px; grid-template-columns:inherit; align-items:center
+    }
+    .adv{font-weight:700; text-align:center; padding:6px 10px; border-radius:999px}
+    .adv.a{background:rgba(90,167,255,.12); color:#b7d8ff; border:1px solid rgba(90,167,255,.35)}
+    .adv.b{background:rgba(123,255,189,.12); color:#cdfde8; border:1px solid rgba(123,255,189,.35)}
+    .adv.tie{background:rgba(156,163,175,.18); color:#d1d5db; border:1px solid rgba(156,163,175,.25)}
+
+    /* chart canvas wrapper */
+    .canvas-wrap{height:340px; position:relative}
+    canvas{width:100% !important; height:100% !important}
+
+    /* footnote */
+    .foot{color:#94a3b8; font-size:12px; margin-top:12px}
+    .rank-pill{background:#19233a; border:1px solid #23314d; padding:4px 8px; border-radius:999px; font-weight:700; color:#dbeafe}
+    .flex{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+  </style>
 </head>
-<body class="dark">
+<body>
   <div class="container">
 
-    <!-- Notice -->
-    <div class="notice-bar">
-      <a href="https://dstaggs.dev/cfbranking/" target="_blank">🏈 Model Top 25 Rankings</a>
-      <span>Rankings displayed on this site are generated using Daniel Staggs’ custom BCS-style algorithmic model — they are <strong>not</strong> official AP or CFP rankings.</span>
+    <!-- Rankings notice -->
+    <div class="notice">
+      <span class="badge">🏈 Model Top 25 Rankings</span>
+      <span>Rankings shown here are from Daniel Staggs’ custom BCS-style model — not AP or CFP.</span>
+      <span class="flex" style="margin-left:auto;">
+        <a href="https://dstaggs.dev/cfbranking/" target="_blank" rel="noopener">View full rankings</a>
+      </span>
     </div>
 
-    <!-- Header -->
-    <header class="page-header">
-      <h1>Team Analytics</h1>
-      <div class="controls">
-        <label for="teamSelect">Team:</label>
-        <select id="teamSelect"></select>
-        <div id="teamBadge" class="team-badge"></div>
+    <header>
+      <div>
+        <h1>Team Analytics</h1>
+        <div id="teamHeadline" class="sub">Select a team to view its profile.</div>
+      </div>
+      <div class="toolbar">
+        <select id="teamSelect" class="select"></select>
+        <span id="headlineChips" class="flex"></span>
       </div>
     </header>
 
-    <!-- SUMMARY: stat list -->
-    <section class="section">
-      <h2 class="section-title">Team Summary</h2>
-      <div id="summaryGrid" class="summary-grid">
-        <!-- stat cards injected here -->
+    <!-- Summary metric cards -->
+    <section class="card">
+      <h3>Snapshot</h3>
+      <div id="stats" class="stats"></div>
+      <div class="foot">Note: Higher is better for PPG, Yards/Play, Success Rate, Explosiveness, and PPA (offense). For defense, lower allowed values are better.</div>
+    </section>
+
+    <!-- Charts -->
+    <section class="grid" style="margin-top:16px">
+      <div class="card" style="grid-column:span 6;">
+        <h3>Offensive Profile (Radar)</h3>
+        <div class="canvas-wrap"><canvas id="radar"></canvas></div>
+      </div>
+      <div class="card" style="grid-column:span 6;">
+        <h3>Efficiency Comparison (Bar)</h3>
+        <div class="canvas-wrap"><canvas id="bars"></canvas></div>
       </div>
     </section>
 
-    <!-- CHARTS -->
-    <section class="section">
-      <h2 class="section-title">Charts</h2>
-      <div class="charts">
-        <div class="card">
-          <div class="card-title">Offensive Profile (Radar)</div>
-          <canvas id="radarChart"></canvas>
-        </div>
-
-        <div class="card">
-          <div class="card-title">Efficiency Comparison (Bar)</div>
-          <canvas id="effBarChart"></canvas>
+    <!-- Compare tool -->
+    <section class="card" style="margin-top:16px">
+      <div class="flex" style="justify-content:space-between">
+        <h3>Compare Teams</h3>
+        <div class="flex">
+          <select id="cmpA" class="select"></select>
+          <select id="cmpB" class="select"></select>
         </div>
       </div>
+
+      <div class="compare-grid header" style="margin-top:10px; padding:0 4px">
+        <div>Metric</div><div id="cmpATitle">Team A</div><div id="cmpBTitle">Team B</div><div>Edge</div>
+      </div>
+      <div id="cmpRows" style="display:grid; gap:10px; margin-top:8px"></div>
+      <div class="foot">Values shown use offense (per-game / per-play) and defense allowed where available. Edges determined by directionality of the metric.</div>
     </section>
 
-    <!-- COMPARE -->
-    <section class="section">
-      <h2 class="section-title">Compare Teams</h2>
-      <div class="compare-controls">
-        <div class="compare-pick">
-          <label for="teamA">Team A</label>
-          <select id="teamA"></select>
-        </div>
-        <div class="compare-pick">
-          <label for="teamB">Team B</label>
-          <select id="teamB"></select>
-        </div>
-        <button id="compareBtn">Compare</button>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Stat-by-Stat Ranks & Advantage</div>
-        <div class="table-wrap">
-          <table class="table" id="compareTable">
-            <thead>
-              <tr>
-                <th>Stat</th>
-                <th id="thA">Team A</th>
-                <th id="thB">Team B</th>
-                <th>Advantage</th>
-              </tr>
-            </thead>
-            <tbody id="compareBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- FOOTER -->
-    <footer class="footer">
-      <a href="https://github.com/dstaggs-15/cfb-pickem-model" target="_blank" rel="noopener noreferrer">GitHub Repo</a>
-    </footer>
   </div>
 
-  <script src="analytics.js"></script>
+<script>
+/* ---------------------
+   CONFIG / KEY MAPPING
+----------------------*/
+
+// These are the metric keys we look for in each team object. The array items include:
+// - label shown to users
+// - list of candidate keys to pull from your JSON (we'll pick the first that exists)
+// - better: 'higher' or 'lower' to determine who has the edge in comparisons
+const METRICS = [
+  { id:'off_ppg',      label:'Off PPG',           keys:['off_ppg','ppg','points_per_game','off_points_per_game'], better:'higher', dp:2 },
+  { id:'off_ypp',      label:'Off Yards/Play',    keys:['off_ypp','yards_per_play','off_yards_per_play'],         better:'higher', dp:2 },
+  { id:'off_success',  label:'Off Success Rate',  keys:['off_success','success_rate','off_success_rate'],         better:'higher', dp:3 },
+  { id:'off_expl',     label:'Off Explosiveness', keys:['off_explosiveness','explosiveness','off_expl'],          better:'higher', dp:3 },
+  { id:'off_ppa',      label:'Off PPA',           keys:['off_ppa','ppa','off_predicted_points_added'],            better:'higher', dp:3 },
+
+  { id:'def_ppg',      label:'Def PPG Allowed',   keys:['def_ppg','points_allowed_per_game','def_points_per_game'], better:'lower', dp:2 },
+  { id:'def_ypp',      label:'Def Yards/Play',    keys:['def_ypp','yards_per_play_allowed','def_yards_per_play'],   better:'lower', dp:2 },
+  { id:'def_success',  label:'Def Success Rate',  keys:['def_success','success_rate_allowed','def_success_rate'],   better:'lower', dp:3 },
+  { id:'def_expl',     label:'Def Explosive Rate',keys:['def_explosiveness','explosiveness_allowed','def_expl'],     better:'lower', dp:3 },
+  { id:'def_ppa',      label:'Def PPA Allowed',   keys:['def_ppa','predicted_points_added_allowed','def_ppa_allowed'], better:'lower', dp:3 },
+];
+
+const RADAR_OFF_KEYS = ['off_ppg','off_ypp','off_success','off_expl','off_ppa'];
+const BAR_KEYS       = ['off_ppa','def_ppa','off_success','def_success','off_ypp','def_ypp'];
+
+/* ---------------------
+   UTILITIES
+----------------------*/
+const $ = sel => document.querySelector(sel);
+const el = (tag, cls, txt) => { const n=document.createElement(tag); if(cls) n.className=cls; if(txt!==undefined) n.textContent=txt; return n; };
+const fmt = (v, dp=2) => (v==null || isNaN(v)) ? '—' : Number(v).toFixed(dp);
+const numberOrNull = v => (v==null || isNaN(+v)) ? null : +v;
+
+function byKeyCandidates(obj, candidates){
+  for(const k of candidates){ if(k in obj && obj[k] != null) return numberOrNull(obj[k]); }
+  // also look inside nested objects if present (common shapes: obj.offense.ppa)
+  for(const k of candidates){
+    const parts = k.split('.');
+    if(parts.length>1){
+      let cur=obj;
+      for(const p of parts){ cur = (cur||{})[p]; }
+      if(cur!=null) return numberOrNull(cur);
+    }
+  }
+  return null;
+}
+
+function extractMetrics(team){
+  const out = {};
+  for(const m of METRICS){ out[m.id] = byKeyCandidates(team, m.keys); }
+  // FPI / Elo style number if present
+  out.fpi = byKeyCandidates(team, ['fpi','espn_fpi','FPI','rating','elo']);
+  return out;
+}
+
+function normalize(values){ // min-max to 0-1, ignore null
+  const xs = values.filter(v => v!=null);
+  if(!xs.length) return values.map(()=>0);
+  const min = Math.min(...xs), max = Math.max(...xs);
+  if(min===max) return values.map(v => v==null ? 0 : .5);
+  return values.map(v => v==null ? 0 : (v-min)/(max-min));
+}
+
+function cmpEdge(a, b, better){ // returns 'a' | 'b' | 'tie'
+  if(a==null && b==null) return 'tie';
+  if(a==null) return 'b';
+  if(b==null) return 'a';
+  if (Math.abs(a-b) < 1e-9) return 'tie';
+  return (better==='higher') ? (a>b?'a':'b') : (a<b?'a':'b');
+}
+
+function teamLabel(teamObj, rankMap){
+  const name = teamObj.team ?? teamObj.name ?? teamObj.Team ?? 'Unknown';
+  const r = rankMap[name];
+  return (r ? `#${r} ${name}` : name);
+}
+
+/* ---------------------
+   STATE
+----------------------*/
+let TEAMS=[], TEAM_BY_NAME={}, METRIC_CACHE={}, RANKS={}, TEAMS_SORTED=[];
+let radarChart=null, barChart=null;
+
+/* ---------------------
+   RENDER
+----------------------*/
+function renderTeamOptions(){
+  const sel = $('#teamSelect');
+  const a = $('#cmpA'); const b = $('#cmpB');
+  sel.innerHTML = ''; a.innerHTML=''; b.innerHTML='';
+
+  for(const t of TEAMS_SORTED){
+    const label = teamLabel(t,RANKS);
+    for(const s of [sel,a,b]){
+      const opt = el('option',null,label);
+      opt.value = t.team ?? t.name ?? t.Team;
+      s.appendChild(opt);
+    }
+  }
+  // default selections
+  if (TEAMS_SORTED.length){
+    sel.value = TEAMS_SORTED[0].team ?? TEAMS_SORTED[0].name ?? TEAMS_SORTED[0].Team;
+    a.value   = TEAMS_SORTED[0].team ?? TEAMS_SORTED[0].name ?? TEAMS_SORTED[0].Team;
+    if(TEAMS_SORTED[1]) b.value = TEAMS_SORTED[1].team ?? TEAMS_SORTED[1].name ?? TEAMS_SORTED[1].Team;
+  }
+}
+
+function buildHeadline(teamObj){
+  const name = teamObj.team ?? teamObj.name ?? teamObj.Team;
+  const r = RANKS[name];
+  const chips = $('#headlineChips'); chips.innerHTML='';
+
+  $('#teamHeadline').innerHTML = `
+    <span class="rank-pill">${r?`#${r}`:'NR'}</span>
+    <strong style="margin-left:6px">${name}</strong>
+  `;
+
+  const metrics = METRIC_CACHE[name];
+  if(metrics && metrics.fpi!=null){
+    chips.appendChild(el('span','chip',`FPI: ${fmt(metrics.fpi,2)}`));
+  }
+}
+
+function renderStats(teamObj){
+  const name = teamObj.team ?? teamObj.name ?? teamObj.Team;
+  const m = METRIC_CACHE[name] || {};
+  const holder = $('#stats'); holder.innerHTML='';
+
+  const defs = [
+    {label:'Off PPG',       val:m.off_ppg, dp:2},
+    {label:'Off Yds/Play',  val:m.off_ypp, dp:2},
+    {label:'Off Success',   val:m.off_success, dp:3},
+    {label:'Off Explosive', val:m.off_expl, dp:3},
+    {label:'Off PPA',       val:m.off_ppa, dp:3},
+    {label:'Def PPG (A)',   val:m.def_ppg, dp:2},
+    {label:'Def Yds/Play',  val:m.def_ypp, dp:2},
+    {label:'Def Success',   val:m.def_success, dp:3},
+    {label:'Def Explosive', val:m.def_expl, dp:3},
+    {label:'Def PPA (A)',   val:m.def_ppa, dp:3},
+    {label:'FPI',           val:m.fpi, dp:2},
+  ];
+
+  defs.forEach(d=>{
+    const card = el('div','stat');
+    const lab  = el('div','label',d.label);
+    const val  = el('div','value',fmt(d.val,d.dp));
+    card.append(lab,val);
+    holder.appendChild(card);
+  });
+}
+
+function renderCharts(teamObj){
+  const ctxR = $('#radar');
+  const ctxB = $('#bars');
+  const name = teamObj.team ?? teamObj.name ?? teamObj.Team;
+  const m = METRIC_CACHE[name];
+
+  // Radar: normalize each radar metric across all teams
+  const allForKey = k => TEAMS.map(t=>{
+    const n=t.team??t.name??t.Team; return (METRIC_CACHE[n]||{})[k] ?? null;
+  });
+
+  const radarLabels = ['PPG','Yds/Play','Success','Explosive','PPA'];
+  const radarValues = RADAR_OFF_KEYS.map(k=>{
+    const norm = normalize(allForKey(k));
+    const idx = TEAMS.findIndex(t=>(t.team??t.name??t.Team)===name);
+    return norm[idx] ?? 0;
+  });
+
+  if(radarChart){ radarChart.destroy(); }
+  radarChart = new Chart(ctxR, {
+    type:'radar',
+    data:{
+      labels:radarLabels,
+      datasets:[{
+        label:'Offense (normalized)',
+        data:radarValues,
+        fill:true,
+      }]
+    },
+    options:{
+      responsive:true,
+      scales:{ r:{ grid:{color:'#203049'}, angleLines:{color:'#203049'}, pointLabels:{color:'#aab7cc'}, suggestedMin:0, suggestedMax:1 } },
+      plugins:{ legend:{labels:{color:'#d6e1f2'}} }
+    }
+  });
+
+  // Bar: off/def efficiency trio
+  const barLabels = ['Off PPA','Def PPA (A)','Off Success','Def Success','Off YPP','Def YPP'];
+  const barValues = BAR_KEYS.map(k => (m?.[k] ?? 0));
+
+  if(barChart){ barChart.destroy(); }
+  barChart = new Chart(ctxB, {
+    type:'bar',
+    data:{
+      labels:barLabels,
+      datasets:[{ label:name, data:barValues }]
+    },
+    options:{
+      responsive:true,
+      scales:{
+        x:{ grid:{color:'#1a2332'}, ticks:{color:'#aab7cc'} },
+        y:{ grid:{color:'#1a2332'}, ticks:{color:'#aab7cc'} }
+      },
+      plugins:{ legend:{labels:{color:'#d6e1f2'}} }
+    }
+  });
+}
+
+function renderCompare(){
+  const aName = $('#cmpA').value;
+  const bName = $('#cmpB').value;
+  const aObj = TEAM_BY_NAME[aName];
+  const bObj = TEAM_BY_NAME[bName];
+  $('#cmpATitle').textContent = teamLabel(aObj, RANKS);
+  $('#cmpBTitle').textContent = teamLabel(bObj, RANKS);
+
+  const rows = $('#cmpRows'); rows.innerHTML='';
+
+  for(const m of METRICS){
+    const av = METRIC_CACHE[aName]?.[m.id] ?? null;
+    const bv = METRIC_CACHE[bName]?.[m.id] ?? null;
+    const edge = cmpEdge(av, bv, m.better);
+
+    const row = el('div','row compare-grid');
+    row.append(
+      el('div',null,m.label),
+      el('div',null,fmt(av,m.dp ?? 2)),
+      el('div',null,fmt(bv,m.dp ?? 2)),
+      (() => {
+        const pill = el('div','adv ' + (edge==='a'?'a':edge==='b'?'b':'tie'),
+          edge==='a' ? 'A' : edge==='b' ? 'B' : 'Tie'
+        );
+        return pill;
+      })()
+    );
+    rows.appendChild(row);
+  }
+}
+
+/* ---------------------
+   BOOTSTRAP
+----------------------*/
+async function loadJSON(path){
+  const res = await fetch(path, {cache:'no-store'});
+  if(!res.ok) throw new Error(`${path} ${res.status}`);
+  return res.json();
+}
+
+async function init(){
+  try{
+    const [teamStats, cfbrank] = await Promise.all([
+      loadJSON('./data/team_stats.json'),
+      loadJSON('./data/cfbrank.json')
+    ]);
+
+    // Ranks: prefer cfbrank.teams map (fast lookup), otherwise build from ranks list
+    RANKS = cfbrank?.teams ?? {};
+    if(!Object.keys(RANKS).length && Array.isArray(cfbrank?.ranks)){
+      for(const r of cfbrank.ranks){ RANKS[r.team] = r.rank; }
+    }
+
+    TEAMS = Array.isArray(teamStats) ? teamStats : (teamStats?.teams ?? []);
+    if(!Array.isArray(TEAMS) || !TEAMS.length) throw new Error('No teams found in team_stats.json');
+
+    // Normalize name + cache metrics
+    TEAMS.forEach(t=>{
+      const name = t.team ?? t.name ?? t.Team;
+      TEAM_BY_NAME[name] = t;
+      METRIC_CACHE[name] = extractMetrics(t);
+    });
+
+    // Sort options by model rank first, then name
+    TEAMS_SORTED = [...TEAMS].sort((a,b)=>{
+      const an = a.team ?? a.name ?? a.Team, bn = b.team ?? b.name ?? b.Team;
+      const ar = RANKS[an] ?? 999, br = RANKS[bn] ?? 999;
+      if (ar!==br) return ar - br;
+      return an.localeCompare(bn);
+    });
+
+    renderTeamOptions();
+
+    // initial render
+    const first = TEAMS_SORTED[0];
+    buildHeadline(first);
+    renderStats(first);
+    renderCharts(first);
+    renderCompare();
+
+    // listeners
+    $('#teamSelect').addEventListener('change', e=>{
+      const sel = e.target.value;
+      const obj = TEAM_BY_NAME[sel];
+      buildHeadline(obj);
+      renderStats(obj);
+      renderCharts(obj);
+    });
+    $('#cmpA').addEventListener('change', renderCompare);
+    $('#cmpB').addEventListener('change', renderCompare);
+
+  }catch(err){
+    console.error(err);
+    document.body.innerHTML = `
+      <div style="max-width:720px;margin:60px auto;padding:24px;border:1px solid var(--ring);
+                  border-radius:14px;background:var(--panel);color:var(--text);">
+        <h2 style="margin:0 0 8px">Couldn’t load analytics</h2>
+        <p style="color:var(--muted);margin:0 0 12px;">
+          I tried to fetch <code>./data/team_stats.json</code> and <code>./data/cfbrank.json</code> but something failed.
+        </p>
+        <pre style="white-space:pre-wrap;background:#0b111a;border:1px solid #1a2332;padding:12px;border-radius:8px; color:#cbd5e1">${err}</pre>
+      </div>`;
+  }
+}
+
+init();
+</script>
 </body>
 </html>
