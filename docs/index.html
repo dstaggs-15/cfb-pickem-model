@@ -8,32 +8,51 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* fixed top banner */
+    .notice-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: #1b1b1b;
+      color: #ddd;
+      border-bottom: 1px solid #333;
+      padding: 10px 15px;
+      font-size: 14px;
+      line-height: 1.5;
+      text-align: center;
+      z-index: 999;
+    }
+    .notice-bar a {
+      color: #4da3ff;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .notice-bar span {
+      display: block;
+      margin-top: 4px;
+      font-size: 13px;
+      color: #aaa;
+    }
+    body {
+      margin-top: 85px; /* offset for fixed banner */
+    }
+  </style>
 </head>
 <body>
-  <div class="container">
-    <!-- === NEW: Rankings link + disclaimer === -->
-    <div class="notice-bar" style="
-      background:#1b1b1b;
-      color:#ddd;
-      border-bottom:1px solid #333;
-      padding:10px 15px;
-      font-size:14px;
-      line-height:1.5;
-      text-align:center;
-      margin-bottom:10px;
-    ">
-      <a href="https://dstaggs.dev/cfbranking/" target="_blank" 
-         style="color:#4da3ff; font-weight:600; text-decoration:none;">
-         🏈 Model Top 25 Rankings
-      </a>
-      <br>
-      <span style="display:block; margin-top:4px; font-size:13px; color:#aaa;">
-        Rankings displayed on this site are generated using Daniel Staggs’ custom
-        BCS-style algorithmic model — they are <strong>not</strong> official AP or CFP rankings.
-      </span>
-    </div>
-    <!-- === END NEW SECTION === -->
+  <!-- === FIXED TOP NOTICE === -->
+  <div class="notice-bar">
+    <a href="analytics.html">📊 Team Analytics Dashboard</a> |
+    <a href="https://dstaggs.dev/cfbranking/" target="_blank">🏈 Model Top 25 Rankings</a>
+    <span>
+      Rankings displayed on this site are generated using Daniel Staggs’ custom
+      BCS-style algorithmic model — they are <strong>not</strong> official AP or CFP rankings.
+    </span>
+  </div>
+  <!-- === END NOTICE === -->
 
+  <div class="container">
     <header>
       <h1>CFB Pick'em Model</h1>
       <a class="navlink" href="results.html">Results &amp; Analytics</a>
