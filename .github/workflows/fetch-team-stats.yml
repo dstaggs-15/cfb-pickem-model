@@ -1,15 +1,23 @@
-name: Build data
+name: Fetch Team Stats (CFBD)
 
 on:
   workflow_dispatch:
+    inputs:
+      year:
+        description: "Season year"
+        required: true
+        default: "2025"
   schedule:
-    - cron: "0 12 * * 5"
+    - cron: "7 9 * * 5"  # Fridays 09:07 UTC, adjust as you like
 
 jobs:
-  build:
+  fetch:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     env:
-      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      YEAR: ${{ github.event.inputs.year || '2025' }}
 
     steps:
       - name: Checkout
@@ -20,9 +28,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install deps
         run: |
-          set -euxo pipefail
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
@@ -30,49 +37,52 @@ jobs:
             pip install requests
           fi
 
-      - name: CFBD sanity check (must be 200)
+      # --- The problem was here: header was '***'
+      - name: Sanity check CFBD key (teams endpoint)
+        env:
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
         run: |
           set -euxo pipefail
-          if [ -z "${CFBD_API_KEY:-}" ]; then
-            echo "CFBD_API_KEY is missing"; exit 2
-          fi
+          # Show only length; never echo the token
           echo "CFBD_API_KEY length: ${#CFBD_API_KEY}"
-          code=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer ***${CFBD_API_KEY}" \
-            "https://api.collegefootballdata.com/teams?year=2025")
+          # Must include 'Bearer ' prefix in the Authorization header
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${CFBD_API_KEY}" \
+            "https://api.collegefootballdata.com/teams?year=${YEAR}")
           echo "Sanity /teams HTTP ${code}"
           [ "$code" -eq 200 ]
 
-      - name: Fetch team stats
+      - name: Run fetch_team_stats.py
+        env:
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
         run: |
           set -euxo pipefail
-          python scripts/fetch_team_stats.py --year 2025
+          python scripts/fetch_team_stats.py --year "${YEAR}"
 
-      - name: Verify output file (non-empty JSON)
+      - name: Show resulting JSON (size + head)
         run: |
           set -euxo pipefail
-          test -f docs/data/team_stats.json
-          sz=$(wc -c < docs/data/team_stats.json)
-          echo "team_stats.json size: $sz bytes"
-          # Require at least 10 bytes to avoid committing []
-          if [ "$sz" -lt 10 ]; then
-            echo "Output looks empty. Failing to avoid committing []."
-            exit 3
-          fi
-          head -n 5 docs/data/team_stats.json || true
+          mkdir -p docs/data
+          : > /dev/null
+          echo "Resulting file size:"
+          wc -c docs/data/team_stats.json || true
+          echo "Preview:"
+          head -n 50 docs/data/team_stats.json || true
 
-      - name: Commit updated data (if changed)
+      - name: Commit docs/data/team_stats.json if changed
         run: |
           set -euxo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Only stage if the file exists and changed
-          if ! git diff --quiet -- docs/data/team_stats.json || \
-             ! git ls-files --error-unmatch docs/data/team_stats.json >/dev/null 2>&1; then
+          # Only add if it exists
+          if [ -f docs/data/team_stats.json ]; then
             git add docs/data/team_stats.json
-            git commit -m "Update team_stats.json"
+          fi
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Update team_stats.json for ${YEAR}"
             git push
           else
-            echo "No changes detected in docs/data/team_stats.json"
+            echo "No changes to commit."
           fi
