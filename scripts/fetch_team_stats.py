@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """
-Fetch team season and advanced stats from CFBD for all teams in docs/input/games.txt.
-Writes: docs/data/team_stats.json
+Fetch team season + advanced stats from CFBD for all teams referenced in docs/input/games.txt,
+and write them to docs/data/team_stats.json.
 
-Requires env CFBD_API_KEY = your RAW key (no 'Bearer', no '***').
+Env:
+  CFBD_API_KEY = your RAW CFBD key (no 'Bearer', no '***').
+
+Auth detail:
+  CFBD now requires the header "Authorization: Bearer ***<KEY>" (note the three asterisks).
 """
 
 import os
@@ -14,31 +18,31 @@ import sys
 import cfbd
 from cfbd.rest import ApiException
 
-
-# ---------- CONSTANTS ----------
+# ---------- paths ----------
 GAMES_FILE = "docs/input/games.txt"
 OUT_JSON = "docs/data/team_stats.json"
 CFRANK_JSON = "docs/data/cfbrank.json"
 
 
-# ---------- UTILITIES ----------
+# ---------- utils ----------
 def mask_key(k: str) -> str:
     if not k:
         return ""
+    if len(k) <= 6:
+        return "*" * len(k)
     return k[:3] + "*" * (len(k) - 6) + k[-3:]
 
 
-def die(msg, code=1):
+def die(msg: str, code: int = 1):
     print(msg, flush=True)
     sys.exit(code)
 
 
 def load_games(path: str):
-    """Parse team names from docs/input/games.txt."""
-    teams = set()
+    """Scrape team tokens from games.txt lines like 'Texas vs Oklahoma | 9/7'."""
     if not os.path.exists(path):
         return []
-
+    teams = set()
     splitter = re.compile(r"\s*(?:,|\||vs\.?|@)\s*", re.I)
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
@@ -47,14 +51,16 @@ def load_games(path: str):
                 continue
             parts = [p.strip() for p in splitter.split(raw) if p.strip()]
             for p in parts:
+                # skip obvious date/score fragments
                 if re.fullmatch(r"[0-9/:\-\s]+", p):
                     continue
                 teams.add(p)
     return sorted(teams)
 
 
-# ---------- RANKING LOADER ----------
+# ---------- cfbrank loader (robust to dict or list shapes) ----------
 def load_cfbrank(path: str) -> dict:
+    """Returns {team_name: rank} or {}."""
     if not os.path.exists(path):
         return {}
     try:
@@ -63,82 +69,100 @@ def load_cfbrank(path: str) -> dict:
         return {}
 
     ranks = {}
+
+    # Case A: dict with possible "ranks" sub-dict or numeric keys
     if isinstance(data, dict):
-        for k, v in data.items():
-            if str(k).isdigit() and isinstance(v, dict):
-                for rk, tm in v.items():
-                    try:
-                        ranks[str(tm)] = int(rk)
-                    except Exception:
-                        continue
         if "ranks" in data and isinstance(data["ranks"], dict):
             for rk, tm in data["ranks"].items():
                 try:
                     ranks[str(tm)] = int(rk)
                 except Exception:
-                    continue
+                    pass
+        # also support {"1":"Georgia","2":"Michigan",...} or {"1":{"team":"..."}}
+        for k, v in data.items():
+            if str(k).isdigit():
+                if isinstance(v, str):
+                    try:
+                        ranks[v] = int(k)
+                    except Exception:
+                        pass
+                elif isinstance(v, dict):
+                    tm = v.get("team") or v.get("Team")
+                    if tm:
+                        try:
+                            ranks[str(tm)] = int(k)
+                        except Exception:
+                            pass
+
+    # Case B: list of objects like [{"rank":1,"team":"..."}, ...]
     elif isinstance(data, list):
         for obj in data:
-            if not isinstance(obj, dict):
-                continue
-            rk = obj.get("rank") or obj.get("Rank")
-            tm = obj.get("team") or obj.get("Team")
-            try:
-                if rk and tm:
-                    ranks[str(tm)] = int(rk)
-            except Exception:
-                continue
+            if isinstance(obj, dict):
+                rk = obj.get("rank") or obj.get("Rank")
+                tm = obj.get("team") or obj.get("Team")
+                if rk is not None and tm:
+                    try:
+                        ranks[str(tm)] = int(rk)
+                    except Exception:
+                        pass
+
     return ranks
 
 
-# ---------- CFBD CLIENT ----------
+# ---------- CFBD client ----------
 def make_cfbd_client():
-    """Build a CFBD ApiClient that uses Bearer ***KEY authentication."""
+    """
+    Build an authorized cfbd.ApiClient that sends:
+        Authorization: Bearer ***<KEY>
+    where CFBD_API_KEY env var is the RAW key (no 'Bearer', no '***').
+    """
     raw_key = os.environ.get("CFBD_API_KEY", "").strip()
     if not raw_key:
-        die("[error] CFBD_API_KEY missing. Provide it as a secret or env var.")
+        die("[error] CFBD_API_KEY is missing. Set it to your RAW key (no 'Bearer', no '***').")
 
     cfg = cfbd.Configuration()
-    cfg.api_key["Authorization"] = f"***{raw_key}"  # CFBD now requires the *** prefix
+    # New requirement: three asterisks prefix lives in the api_key value
+    cfg.api_key["Authorization"] = f"***{raw_key}"
     cfg.api_key_prefix["Authorization"] = "Bearer"
 
-    print(f"[debug] Using CFBD_API_KEY (masked): {mask_key(raw_key)}")
+    print(f"[debug] CFBD_API_KEY present: True len={len(raw_key)} value(masked)={mask_key(raw_key)}")
     return cfbd.ApiClient(cfg)
 
 
-# ---------- TEAM NORMALIZATION ----------
+# ---------- team normalization ----------
 def build_name_map(teams_api, year: int):
-    """Return {alias_lower: canonical_school_name} for normalization."""
+    """Return {alias_lower: canonical_school_name} so 'OU' → 'Oklahoma' etc."""
     mapping = {}
     try:
         teams = teams_api.get_teams(year=year)
     except ApiException as e:
-        print(f"[warn] Could not fetch team list: {e}")
+        print(f"[warn] get_teams failed: {e}")
         return mapping
 
     for t in teams or []:
-        names = {t.school}
-        for alt in [t.abbreviation, t.alt_name_1, t.alt_name_2, t.alt_name_3]:
+        aliases = {t.school}
+        for alt in (t.abbreviation, t.alt_name_1, t.alt_name_2, t.alt_name_3):
             if alt:
-                names.add(alt)
-        for n in names:
-            mapping[n.lower()] = t.school
+                aliases.add(alt)
+        for a in aliases:
+            mapping[a.lower()] = t.school
     return mapping
 
 
-def normalize_team(name_map, raw):
+def normalize_team(name_map: dict, raw: str) -> str:
     return name_map.get(raw.lower().strip(), raw.strip())
 
 
-# ---------- FETCH STATS ----------
-def fetch_team(stats_api, ratings_api, team, year):
-    result = {"team": team, "year": year, "simple": {}, "advanced": {}, "fpi": None}
+# ---------- fetchers ----------
+def fetch_team(stats_api, ratings_api, team: str, year: int):
+    """Return (record_dict, unauthorized_flag)."""
+    rec = {"team": team, "year": year, "simple": {}, "advanced": {}, "fpi": None}
     unauthorized = False
 
-    # Basic stats
+    # basic team stats
     try:
-        stats = stats_api.get_team_stats(year=year, team=team)
-        for item in stats or []:
+        rows = stats_api.get_team_stats(year=year, team=team)
+        for item in rows or []:
             cat = (item.category or "overall").lower()
             stat = (item.stat_name or "").lower().replace(" ", "_")
             key = f"{cat}__{stat}"
@@ -146,43 +170,44 @@ def fetch_team(stats_api, ratings_api, team, year):
                 val = float(item.stat_value)
             except Exception:
                 val = item.stat_value
-            result["simple"][key] = val
+            rec["simple"][key] = val
     except ApiException as e:
         if e.status == 401:
             unauthorized = True
         print(f"[warn] team_stats failed for {team}: {e}")
 
-    # Advanced stats
+    # advanced season stats
     try:
         advs = stats_api.get_advanced_season_stats(year=year, team=team)
         if advs:
             adv = advs[0]
-            def flatten(prefix, node):
-                res = {}
-                if not node:
-                    return res
-                nd = node.to_dict()
-                for k, v in nd.items():
-                    if isinstance(v, dict):
-                        for subk, subv in v.items():
-                            res[f"{prefix}__{k}__{subk}"] = subv
-                    else:
-                        res[f"{prefix}__{k}"] = v
-                return res
 
-            result["advanced"].update(flatten("offense", adv.offense))
-            result["advanced"].update(flatten("defense", adv.defense))
+            def flatten(prefix, node):
+                out = {}
+                if not node:
+                    return out
+                d = node.to_dict()
+                for k, v in d.items():
+                    if isinstance(v, dict):
+                        for sk, sv in v.items():
+                            out[f"{prefix}__{k}__{sk}"] = sv
+                    else:
+                        out[f"{prefix}__{k}"] = v
+                return out
+
+            rec["advanced"].update(flatten("offense", adv.offense))
+            rec["advanced"].update(flatten("defense", adv.defense))
     except ApiException as e:
         if e.status == 401:
             unauthorized = True
         print(f"[warn] advanced stats failed for {team}: {e}")
 
-    # FPI
+    # FPI (ratings)
     try:
         fpi_rows = ratings_api.get_fpi(year=year)
         for row in fpi_rows or []:
             if row.team == team:
-                result["fpi"] = {
+                rec["fpi"] = {
                     "fpi": row.fpi,
                     "ranking": row.rank,
                     "resume_rank": getattr(row, "resume_rank", None),
@@ -193,40 +218,42 @@ def fetch_team(stats_api, ratings_api, team, year):
             unauthorized = True
         print(f"[warn] FPI failed for {team}: {e}")
 
-    return result, unauthorized
+    return rec, unauthorized
 
 
-# ---------- MAIN ----------
+# ---------- main ----------
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--year", type=int, required=True)
-    args = ap.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--year", type=int, required=True)
+    args = parser.parse_args()
 
-    games = load_games(GAMES_FILE)
-    if not games:
+    teams_raw = load_games(GAMES_FILE)
+    if not teams_raw:
         die(f"[error] No teams found in {GAMES_FILE}.", 2)
 
-    print(f"[info] Found {len(games)} raw team entries in games.txt")
+    print(f"[info] discovered {len(teams_raw)} team tokens from {GAMES_FILE}")
 
     client = make_cfbd_client()
     stats_api = cfbd.StatsApi(client)
     ratings_api = cfbd.RatingsApi(client)
     teams_api = cfbd.TeamsApi(client)
 
+    # normalize team names to CFBD canonical form
     name_map = build_name_map(teams_api, args.year)
-    teams = sorted({normalize_team(name_map, t) for t in games})
-    print(f"[info] Normalized to {len(teams)} valid team names.")
+    teams = sorted({normalize_team(name_map, t) for t in teams_raw})
+    print(f"[info] normalized to {len(teams)} CFBD team names")
     for t in teams:
-        print("  -", t)
+        print(f"  - {t}")
 
+    # optional model ranks
     ranks = load_cfbrank(CFRANK_JSON)
 
-    data = []
+    out = []
     unauthorized_count = 0
     nonempty_count = 0
 
     for team in teams:
-        print(f"[info] Fetching {team} stats...")
+        print(f"[info] fetching {team} ({args.year})")
         rec, unauth = fetch_team(stats_api, ratings_api, team, args.year)
         if unauth:
             unauthorized_count += 1
@@ -234,18 +261,18 @@ def main():
             nonempty_count += 1
         if team in ranks:
             rec["model_rank"] = ranks[team]
-        data.append(rec)
+        out.append(rec)
 
     if unauthorized_count == len(teams):
-        die("[error] All API calls unauthorized — fix CFBD_API_KEY formatting.", 4)
+        die("[error] All requests returned 401 Unauthorized. Your CFBD API key is missing/invalid or formatted incorrectly. In GitHub Secrets store the RAW key (no 'Bearer').", 4)
     if nonempty_count == 0:
-        die("[error] No data returned for any team.", 5)
+        die("[error] No data returned for any team. Aborting to avoid writing [].", 5)
 
     os.makedirs(os.path.dirname(OUT_JSON), exist_ok=True)
     with open(OUT_JSON, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+        json.dump(out, f, indent=2)
 
-    print(f"[ok] Wrote {OUT_JSON} with {len(data)} teams ({nonempty_count} with real data)")
+    print(f"[ok] wrote {OUT_JSON} with {len(out)} teams ({nonempty_count} with real data)")
 
 
 if __name__ == "__main__":
