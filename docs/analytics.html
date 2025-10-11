@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>College Team Analytics – Compare & Explore</title>
+<title>College Team Analytics – CFBD Live</title>
 <style>
   :root{
     --bg:#0b111a;--panel:#0f1621;--muted:#95a3b8;--text:#e6edf3;
-    --border:#1e2633;--brand:#4aa9ff;--good:#2dd4bf;--bad:#f43f5e;
-    --warn:#f59e0b;--radius:14px
+    --border:#1e2633;--brand:#4aa9ff;--accent:#9b59ff;--good:#2dd4bf;--bad:#f43f5e;
+    --radius:14px
   }
   *{box-sizing:border-box}
   body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#0b1220,transparent),radial-gradient(900px 500px at 100% 0%,#071422,transparent),var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
@@ -16,17 +16,18 @@
   .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
   h1{font-size:26px;margin:0 0 10px}
   .pill{background:#0b1420;border:1px solid var(--border);padding:4px 10px;border-radius:999px;color:#cbd5e1;font-size:12px}
-  select{appearance:none;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 12px;min-width:220px}
+  select,input,button{appearance:none;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 12px}
+  button{cursor:pointer}
   .card{background:linear-gradient(180deg,rgba(255,255,255,.02),transparent),var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
   .grid{display:grid;gap:16px}
   .grid-2{grid-template-columns:1fr 1fr}
-  .grid-3{grid-template-columns:1fr 1fr 1fr}
-  @media (max-width:1000px){.grid-2,.grid-3{grid-template-columns:1fr}}
-  .error{background:#2a1320;border:1px solid #5c1e34;color:#ffd1da;padding:10px 12px;border-radius:10px;margin-bottom:12px;display:none;white-space:pre-wrap}
+  @media (max-width:1000px){.grid-2{grid-template-columns:1fr}}
+  .error{background:#2a1320;border:1px solid #5c1e34;color:#ffd1da;padding:10px 12px;border-radius:10px;margin-bottom:12px;white-space:pre-wrap;display:none}
+  .info{background:#112333;border:1px solid #214a5e;color:#c9f1ff;padding:10px 12px;border-radius:10px;margin-top:8px}
   .svgbox{width:100%; height:360px; border:1px solid var(--border); border-radius:12px; background:rgba(255,255,255,.01); display:flex; align-items:center; justify-content:center}
   .legend{display:flex;gap:12px;align-items:center;font-size:12px;color:#a9b4c2;margin-top:8px}
   .dot{width:10px;height:10px;border-radius:50%}
-  .dot.a{background:#4aa9ff}.dot.b{background:#9b59ff}
+  .dot.a{background:var(--brand)}.dot.b{background:var(--accent)}
   .statgrid{display:grid;gap:10px;grid-template-columns:repeat(4,minmax(180px,1fr))}
   @media (max-width:1100px){.statgrid{grid-template-columns:repeat(2,minmax(180px,1fr))}}
   .stat{border:1px solid var(--border);border-radius:12px;padding:10px;background:rgba(255,255,255,.02);min-height:74px}
@@ -36,34 +37,40 @@
   table{width:100%;border-collapse:collapse}
   th,td{border-bottom:1px solid var(--border);padding:8px 10px;text-align:left}
   th{color:#c8d2e0;font-weight:600}
-  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .search{flex:1;min-width:200px}
-  input[type="search"]{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#0e1520;color:var(--text)}
-  .note{color:#95a3b8;font-size:12px;margin-top:10px}
+  .toolbar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+  .toolbar > div{display:flex;flex-direction:column;gap:6px}
+  .grow{flex:1}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Team Analytics <span class="pill">No-CDN</span> <span class="pill">Comprehensive</span></h1>
+  <h1>Team Analytics <span class="pill">CFBD Live</span> <span class="pill">Compare & Explore</span></h1>
 
   <div id="errorBox" class="error"></div>
 
   <div class="card">
     <div class="toolbar">
+      <div class="grow">
+        <label>CFBD API Key</label>
+        <input id="apiKey" placeholder="Paste your CFBD key (stored locally)" />
+      </div>
       <div>
-        <label>Team A</label><br/>
+        <label>Season</label>
+        <select id="year"></select>
+      </div>
+      <div>
+        <label>Team A</label>
         <select id="teamA"></select>
       </div>
       <div>
-        <label>Team B (compare)</label><br/>
+        <label>Team B (compare)</label>
         <select id="teamB"></select>
       </div>
-      <div class="search">
-        <label>Filter teams</label>
-        <input id="filterBox" type="search" placeholder="Type to filter by school name…"/>
+      <div>
+        <button id="reload">Reload from CFBD</button>
       </div>
-      <span class="note">Paste your raw JSON in the block at the bottom. The picks update instantly.</span>
     </div>
+    <div class="info">Tip: pick any two teams to compare. Advanced metrics auto-fill when CFBD provides them; if not, we still compute what we can from season totals.</div>
   </div>
 
   <div class="grid grid-2" style="margin-top:16px">
@@ -95,7 +102,7 @@
   <div class="card" style="margin-top:16px">
     <h3>Snapshot – Key Stats</h3>
     <div id="snap" class="statgrid"></div>
-    <div class="note">Gray entries mean a value couldn’t be computed from your JSON fields.</div>
+    <div class="info">Gray entries mean a value couldn’t be computed or wasn’t returned by CFBD for that team/year.</div>
   </div>
 
   <div class="card" style="margin-top:16px">
@@ -109,79 +116,239 @@
   </div>
 </div>
 
-<!-- ==== PASTE YOUR RAW JSON ARRAY BELOW (comments ok, trailing commas ok) ==== -->
-<script id="teams-json" type="text/plain">
-[
-  {
-    "team":"Alabama","year":2025,
-    "simple":{
-      "overall__games":5,
-      "overall__netpassingyards":1627,"overall__rushingyards":634,
-      "overall__passattempts":176,"overall__rushattempts":163,
-      "overall__netpassingyardsopponent":652,"overall__rushingyardsopponent":778,
-      "overall__firstdowns":119,"overall__firstdownsopponent":77,
-      "overall__turnovers":1,"overall__turnoversopponent":9,
-      "overall__penalties":27,"overall__penaltyyards":228,
-      "overall__possessiontime":9947
-    },
-    "advanced":{
-      "offense":{"plays":339,"ppa":0.37535891410422856,"successRate":0.471976401179941,"explosiveness":1.398429456846684},
-      "defense":{"plays":272,"ppa":0.12060085388961003,"successRate":0.39705882352941174,"explosiveness":1.2869135990231348}
-    },
-    "fpi":{"fpi":23.452}
-  },
-  {
-    "team":"Georgia","year":2025,
-    "simple":{
-      "overall__games":5,
-      "overall__netpassingyards":1480,"overall__rushingyards":790,
-      "overall__passattempts":170,"overall__rushattempts":188,
-      "overall__netpassingyardsopponent":720,"overall__rushingyardsopponent":650,
-      "overall__firstdowns":113,"overall__firstdownsopponent":81,
-      "overall__turnovers":3,"overall__turnoversopponent":7,
-      "overall__penalties":22,"overall__penaltyyards":205,
-      "overall__possessiontime":10120
-    },
-    "advanced":{
-      "offense":{"plays":358,"ppa":0.345,"successRate":0.462,"explosiveness":1.33},
-      "defense":{"plays":300,"ppa":0.145,"successRate":0.402,"explosiveness":1.25}
-    },
-    "fpi":{"fpi":22.1}
-  }
-]
-</script>
-
 <script>
 (function(){
+  // ----------- UI helpers -----------
   const $ = id => document.getElementById(id);
   const err = $("errorBox");
-  const RAW = $("teams-json").textContent;
+  const showErr = (msg) => { err.textContent = msg; err.style.display = "block"; };
+  const clearErr = () => { err.style.display = "none"; err.textContent = ""; };
 
-  // ---------- Utilities ----------
+  // ----------- CFBD API ----------------
+  const CFBD = {
+    base: "https://api.collegefootballdata.com",
+    key: "",
+    headers(){ return { "Authorization":"Bearer "+CFBD.key }; },
+    async json(path, params={}){
+      const url = new URL(CFBD.base + path);
+      Object.entries(params).forEach(([k,v])=> (v!==undefined && v!==null) && url.searchParams.append(k, v));
+      const res = await fetch(url, { headers: CFBD.headers() });
+      if(!res.ok) throw new Error(`CFBD ${res.status}: ${await res.text()}`);
+      return res.json();
+    },
+    // FBS teams list
+    listTeams(year){ return CFBD.json("/teams/fbs",{ year }); },
+    // Season aggregate “simple” stats (rushing, passing, downs, penalties, turnovers, etc.)
+    seasonStats(year, team){ return CFBD.json("/stats/season", { year, team }); },
+    // Advanced: Points per Play (PPA) offense/defense (team aggregate)
+    ppaTeam(year, team){ return CFBD.json("/metrics/ppa/teams", { year, team, excludeGarbageTime: true }); },
+    // Advanced: Success Rate (team)
+    successTeam(year, team){ return CFBD.json("/metrics/success/teams", { year, team, excludeGarbageTime: true }); },
+    // Advanced: Explosiveness (team)
+    explosiveTeam(year, team){ return CFBD.json("/metrics/explosiveness/teams", { year, team, excludeGarbageTime: true }); },
+    // FPI / SP+ equivalents aren’t in CFBD; leaving a hook:
+    fpiTeam(year, team){ return Promise.resolve(null); }
+  };
+
+  // ----------- Years -----------
+  const thisYear = new Date().getFullYear();
+  const years = Array.from({length: 25}, (_,i)=> thisYear - i); // last 25 seasons
+  $("year").innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join("");
+  $("year").value = thisYear;
+
+  // Persist API key locally
+  $("apiKey").value = localStorage.getItem("cfbd_api_key") || "";
+  const saveKey = () => { localStorage.setItem("cfbd_api_key", $("apiKey").value.trim()); };
+  $("apiKey").addEventListener("change", saveKey);
+
+  // Data cache (per year)
+  const CACHE = {}; // { [year]: { teams:[{school,...}], teamData: { [team]: mergedObj } } }
+
+  // ----------- Formatting helpers -----------
   const fmt = (n,d=3) => (n==null||isNaN(n)) ? "—" : Number(n).toFixed(d);
   const pct = n => (n==null||isNaN(n)) ? "—" : (n*100).toFixed(1)+"%";
-  const secToClock = s => isFinite(s)? new Date(s*1000).toISOString().substr(11,8) : "—";
-  function sanitizeJSON(text){
-    return text.replace(/\/\*[\s\S]*?\*\//g,"").replace(/(^|[^:])\/\/.*$/gm,"$1").replace(/,\s*([}\]])/g,"$1").trim();
-  }
-  function safeParse(text){
-    const clean = sanitizeJSON(text);
-    try{ return JSON.parse(clean); }
-    catch(e){ err.style.display="block"; err.textContent="JSON parse error: "+e.message; return []; }
+  const secToClock = s => (s==null||!isFinite(s)) ? "—" : new Date(s*1000).toISOString().substr(11,8);
+
+  // Pull safe numeric
+  const num = v => (typeof v === "number" && isFinite(v)) ? v : null;
+
+  // Build our canonical data shape from CFBD responses
+  async function loadTeam(year, teamName){
+    const y = String(year);
+    if(!CACHE[y]) CACHE[y] = { teams: [], teamData: {} };
+    if(CACHE[y].teamData[teamName]) return CACHE[y].teamData[teamName];
+
+    // Fetch in parallel; tolerate failures
+    const tasks = [
+      CFBD.seasonStats(year, teamName).catch(()=>[]),
+      CFBD.ppaTeam(year, teamName).catch(()=>[]),
+      CFBD.successTeam(year, teamName).catch(()=>[]),
+      CFBD.explosiveTeam(year, teamName).catch(()=>[]),
+      CFBD.fpiTeam(year, teamName).catch(()=>null),
+    ];
+    const [season, ppa, succ, expl, fpi] = await Promise.all(tasks);
+
+    // CFBD /stats/season returns an array; we’ll merge interesting fields
+    // We sum “offense” rows to get totals; many fields are already totals.
+    const sRow = Array.isArray(season) ? season.find(r=>r.team === teamName) || season[0] : null;
+
+    // Build “simple”
+    const simple = {
+      games: num(sRow?.games),
+      passYds: num(sRow?.passingYards),
+      rushYds: num(sRow?.rushingYards),
+      passAtt: num(sRow?.passingAttempts),
+      rushAtt: num(sRow?.rushingAttempts),
+      oppPassYds: num(sRow?.opponentPassingYards),
+      oppRushYds: num(sRow?.opponentRushingYards),
+      firstDowns: num(sRow?.firstDowns),
+      oppFirstDowns: num(sRow?.opponentFirstDowns),
+      turnovers: num(sRow?.turnovers),
+      takeaways: num(sRow?.takeaways),
+      penalties: num(sRow?.penalties),
+      penaltyYds: num(sRow?.penaltyYards),
+      timePossSeconds: num(sRow?.timeOfPossession), // CFBD returns seconds
+      totalYds: num(sRow?.totalYards),
+      oppTotalYds: num(sRow?.opponentTotalYards),
+      plays: num(sRow?.plays),
+      oppPlays: num(sRow?.opponentPlays)
+    };
+
+    // Advanced merges (normalize common shape)
+    const adv = { offense:{}, defense:{} };
+
+    // PPA
+    const ppaRow = Array.isArray(ppa) ? ppa.find(r=>r.team === teamName) : null;
+    if(ppaRow){
+      adv.offense.ppa = num(ppaRow?.offense?.overall?.ppa);
+      adv.defense.ppa = num(ppaRow?.defense?.overall?.ppa);
+      adv.offense.plays = num(ppaRow?.offense?.overall?.plays) ?? simple.plays;
+      adv.defense.plays = num(ppaRow?.defense?.overall?.plays) ?? simple.oppPlays;
+    }
+
+    // Success Rate
+    const sRow2 = Array.isArray(succ) ? succ.find(r=>r.team === teamName) : null;
+    if(sRow2){
+      adv.offense.successRate = num(sRow2?.offense?.overall?.successRate);
+      adv.defense.successRate = num(sRow2?.defense?.overall?.successRate);
+    }
+
+    // Explosiveness
+    const eRow = Array.isArray(expl) ? expl.find(r=>r.team === teamName) : null;
+    if(eRow){
+      adv.offense.explosiveness = num(eRow?.offense?.overall?.explosiveness);
+      adv.defense.explosiveness = num(eRow?.defense?.overall?.explosiveness);
+    }
+
+    const out = {
+      team: teamName,
+      year,
+      simple: {
+        overall__games: simple.games,
+        overall__netpassingyards: simple.passYds,
+        overall__rushingyards: simple.rushYds,
+        overall__passattempts: simple.passAtt,
+        overall__rushattempts: simple.rushAtt,
+        overall__netpassingyardsopponent: simple.oppPassYds,
+        overall__rushingyardsopponent: simple.oppRushYds,
+        overall__firstdowns: simple.firstDowns,
+        overall__firstdownsopponent: simple.oppFirstDowns,
+        overall__turnovers: simple.turnovers,
+        overall__turnoversopponent: simple.takeaways,
+        overall__penalties: simple.penalties,
+        overall__penaltyyards: simple.penaltyYds,
+        overall__possessiontime: simple.timePossSeconds,
+        overall__totalyards: simple.totalYds,
+        overall__totalyardsopponent: simple.oppTotalYds,
+        overall__plays: simple.plays,
+        overall__playsopponent: simple.oppPlays
+      },
+      advanced: adv,
+      fpi: fpi || null
+    };
+
+    CACHE[y].teamData[teamName] = out;
+    return out;
   }
 
-  // ---------- Data helpers ----------
-  function get(simple, key){ const v = simple?.[key]; return typeof v==="number" ? v : null; }
-  function totalYards(simple){ return get(simple,"overall__totalyards") ?? (get(simple,"overall__netpassingyards")??0)+(get(simple,"overall__rushingyards")??0); }
-  function totalYardsOpp(simple){ return get(simple,"overall__totalyardsopponent") ?? (get(simple,"overall__netpassingyardsopponent")??0)+(get(simple,"overall__rushingyardsopponent")??0); }
-  function playsOff(t){ return t?.advanced?.offense?.plays ?? ((get(t.simple,"overall__passattempts")??0)+(get(t.simple,"overall__rushattempts")??0) || null); }
-  function playsDef(t){ return t?.advanced?.defense?.plays ?? ((get(t.simple,"overall__passattemptsopponent")??0)+(get(t.simple,"overall__rushattemptsopponent")??0) || null); }
-  function perGame(v,g){ return (v!=null && g>0) ? v/g : null; }
+  async function loadTeamsForYear(year){
+    clearErr();
+    const y = String(year);
+    if(CACHE[y]?.teams?.length) return CACHE[y].teams;
 
-  // Build metric list (name, getter, description)
+    const list = await CFBD.listTeams(year);
+    // CFBD returns [{school, conference, logos, ...}]
+    CACHE[y] = CACHE[y] || { teams: [], teamData: {} };
+    CACHE[y].teams = list.map(t=>({ school: t.school, conference: t.conference || "" }))
+                         .sort((a,b)=> a.school.localeCompare(b.school));
+    return CACHE[y].teams;
+  }
+
+  // ----------- Charts (same as before) -----------
+  function el(name, attrs={}, children=[]){
+    const n=document.createElementNS("http://www.w3.org/2000/svg",name);
+    Object.entries(attrs).forEach(([k,v])=> n.setAttribute(k,v));
+    children.forEach(c=> n.appendChild(c));
+    return n;
+  }
+  function clear(node){ while(node.firstChild) node.removeChild(node.firstChild); }
+  function barChartDual(node, labels, A, B){
+    clear(node);
+    const w=node.clientWidth||640, h=node.clientHeight||360, pad={l:80,r:20,t:24,b:44};
+    const svg=el("svg",{width:w,height:h,viewBox:`0 0 ${w} ${h}`});
+    const gw=w-pad.l-pad.r, gh=h-pad.t-pad.b;
+    const max=Math.max(0.001, ...A.map(v=>Math.abs(v||0)), ...B.map(v=>Math.abs(v||0)));
+    svg.appendChild(el("rect",{x:pad.l,y:pad.t,width:gw,height:gh,fill:"none",stroke:"#223045"}));
+    const band=gw/labels.length;
+    const bw=band*0.36;
+    labels.forEach((lab,i)=>{
+      const x=pad.l+band*i;
+      const vA=A[i]??0, vB=B[i]??0;
+      const hA=(Math.abs(vA)/max)*(gh*0.9), hB=(Math.abs(vB)/max)*(gh*0.9);
+      const yA=pad.t+gh-hA, yB=pad.t+gh-hB;
+      svg.appendChild(el("rect",{x:x+band*0.5-bw-3,y:yA,width:bw,height:hA,fill:"var(--brand)"}));
+      svg.appendChild(el("rect",{x:x+band*0.5+3,y:yB,width:bw,height:hB,fill:"var(--accent)"}));
+      svg.appendChild(el("text",{x:x+band*0.5,y:pad.t+gh+16,fill:"#a9b4c2","text-anchor":"middle","font-size":"11"},[document.createTextNode(lab)]));
+    });
+    node.appendChild(svg);
+  }
+  function radarDual(node, labels, valsA, valsB, colorA="var(--brand)", colorB="var(--accent)"){
+    clear(node);
+    const w=node.clientWidth||640,h=node.clientHeight||360,cx=w/2,cy=h/2,r=Math.min(w,h)/2-28,rings=4;
+    const svg=el("svg",{width:w,height:h,viewBox:`0 0 ${w} ${h}`});
+    for(let k=1;k<=rings;k++){
+      const rr=(r/rings)*k, pts=[];
+      for(let i=0;i<labels.length;i++){
+        const a=(Math.PI*2/labels.length)*i - Math.PI/2;
+        pts.push(`${cx+rr*Math.cos(a)},${cy+rr*Math.sin(a)}`);
+      }
+      svg.appendChild(el("polygon",{points:pts.join(" "),fill:"none",stroke:"#223045"}));
+    }
+    for(let i=0;i<labels.length;i++){
+      const a=(Math.PI*2/labels.length)*i - Math.PI/2;
+      svg.appendChild(el("line",{x1:cx,y1:cy,x2:cx+r*Math.cos(a),y2:cy+r*Math.sin(a),stroke:"#223045"}));
+      const lx=cx+(r+14)*Math.cos(a), ly=cy+(r+14)*Math.sin(a);
+      svg.appendChild(el("text",{x:lx,y:ly,fill:"#a9b4c2","font-size":"11","text-anchor": Math.cos(a)>0.1?"start":(Math.cos(a)<-0.1?"end":"middle"),"dominant-baseline":"middle"},[document.createTextNode(labels[i])]));
+    }
+    function poly(vals,color){
+      const pts=vals.map((v,i)=>{ const a=(Math.PI*2/vals.length)*i - Math.PI/2; const rr=r*Math.max(0,Math.min(1,v)); return `${cx+rr*Math.cos(a)},${cy+rr*Math.sin(a)}`; }).join(" ");
+      svg.appendChild(el("polygon",{points:pts,fill:color+"30",stroke:color,"stroke-width":"2"}));
+    }
+    poly(valsA,colorA); poly(valsB,colorB);
+    node.appendChild(svg);
+  }
+
+  // ----------- Metrics & rendering -----------
+  function get(simple, key){ return num(simple?.[key]) }
+  function totalYards(s){ return get(s,"overall__totalyards") ?? ((get(s,"overall__netpassingyards")||0)+(get(s,"overall__rushingyards")||0)); }
+  function totalYardsOpp(s){ return get(s,"overall__totalyardsopponent") ?? ((get(s,"overall__netpassingyardsopponent")||0)+(get(s,"overall__rushingyardsopponent")||0)); }
+  function playsOff(t){ return num(t?.advanced?.offense?.plays) ?? get(t.simple,"overall__plays") ?? ((get(t.simple,"overall__passattempts")||0)+(get(t.simple,"overall__rushattempts")||0)); }
+  function playsDef(t){ return num(t?.advanced?.defense?.plays) ?? get(t.simple,"overall__playsopponent") ?? ((get(t.simple,"overall__passattemptsopponent")||0)+(get(t.simple,"overall__rushattemptsopponent")||0)); }
+  const perGame = (v,g) => (v!=null && g>0) ? v/g : null;
+
   const METRICS = [
-    ["Points per Play (Offense)", t => t?.advanced?.offense?.ppa ?? null, "From advanced offense: points added per play."],
-    ["Success Rate (Offense)", t => t?.advanced?.offense?.successRate ?? null, "Share of plays that keep the drive on schedule."],
+    ["Points per Play (Offense)", t => t?.advanced?.offense?.ppa ?? null, "From CFBD PPA team metrics."],
+    ["Success Rate (Offense)", t => t?.advanced?.offense?.successRate ?? null, "Share of plays keeping the drive on schedule."],
     ["Explosiveness (Offense)", t => t?.advanced?.offense?.explosiveness ?? null, "How big the gains are when a play hits."],
     ["Yards per Play (Offense)", t => { const ty=totalYards(t.simple), p=playsOff(t); return (ty!=null&&p)? ty/p : null }, "Total yards divided by offensive plays."],
 
@@ -203,188 +370,125 @@
     ["Penalty Yards per Game", t => perGame(get(t.simple,"overall__penaltyyards"), t?.simple?.overall__games ?? 0), "Penalty yards per game."]
   ];
 
-  // ---------- Parse & state ----------
-  let TEAMS = safeParse(RAW);
-  if (!Array.isArray(TEAMS) || !TEAMS.length){
-    err.style.display="block"; err.textContent="No teams found. Paste a JSON array (each item must have at least { team, simple or advanced }).";
-    TEAMS = [];
+  // Normalize maxima for radar scaling (per year, across loaded teams so far)
+  function computeMaxima(dataset){
+    return dataset.reduce((m,t)=>{
+      const off=t?.advanced?.offense||{}, def=t?.advanced?.defense||{};
+      const ypp = (()=>{ const ty=totalYards(t.simple), p=playsOff(t); return (ty!=null&&p)? ty/p : 0; })();
+      const yppa=(()=>{ const ty=totalYardsOpp(t.simple), p=playsDef(t); return (ty!=null&&p)? ty/p : 0; })();
+      m.opp = Math.max(m.opp, off.ppa??0);
+      m.osr = Math.max(m.osr, off.successRate??0);
+      m.oex = Math.max(m.oex, off.explosiveness??0);
+      m.oyp = Math.max(m.oyp, ypp||0);
+      m.dpp = Math.max(m.dpp, def.ppa??0);
+      m.dsr = Math.max(m.dsr, def.successRate??0);
+      m.dex = Math.max(m.dex, def.explosiveness??0);
+      m.dyp = Math.max(m.dyp, yppa||0);
+      return m;
+    },{opp:0,osr:0,oex:0,oyp:0,dpp:0,dsr:0,dex:0,dyp:0});
+  }
+  const norm = (v,max) => Math.min(1,(v||0)/(max||1));
+
+  // ----- Populate team selects & render -----
+  const sYear = $("year"), sA = $("teamA"), sB = $("teamB"), btnReload = $("reload");
+
+  async function populateTeams(){
+    try{
+      clearErr();
+      CFBD.key = ($("apiKey").value || "").trim();
+      if(!CFBD.key){ showErr("Please paste your CFBD API key first."); return; }
+      const year = sYear.value;
+      const teams = await loadTeamsForYear(year);
+      const opts = teams.map(t=>`<option value="${t.school}">${t.school}</option>`).join("");
+      sA.innerHTML = opts; sB.innerHTML = opts;
+      if(teams.length){ sA.value = teams[0].school; sB.value = teams[1]?.school || teams[0].school; }
+      await render();
+    }catch(e){ showErr(e.message); }
   }
 
-  // Build selects
-  const sA = $("teamA"), sB = $("teamB");
-  function populateSelects(list){
-    [sA,sB].forEach(s=>{ s.innerHTML=""; list.forEach(t=>{ const o=document.createElement("option"); o.value=t.team; o.textContent=t.team; s.appendChild(o); }); });
-    if (list[0]) sA.value = list[0].team;
-    if (list[1]) sB.value = list[1].team; else sB.value = list[0]?.team || "";
-  }
-  populateSelects(TEAMS);
+  async function render(){
+    try{
+      clearErr();
+      CFBD.key = ($("apiKey").value || "").trim();
+      if(!CFBD.key){ showErr("Please paste your CFBD API key first."); return; }
+      const year = sYear.value;
+      const teamA = sA.value, teamB = sB.value;
 
-  // Filter
-  $("filterBox").addEventListener("input", e=>{
-    const q = e.target.value.toLowerCase();
-    const filtered = TEAMS.filter(t=> t.team.toLowerCase().includes(q));
-    populateSelects(filtered.length? filtered : TEAMS);
-    render();
-  });
+      // Load both teams (and keep a growing pool to scale the radar more meaningfully)
+      const [A,B] = await Promise.all([loadTeam(year, teamA), loadTeam(year, teamB)]);
+      // Include every team we've loaded this session for maxima
+      const loaded = Object.values(CACHE[String(year)].teamData);
+      const MAX = computeMaxima(loaded);
 
-  // ---------- SVG helpers ----------
-  function el(name, attrs={}, children=[]){
-    const n=document.createElementNS("http://www.w3.org/2000/svg",name);
-    Object.entries(attrs).forEach(([k,v])=> n.setAttribute(k,v));
-    children.forEach(c=> n.appendChild(c));
-    return n;
-  }
-  function clear(node){ while(node.firstChild) node.removeChild(node.firstChild); }
+      // Spiders
+      const calcYPP = t => { const ty=totalYards(t.simple), p=playsOff(t); return (ty!=null&&p)? ty/p : 0; };
+      const calcYPPD= t => { const ty=totalYardsOpp(t.simple), p=playsDef(t); return (ty!=null&&p)? ty/p : 0; };
 
-  function barChartDual(node, labels, A, B){
-    clear(node);
-    const w=node.clientWidth, h=node.clientHeight, pad={l:70,r:20,t:24,b:40};
-    const svg=el("svg",{width:w,height:h,viewBox:`0 0 ${w} ${h}`});
-    const gw=w-pad.l-pad.r, gh=h-pad.t-pad.b;
-    const max=Math.max(0.001, ...A.map((v,i)=>Math.abs(v||0)), ...B.map((v,i)=>Math.abs(v||0)));
-    svg.appendChild(el("rect",{x:pad.l,y:pad.t,width:gw,height:gh,fill:"none",stroke:"#223045"}));
-    const band=gw/labels.length;
-    const bw=band*0.36;
-    labels.forEach((lab,i)=>{
-      const x=pad.l+band*i;
-      const vA=A[i]??0, vB=B[i]??0;
-      const hA=(Math.abs(vA)/max)*(gh*0.9), hB=(Math.abs(vB)/max)*(gh*0.9);
-      const yA=pad.t+gh-hA, yB=pad.t+gh-hB;
-      svg.appendChild(el("rect",{x:x+band*0.5-bw-3,y:yA,width:bw,height:hA,fill:"#4aa9ff"}));
-      svg.appendChild(el("rect",{x:x+band*0.5+3,y:yB,width:bw,height:hB,fill:"#9b59ff"}));
-      svg.appendChild(el("text",{x:x+band*0.5,y:pad.t+gh+14,fill:"#a9b4c2","text-anchor":"middle","font-size":"11"},[document.createTextNode(lab)]));
-    });
-    node.appendChild(svg);
-  }
+      const AoffRaw = [A?.advanced?.offense?.ppa, A?.advanced?.offense?.successRate, A?.advanced?.offense?.explosiveness, calcYPP(A)];
+      const BoffRaw = [B?.advanced?.offense?.ppa, B?.advanced?.offense?.successRate, B?.advanced?.offense?.explosiveness, calcYPP(B)];
+      const Aoff = [norm(AoffRaw[0],MAX.opp), norm(AoffRaw[1],MAX.osr), norm(AoffRaw[2],MAX.oex), norm(AoffRaw[3],MAX.oyp)];
+      const Boff = [norm(BoffRaw[0],MAX.opp), norm(BoffRaw[1],MAX.osr), norm(BoffRaw[2],MAX.oex), norm(BoffRaw[3],MAX.oyp)];
+      radarDual($("offRadar"), ["Points/Play","Success","Explosiveness","Yards/Play"], Aoff, Boff);
 
-  function radarDual(node, labels, valsA, valsB, colorA="#4aa9ff", colorB="#9b59ff"){
-    clear(node);
-    const w=node.clientWidth,h=node.clientHeight,cx=w/2,cy=h/2,r=Math.min(w,h)/2-28,rings=4;
-    const svg=el("svg",{width:w,height:h,viewBox:`0 0 ${w} ${h}`});
-    // grid
-    for(let k=1;k<=rings;k++){
-      const rr=(r/rings)*k, poly=[];
-      for(let i=0;i<labels.length;i++){
-        const a=(Math.PI*2/labels.length)*i - Math.PI/2;
-        poly.push(`${cx+rr*Math.cos(a)},${cy+rr*Math.sin(a)}`);
-      }
-      svg.appendChild(el("polygon",{points:poly.join(" "),fill:"none",stroke:"#223045"}));
-    }
-    for(let i=0;i<labels.length;i++){
-      const a=(Math.PI*2/labels.length)*i - Math.PI/2;
-      svg.appendChild(el("line",{x1:cx,y1:cy,x2:cx+r*Math.cos(a),y2:cy+r*Math.sin(a),stroke:"#223045"}));
-      const lx=cx+(r+14)*Math.cos(a), ly=cy+(r+14)*Math.sin(a);
-      svg.appendChild(el("text",{x:lx,y:ly,fill:"#a9b4c2","font-size":"11","text-anchor": Math.cos(a)>0.1?"start":(Math.cos(a)<-0.1?"end":"middle"),"dominant-baseline":"middle"},[document.createTextNode(labels[i])]));
-    }
-    function poly(vals,color){
-      const pts=vals.map((v,i)=>{ const a=(Math.PI*2/vals.length)*i - Math.PI/2; const rr=r*Math.max(0,Math.min(1,v)); return `${cx+rr*Math.cos(a)},${cy+rr*Math.sin(a)}`; }).join(" ");
-      svg.appendChild(el("polygon",{points:pts,fill:color+"30",stroke:color,"stroke-width":"2"}));
-    }
-    poly(valsA,colorA); poly(valsB,colorB);
-    node.appendChild(svg);
-  }
+      const AdefRaw = [A?.advanced?.defense?.ppa, A?.advanced?.defense?.successRate, A?.advanced?.defense?.explosiveness, calcYPPD(A)];
+      const BdefRaw = [B?.advanced?.defense?.ppa, B?.advanced?.defense?.successRate, B?.advanced?.defense?.explosiveness, calcYPPD(B)];
+      const Adef = [norm(AdefRaw[0],MAX.dpp), norm(AdefRaw[1],MAX.dsr), norm(AdefRaw[2],MAX.dex), norm(AdefRaw[3],MAX.dyp)];
+      const Bdef = [norm(BdefRaw[0],MAX.dpp), norm(BdefRaw[1],MAX.dsr), norm(BdefRaw[2],MAX.dex), norm(BdefRaw[3],MAX.dyp)];
+      radarDual($("defRadar"), ["Pts/Play Allowed","Success Allowed","Explosive Allowed","Yds/Play Allowed"], Adef, Bdef);
 
-  // Precompute max for normalization
-  const MAX = TEAMS.reduce((m,t)=>{
-    const off=t?.advanced?.offense||{}, def=t?.advanced?.defense||{};
-    const ypp = (()=>{ const ty=totalYards(t.simple), p=playsOff(t); return (ty!=null&&p)? ty/p : 0; })();
-    const yppa=(()=>{ const ty=totalYardsOpp(t.simple), p=playsDef(t); return (ty!=null&&p)? ty/p : 0; })();
-    m.opp = Math.max(m.opp, off.ppa??0);
-    m.osr = Math.max(m.osr, off.successRate??0);
-    m.oex = Math.max(m.oex, off.explosiveness??0);
-    m.oyp = Math.max(m.oyp, ypp);
-    m.dpp = Math.max(m.dpp, def.ppa??0);
-    m.dsr = Math.max(m.dsr, def.successRate??0);
-    m.dex = Math.max(m.dex, def.explosiveness??0);
-    m.dyp = Math.max(m.dyp, yppa);
-    return m;
-  },{opp:0,osr:0,oex:0,oyp:0,dpp:0,dsr:0,dex:0,dyp:0});
+      // Head-to-Head bars
+      const labels1 = ["Pts/Play (Off)","Pts/Play Allowed","Success (Off)","Success Allowed","Yds/Play (Off)","Yds/Play Allowed"];
+      barChartDual($("barsH2H"), labels1,
+        [AoffRaw[0]||0, AdefRaw[0]||0, AoffRaw[1]||0, AdefRaw[1]||0, AoffRaw[3]||0, AdefRaw[3]||0],
+        [BoffRaw[0]||0, BdefRaw[0]||0, BoffRaw[1]||0, BdefRaw[1]||0, BoffRaw[3]||0, BdefRaw[3]||0]
+      );
 
-  function norm(v,max){ return Math.min(1,(v||0)/(max||1)); }
+      // Pace & Mix bars
+      const Ap = playsOff(A)||0, Bp=playsOff(B)||0;
+      const Apass=get(A.simple,"overall__passattempts"), Arush=get(A.simple,"overall__rushattempts");
+      const Bpass=get(B.simple,"overall__passattempts"), Brush=get(B.simple,"overall__rushattempts");
+      const Ag=get(A.simple,"overall__games")||0, Bg=get(B.simple,"overall__games")||0;
+      const Atempo=Ag?Ap/Ag:0, Btempo=Bg?Bp/Bg:0;
+      const ApassShare=(Apass!=null&&Arush!=null&&(Apass+Arush)>0)?Apass/(Apass+Arush):0;
+      const BpassShare=(Bpass!=null&&Brush!=null&&(Bpass+Brush)>0)?Bpass/(Bpass+Brush):0;
+      barChartDual($("barsPace"), ["Plays/Game","Pass Rate"], [Atempo,ApassShare],[Btempo,BpassShare]);
 
-  // ---------- Rendering ----------
-  function teamByName(name){ return TEAMS.find(t=>t.team===name) || TEAMS[0]; }
+      // Snapshot (top cards)
+      const snap = $("snap"); snap.innerHTML="";
+      const topSnap = ["Points per Play (Offense)","Yards per Play (Offense)","Success Rate (Offense)","Explosiveness (Offense)","Points per Play Allowed (Defense)","Yards per Play Allowed (Defense)","Success Rate Allowed (Defense)","Explosiveness Allowed (Defense)","Plays per Game (Offense)","Pass Rate (share of plays)","Rush Rate (share of plays)","Total Yards per Game","Opponent Yards per Game","First Downs per Game","Turnover Margin per Game","Time of Possession per Game"];
+      topSnap.forEach(name=>{
+        const m = METRICS.find(x=>x[0]===name);
+        const va = m? m[1](A) : null;
+        const vtxt = name.includes("Rate") || name.includes("Share") ? pct(va) : (name.includes("Time of Possession") ? secToClock(va) : fmt(va, name.includes("Yards")?2:3));
+        const div=document.createElement("div"); div.className="stat"+(va==null?" fade":"");
+        div.innerHTML=`<label>${name}</label><div class="v">${vtxt}</div>`;
+        snap.appendChild(div);
+      });
 
-  function render(){
-    const A=teamByName(sA.value), B=teamByName(sB.value)||A;
-    // Spiders
-    const Aoff = [
-      A?.advanced?.offense?.ppa ?? 0,
-      A?.advanced?.offense?.successRate ?? 0,
-      A?.advanced?.offense?.explosiveness ?? 0,
-      (()=>{ const ty=totalYards(A.simple), p=playsOff(A); return (ty!=null&&p)? ty/p : 0; })()
-    ].map((v,i)=>[MAX.opp,MAX.osr,MAX.oex,MAX.oyp][i]).map((mx,idx)=> norm([A?.advanced?.offense?.ppa, A?.advanced?.offense?.successRate, A?.advanced?.offense?.explosiveness, (()=>{ const ty=totalYards(A.simple), p=playsOff(A); return (ty!=null&&p)? ty/p : 0; })()][idx], [MAX.opp,MAX.osr,MAX.oex,MAX.oyp][idx]));
-    const Boff = [
-      B?.advanced?.offense?.ppa ?? 0,
-      B?.advanced?.offense?.successRate ?? 0,
-      B?.advanced?.offense?.explosiveness ?? 0,
-      (()=>{ const ty=totalYards(B.simple), p=playsOff(B); return (ty!=null&&p)? ty/p : 0; })()
-    ].map((v,i)=>[MAX.opp,MAX.osr,MAX.oex,MAX.oyp][i]).map((mx,idx)=> norm([B?.advanced?.offense?.ppa, B?.advanced?.offense?.successRate, B?.advanced?.offense?.explosiveness, (()=>{ const ty=totalYards(B.simple), p=playsOff(B); return (ty!=null&&p)? ty/p : 0; })()][idx], [MAX.opp,MAX.osr,MAX.oex,MAX.oyp][idx]));
-    radarDual($("offRadar"), ["Points/Play","Success","Explosiveness","Yards/Play"], Aoff, Boff);
-
-    const Adef = [
-      A?.advanced?.defense?.ppa ?? 0,
-      A?.advanced?.defense?.successRate ?? 0,
-      A?.advanced?.defense?.explosiveness ?? 0,
-      (()=>{ const ty=totalYardsOpp(A.simple), p=playsDef(A); return (ty!=null&&p)? ty/p : 0; })()
-    ].map((v,i)=>[MAX.dpp,MAX.dsr,MAX.dex,MAX.dyp][i]).map((mx,idx)=> norm([A?.advanced?.defense?.ppa, A?.advanced?.defense?.successRate, A?.advanced?.defense?.explosiveness, (()=>{ const ty=totalYardsOpp(A.simple), p=playsDef(A); return (ty!=null&&p)? ty/p : 0; })()][idx], [MAX.dpp,MAX.dsr,MAX.dex,MAX.dyp][idx]));
-    const Bdef = [
-      B?.advanced?.defense?.ppa ?? 0,
-      B?.advanced?.defense?.successRate ?? 0,
-      B?.advanced?.defense?.explosiveness ?? 0,
-      (()=>{ const ty=totalYardsOpp(B.simple), p=playsDef(B); return (ty!=null&&p)? ty/p : 0; })()
-    ].map((v,i)=>[MAX.dpp,MAX.dsr,MAX.dex,MAX.dyp][i]).map((mx,idx)=> norm([B?.advanced?.defense?.ppa, B?.advanced?.defense?.successRate, B?.advanced?.defense?.explosiveness, (()=>{ const ty=totalYardsOpp(B.simple), p=playsDef(B); return (ty!=null&&p)? ty/p : 0; })()][idx], [MAX.dpp,MAX.dsr,MAX.dex,MAX.dyp][idx]));
-    radarDual($("defRadar"), ["Pts/Play Allowed","Success Allowed","Explosive Allowed","Yds/Play Allowed"], Adef, Bdef);
-
-    // H2H bars (raw values)
-    const labels1 = ["Pts/Play (Off)","Pts/Play Allowed","Success (Off)","Success Allowed","Yds/Play (Off)","Yds/Play Allowed"];
-    const calcYPP = t => { const ty=totalYards(t.simple), p=playsOff(t); return (ty!=null&&p)? ty/p : 0; };
-    const calcYPPD = t => { const ty=totalYardsOpp(t.simple), p=playsDef(t); return (ty!=null&&p)? ty/p : 0; };
-    const Avals1 = [A?.advanced?.offense?.ppa, A?.advanced?.defense?.ppa, A?.advanced?.offense?.successRate, A?.advanced?.defense?.successRate, calcYPP(A), calcYPPD(A)].map(v=>v??0);
-    const Bvals1 = [B?.advanced?.offense?.ppa, B?.advanced?.defense?.ppa, B?.advanced?.offense?.successRate, B?.advanced?.defense?.successRate, calcYPP(B), calcYPPD(B)].map(v=>v??0);
-    barChartDual($("barsH2H"), labels1, Avals1, Bvals1);
-
-    // Pace & Mix bars
-    const Aplays = playsOff(A)||0, Bplays=playsOff(B)||0;
-    const Apass=get(A.simple,"overall__passattempts"), Arush=get(A.simple,"overall__rushattempts");
-    const Bpass=get(B.simple,"overall__passattempts"), Brush=get(B.simple,"overall__rushattempts");
-    const Ag=get(A.simple,"overall__games")||0, Bg=get(B.simple,"overall__games")||0;
-    const Atempo=Ag?Aplays/Ag:0, Btempo=Bg?Bplays/Bg:0;
-    const ApassShare = (Apass!=null&&Arush!=null&&(Apass+Arush)>0)? Apass/(Apass+Arush):0;
-    const BpassShare = (Bpass!=null&&Brush!=null&&(Bpass+Brush)>0)? Bpass/(Bpass+Brush):0;
-    barChartDual($("barsPace"), ["Plays/Game","Pass Rate"], [Atempo, ApassShare], [Btempo, BpassShare]);
-
-    // Snapshot tiles (top 16)
-    const snap = $("snap"); snap.innerHTML="";
-    const topSnap = ["Points per Play (Offense)","Yards per Play (Offense)","Success Rate (Offense)","Explosiveness (Offense)","Points per Play Allowed (Defense)","Yards per Play Allowed (Defense)","Success Rate Allowed (Defense)","Explosiveness Allowed (Defense)","Plays per Game (Offense)","Pass Rate (share of plays)","Rush Rate (share of plays)","Total Yards per Game","Opponent Yards per Game","First Downs per Game","Turnover Margin per Game","Time of Possession per Game"];
-    topSnap.forEach(name=>{
-      const m = METRICS.find(x=>x[0]===name);
-      const va = m? m[1](A) : null;
-      const vtxt = name.includes("Rate") || name.includes("Share") ? pct(va) : (name.includes("Time of Possession") ? secToClock(va) : fmt(va, name.includes("Yards")?2:3));
-      const div=document.createElement("div"); div.className="stat"+(va==null?" fade":"");
-      div.innerHTML=`<label>${name}</label><div class="v">${vtxt}</div>`;
-      snap.appendChild(div);
-    });
-
-    // Big table
-    const tbody = $("statTable").querySelector("tbody");
-    tbody.innerHTML="";
-    METRICS.forEach(([name,getter,desc])=>{
-      const Av = getter(A), Bv=getter(B);
-      const isPct = name.toLowerCase().includes("rate") || name.toLowerCase().includes("share");
-      const isClock = name.includes("Time of Possession");
-      const Avs = isPct ? pct(Av) : (isClock ? secToClock(Av) : fmt(Av, name.includes("Yards")?2:3));
-      const Bvs = isPct ? pct(Bv) : (isClock ? secToClock(Bv) : fmt(Bv, name.includes("Yards")?2:3));
-      const tr=document.createElement("tr");
-      tr.innerHTML=`<td>${name}</td><td class="${Av==null?'fade':''}">${Avs}</td><td class="${Bv==null?'fade':''}">${Bvs}</td><td class="fade">${desc}</td>`;
-      tbody.appendChild(tr);
-    });
+      // Full table
+      const tbody = $("statTable").querySelector("tbody");
+      tbody.innerHTML="";
+      METRICS.forEach(([name,getter,desc])=>{
+        const Av = getter(A), Bv=getter(B);
+        const isPct = name.toLowerCase().includes("rate") || name.toLowerCase().includes("share");
+        const isClock = name.includes("Time of Possession");
+        const Avs = isPct ? pct(Av) : (isClock ? secToClock(Av) : fmt(Av, name.includes("Yards")?2:3));
+        const Bvs = isPct ? pct(Bv) : (isClock ? secToClock(Bv) : fmt(Bv, name.includes("Yards")?2:3));
+        const tr=document.createElement("tr");
+        tr.innerHTML=`<td>${name}</td><td class="${Av==null?'fade':''}">${Avs}</td><td class="${Bv==null?'fade':''}">${Bvs}</td><td class="fade">${desc}</td>`;
+        tbody.appendChild(tr);
+      });
+    }catch(e){ showErr(e.message); }
   }
 
+  // Wire up events
+  btnReload.addEventListener("click", async ()=>{ CACHE[String(sYear.value)] = { teams: [], teamData: {} }; await populateTeams(); });
+  sYear.addEventListener("change", populateTeams);
   sA.addEventListener("change", render);
   sB.addEventListener("change", render);
 
-  if (TEAMS.length){ render(); }
+  // First load
+  populateTeams();
 })();
 </script>
 </body>
