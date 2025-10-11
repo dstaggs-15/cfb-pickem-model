@@ -1,294 +1,284 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Team Analytics</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Team Analytics – Stable Build</title>
 
-  <!-- Chart.js CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- Chart.js (optional; UI works even if this fails) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
 
-  <style>
-    :root{
-      --bg:#0c1117;
-      --panel:#0f1621;
-      --muted:#9aa4b2;
-      --text:#e6edf3;
-      --brand:#4aa9ff;
-      --brand-2:#8b5cf6;
-      --border: #1e2633;
-      --good:#2dd4bf;
-      --bad:#f43f5e;
-      --cardGlow: 0 0 0 1px var(--border), 0 10px 30px rgba(0,0,0,.35);
-      --radius:14px;
-    }
-    *{ box-sizing:border-box }
-    html,body{ height:100% }
-    body{
-      margin:0; font:14px/1.45 Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-      color:var(--text); background: radial-gradient(1200px 600px at 20% -10%, #0b1220, transparent),
-                          radial-gradient(900px 500px at 100% 0%, #071422, transparent),
-                          var(--bg);
-    }
-    .wrap{ max-width:1200px; margin:28px auto; padding:0 16px; }
-    .header{
-      display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px;
-    }
-    .title{ font-size:28px; font-weight:700; letter-spacing:.2px; display:flex; align-items:center; gap:10px }
-    .pill{ background:#0b1420; border:1px solid var(--border); color:#cbd5e1; padding:4px 10px; border-radius:999px; font-size:12px }
-    .controls{ display:flex; gap:10px; align-items:center; flex-wrap:wrap }
-    select{
-      appearance:none; background:var(--panel); border:1px solid var(--border); color:var(--text);
-      border-radius:10px; padding:10px 14px; min-width:220px; outline:none; box-shadow:var(--cardGlow);
-    }
-    .grid{ display:grid; gap:16px }
-    @media (min-width: 880px){
-      .grid-2{ grid-template-columns: 1fr 1fr; }
-    }
-
-    .card{
-      background:linear-gradient(180deg, rgba(255,255,255,.02), transparent),
-                 var(--panel);
-      border:1px solid var(--border); border-radius:var(--radius); padding:16px 16px;
-      box-shadow:var(--cardGlow);
-    }
-    .card h3{ margin:0 0 12px 0; font-size:16px; font-weight:700 }
-    .snapshot{
-      display:grid; grid-template-columns: repeat(6, minmax(140px,1fr)); gap:12px;
-    }
-    @media (max-width: 1100px){ .snapshot{ grid-template-columns: repeat(3, minmax(140px,1fr)); } }
-    @media (max-width: 640px){ .snapshot{ grid-template-columns: repeat(2, minmax(120px,1fr)); } }
-
-    .stat{
-      background: rgba(255,255,255,.01);
-      border:1px solid var(--border);
-      border-radius:12px; padding:12px; min-height:76px; display:flex; flex-direction:column; gap:6px;
-    }
-    .stat label{ color:var(--muted); font-size:12px }
-    .stat .value{ font-size:18px; font-weight:700; letter-spacing:.2px }
-    .stat.good .value{ color:var(--good) }
-    .stat.bad .value{ color:var(--bad) }
-
-    .note{ color:#95a3b8; font-size:12px; margin-top:12px; opacity:.85 }
-    canvas{ width:100% !important; height:380px !important; }
-
-    /* Legend chip */
-    .legend{ display:flex; align-items:center; gap:10px; margin:-4px 0 8px 0; }
-    .chip{ width:14px; height:10px; border-radius:3px; background:var(--brand); box-shadow:0 0 0 1px rgba(255,255,255,.06) inset }
-    .subtle{ color:var(--muted) }
-
-    /* Tiny badge next to title (like your screenshot) */
-    .rank-badge{
-      display:inline-flex; gap:8px; align-items:center; padding:6px 10px; border-radius:999px;
-      background:#0c1522; border:1px solid var(--border); font-size:12px; color:#bee3f8;
-      box-shadow: var(--cardGlow);
-    }
-  </style>
+<style>
+  :root{--bg:#0c1117;--panel:#0f1621;--muted:#9aa4b2;--text:#e6edf3;--brand:#4aa9ff;--border:#1e2633;--good:#2dd4bf;--bad:#f43f5e;--radius:14px}
+  *{box-sizing:border-box} body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#0b1220,transparent),radial-gradient(900px 500px at 100% 0%,#071422,transparent),var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  .wrap{max-width:1200px;margin:28px auto;padding:0 16px}
+  .header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+  .title{font-size:28px;font-weight:700;letter-spacing:.2px;display:flex;gap:10px;align-items:center}
+  .pill{background:#0b1420;border:1px solid var(--border);padding:4px 10px;border-radius:999px;color:#cbd5e1;font-size:12px}
+  select{appearance:none;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 14px;min-width:220px}
+  .card{background:linear-gradient(180deg,rgba(255,255,255,.02),transparent),var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+  .card h3{margin:0 0 12px;font-size:16px}
+  .snapshot{display:grid;gap:12px;grid-template-columns:repeat(6,minmax(140px,1fr))}
+  @media (max-width:1100px){.snapshot{grid-template-columns:repeat(3,minmax(140px,1fr))}}
+  @media (max-width:640px){.snapshot{grid-template-columns:repeat(2,minmax(120px,1fr))}}
+  .stat{border:1px solid var(--border);border-radius:12px;padding:12px;min-height:76px;display:flex;flex-direction:column;gap:6px;background:rgba(255,255,255,.01)}
+  .stat label{color:var(--muted);font-size:12px}
+  .stat .value{font-size:18px;font-weight:700}
+  .note{color:#95a3b8;font-size:12px;margin-top:10px}
+  .grid{display:grid;gap:16px} @media (min-width:880px){.grid-2{grid-template-columns:1fr 1fr}}
+  canvas{width:100% !important;height:380px !important}
+  .error{background:#2a1320;border:1px solid #5c1e34;color:#ffd1da;padding:10px 12px;border-radius:10px;margin-bottom:12px;display:none;white-space:pre-wrap}
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="header">
-      <div class="title">
-        <span>Team Analytics</span>
-        <span class="rank-badge" id="teamRankBadge"># —</span>
-        <span class="pill" id="teamNamePill">—</span>
-      </div>
-      <div class="controls">
-        <select id="teamSelect" aria-label="Select team"></select>
-      </div>
+<div class="wrap">
+  <div class="header">
+    <div class="title">
+      <span>Team Analytics</span>
+      <span class="pill" id="rankPill">#—</span>
+      <span class="pill" id="teamPill">—</span>
     </div>
-
-    <!-- Snapshot -->
-    <div class="card">
-      <h3>Snapshot</h3>
-      <div class="snapshot" id="snapshot">
-        <!-- Off -->
-        <div class="stat"><label>Off PPA</label><div class="value" id="offPPA">—</div></div>
-        <div class="stat"><label>Off Success</label><div class="value" id="offSR">—</div></div>
-        <div class="stat"><label>Off Explosive</label><div class="value" id="offExp">—</div></div>
-        <div class="stat"><label>Off Yds/Play</label><div class="value" id="offYPP">—</div></div>
-
-        <!-- Def (allowed) -->
-        <div class="stat"><label>Def PPA (A)</label><div class="value" id="defPPA">—</div></div>
-        <div class="stat"><label>Def Success (A)</label><div class="value" id="defSR">—</div></div>
-        <div class="stat"><label>Def Explosive (A)</label><div class="value" id="defExp">—</div></div>
-        <div class="stat"><label>Def Yds/Play (A)</label><div class="value" id="defYPP">—</div></div>
-
-        <!-- Extras -->
-        <div class="stat"><label>FPI</label><div class="value" id="fpiVal">—</div></div>
-        <div class="stat"><label>Plays (Off)</label><div class="value" id="playsOff">—</div></div>
-        <div class="stat"><label>Plays (Def)</label><div class="value" id="playsDef">—</div></div>
-        <div class="stat"><label>Games</label><div class="value" id="games">—</div></div>
-      </div>
-      <div class="note">
-        Notes: PPA = Predicted Points Added per play. “(A)” = allowed by defense. Yds/Play is computed from your JSON as
-        <span class="subtle">total yards ÷ plays</span>.
-      </div>
-    </div>
-
-    <!-- Charts -->
-    <div class="grid grid-2" style="margin-top:16px">
-      <div class="card">
-        <h3>Offensive Profile (Radar)</h3>
-        <div class="legend"><span class="chip"></span><span class="subtle" id="legendTeam">Team</span></div>
-        <canvas id="radar"></canvas>
-      </div>
-      <div class="card">
-        <h3>Efficiency Comparison (Bar)</h3>
-        <div class="legend"><span class="chip" style="background:var(--brand)"></span><span class="subtle" id="legendTeam2">Team</span></div>
-        <canvas id="bars"></canvas>
-      </div>
-    </div>
+    <select id="teamSelect" aria-label="Select team"></select>
   </div>
 
-  <!-- EMBED YOUR JSON HERE (unchanged) -->
-  <script type="application/json" id="teams-json">
-  [
-    // PASTE THE JSON ARRAY YOU POSTED HERE 1:1
-    // I’ve trimmed it in this snippet for space; use your full payload.
-    {"team":"Alabama","year":2025,"simple":{"overall__games":5.0,"overall__totalyards":2261.0,"overall__totalyardsopponent":1430.0}, "advanced":{"season":2025,"team":"Alabama","offense":{"plays":339,"ppa":0.37535891410422856,"successRate":0.471976401179941,"explosiveness":1.398429456846684},"defense":{"plays":272,"ppa":0.12060085388961003,"successRate":0.39705882352941174,"explosiveness":1.2869135990231348}},"fpi":{"fpi":23.452}},
-    {"team":"Arizona","year":2025,"simple":{"overall__games":5.0,"overall__totalyards":2153.0,"overall__totalyardsopponent":1228.0}, "advanced":{"season":2025,"team":"Arizona","offense":{"plays":333,"ppa":0.16060816441824338,"successRate":0.43243243243243246,"explosiveness":1.2659160278160626},"defense":{"plays":306,"ppa":-0.022380575562132344,"successRate":0.30392156862745096,"explosiveness":1.2860964612180295}},"fpi":{"fpi":5.51}},
-    {"team":"USC","year":2025,"simple":{"overall__games":5.0,"overall__totalyards":2820.0,"overall__totalyardsopponent":1794.0}, "advanced":{"season":2025,"team":"USC","offense":{"plays":339,"ppa":0.5531950072955448,"successRate":0.5899705014749262,"explosiveness":1.312565122804084},"defense":{"plays":325,"ppa":0.05159796137214471,"successRate":0.4123076923076923,"explosiveness":1.2927790664110417}},"fpi":{"fpi":18.728}},
-    {"team":"Oregon","year":2025,"simple":{"overall__games":5.0,"overall__totalyards":2519.0,"overall__totalyardsopponent":1191.0}, "advanced":{"season":2025,"team":"Oregon","offense":{"plays":328,"ppa":0.46180394879489706,"successRate":0.524390243902439,"explosiveness":1.3646513886298568},"defense":{"plays":284,"ppa":0.011182980556836397,"successRate":0.3591549295774648,"explosiveness":1.1189638014997871}},"fpi":{"fpi":24.16}}
-  ]
-  </script>
+  <div id="errorBox" class="error"></div>
 
-  <script>
-    // ---------- Helpers ----------
-    const fmt = (n, d=3) => (n === null || n === undefined || isNaN(n)) ? "—" : Number(n).toFixed(d);
-    const pct = n => (n === null || n === undefined || isNaN(n)) ? "—" : (n*100).toFixed(1) + "%";
+  <div class="card">
+    <h3>Snapshot</h3>
+    <div class="snapshot">
+      <div class="stat"><label>Off PPA</label><div class="value" id="offPPA">—</div></div>
+      <div class="stat"><label>Off Success</label><div class="value" id="offSR">—</div></div>
+      <div class="stat"><label>Off Explosive</label><div class="value" id="offExp">—</div></div>
+      <div class="stat"><label>Off Yds/Play</label><div class="value" id="offYPP">—</div></div>
 
-    // Parse data
-    const TEAMS = JSON.parse(document.getElementById('teams-json').textContent);
+      <div class="stat"><label>Def PPA (A)</label><div class="value" id="defPPA">—</div></div>
+      <div class="stat"><label>Def Success (A)</label><div class="value" id="defSR">—</div></div>
+      <div class="stat"><label>Def Explosive (A)</label><div class="value" id="defExp">—</div></div>
+      <div class="stat"><label>Def Yds/Play (A)</label><div class="value" id="defYPP">—</div></div>
 
-    // Build team map for quick lookup
-    const byTeam = new Map(TEAMS.map(t => [t.team, t]));
+      <div class="stat"><label>FPI</label><div class="value" id="fpiVal">—</div></div>
+      <div class="stat"><label>Plays (Off)</label><div class="value" id="playsOff">—</div></div>
+      <div class="stat"><label>Plays (Def)</label><div class="value" id="playsDef">—</div></div>
+      <div class="stat"><label>Games</label><div class="value" id="games">—</div></div>
+    </div>
+    <div class="note">PPA = Predicted Points Added per play. “(A)” = allowed by defense. Yds/Play is derived from total yards & plays when not provided explicitly.</div>
+  </div>
 
-    // Populate select
-    const sel = document.getElementById('teamSelect');
-    TEAMS.forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t.team; opt.textContent = t.team;
-      sel.appendChild(opt);
-    });
+  <div class="grid grid-2" style="margin-top:16px">
+    <div class="card">
+      <h3>Offensive Profile (Radar)</h3>
+      <canvas id="radar"></canvas>
+      <div class="note" id="radarNote" style="display:none">Chart library not loaded; numbers still shown above.</div>
+    </div>
+    <div class="card">
+      <h3>Efficiency Comparison (Bar)</h3>
+      <canvas id="bars"></canvas>
+      <div class="note" id="barsNote" style="display:none">Chart library not loaded; numbers still shown above.</div>
+    </div>
+  </div>
+</div>
 
-    // Global maxes (for radar normalization)
-    function computeMaxes() {
-      let max = { ppa:0, sr:0, exp:0, ypp:0 };
-      for (const t of TEAMS){
-        const off = t.advanced.offense;
-        const ypp = (t.simple.overall__totalyards || 0) / (off.plays || 1);
-        max.ppa = Math.max(max.ppa, off.ppa || 0);
-        max.sr  = Math.max(max.sr,  off.successRate || 0);
-        max.exp = Math.max(max.exp, off.explosiveness || 0);
-        max.ypp = Math.max(max.ypp, ypp);
-      }
-      return max;
+<!-- PASTE YOUR RAW JSON ARRAY BETWEEN THESE TAGS (comments/trailing commas are OK) -->
+<script id="teams-json" type="text/plain">
+[
+  {
+    "team":"Alabama","year":2025,
+    "simple":{
+      "overall__games":5,
+      "overall__netpassingyards":1627,
+      "overall__rushingyards":634,
+      "overall__passattempts":176,
+      "overall__rushattempts":163,
+      "overall__netpassingyardsopponent":652,
+      "overall__rushingyardsopponent":778
+    },
+    "advanced":{
+      "offense":{"plays":339,"ppa":0.37535891410422856,"successRate":0.471976401179941,"explosiveness":1.398429456846684},
+      "defense":{"plays":272,"ppa":0.12060085388961003,"successRate":0.39705882352941174,"explosiveness":1.2869135990231348}
+    },
+    "fpi":{"fpi":23.452}
+  }
+  // … add the rest of your teams here exactly as you have them …
+]
+</script>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const err = $("errorBox");
+
+  // --- Utilities ---
+  const fmt = (n, d=3) => (n == null || isNaN(n)) ? "—" : Number(n).toFixed(d);
+  const pct = n => (n == null || isNaN(n)) ? "—" : (n*100).toFixed(1) + "%";
+
+  // Remove //comments, /* */ blocks, and trailing commas so “human JSON” won’t crash the app
+  function sanitizeJSON(text){
+    return text
+      .replace(/\/\*[\s\S]*?\*\//g, "")          // block comments
+      .replace(/(^|[^:])\/\/.*$/gm, "$1")        // line comments (keep URLs)
+      .replace(/,\s*([}\]])/g, "$1")             // trailing commas
+      .trim();
+  }
+
+  function safeParse(text){
+    const clean = sanitizeJSON(text);
+    try { return JSON.parse(clean); }
+    catch(e){
+      err.style.display = "block";
+      err.textContent = "JSON parse error: " + e.message + "\n\nFirst 300 chars of cleaned payload:\n" + clean.slice(0,300);
+      return [];
     }
-    const MAXES = computeMaxes();
+  }
+
+  function getTotalYardsSimple(simple){
+    const ty = simple?.overall__totalyards;
+    const pass = simple?.overall__netpassingyards;
+    const rush = simple?.overall__rushingyards ?? simple?.overall__netrushingyards;
+    if (typeof ty === "number") return ty;
+    if (typeof pass === "number" && typeof rush === "number") return pass + rush;
+    return null;
+  }
+  function getTotalYardsOpp(simple){
+    const ty = simple?.overall__totalyardsopponent;
+    const pass = simple?.overall__netpassingyardsopponent;
+    const rush = simple?.overall__rushingyardsopponent ?? simple?.overall__netrushingyardsopponent;
+    if (typeof ty === "number") return ty;
+    if (typeof pass === "number" && typeof rush === "number") return pass + rush;
+    return null;
+  }
+  function getPlaysOff(team){
+    const p = team?.advanced?.offense?.plays;
+    if (typeof p === "number" && p > 0) return p;
+    const pa = team?.simple?.overall__passattempts;
+    const ra = team?.simple?.overall__rushattempts;
+    if (typeof pa === "number" && typeof ra === "number") return pa + ra;
+    return null;
+  }
+  function getPlaysDef(team){
+    const p = team?.advanced?.defense?.plays;
+    if (typeof p === "number" && p > 0) return p;
+    const pa = team?.simple?.overall__passattemptsopponent;
+    const ra = team?.simple?.overall__rushattemptsopponent;
+    if (typeof pa === "number" && typeof ra === "number") return pa + ra;
+    return null;
+  }
+
+  // Load data
+  const RAW = $("teams-json").textContent;
+  const TEAMS = Array.isArray(safeParse(RAW)) ? safeParse(RAW) : [];
+  if (!TEAMS.length){
+    err.style.display = "block";
+    err.textContent = (err.textContent ? err.textContent + "\n\n" : "") + "No teams found. Paste a JSON array in the <script id=\"teams-json\"> block.";
+  }
+
+  // Build select
+  const select = $("teamSelect");
+  TEAMS.forEach(t => {
+    const opt = document.createElement("option");
+    opt.value = t.team; opt.textContent = t.team;
+    select.appendChild(opt);
+  });
+  if (TEAMS[0]) select.value = TEAMS[0].team;
+
+  // Precompute maxes for radar normalization
+  const MAX = TEAMS.reduce((m,t)=>{
+    const off = t?.advanced?.offense || {};
+    const ypp = (getTotalYardsSimple(t.simple) ?? 0) / ((getPlaysOff(t) ?? 1));
+    m.ppa = Math.max(m.ppa, off.ppa ?? 0);
+    m.sr  = Math.max(m.sr,  off.successRate ?? 0);
+    m.exp = Math.max(m.exp, off.explosiveness ?? 0);
+    m.ypp = Math.max(m.ypp, ypp);
+    return m;
+  }, {ppa:0,sr:0,exp:0,ypp:0});
+
+  // Charts (optional)
+  let radarChart=null, barChart=null;
+  function ensureCharts(){
+    if (!window.Chart){
+      $("radarNote").style.display = "block";
+      $("barsNote").style.display = "block";
+      return;
+    }
+    if (!radarChart){
+      radarChart = new Chart($("radar").getContext("2d"),{
+        type:'radar',
+        data:{labels:['PPA','Success','Explosive','Yds/Play'],datasets:[{data:[0,0,0,0],label:'Offense (normalized)',borderWidth:2,pointRadius:3,fill:true,backgroundColor:'rgba(74,169,255,0.15)',borderColor:'rgba(74,169,255,.9)'}]},
+        options:{responsive:true,plugins:{legend:{display:false}},scales:{r:{beginAtZero:true,max:1,angleLines:{color:'#223045'},grid:{color:'#223045'},pointLabels:{color:'#a9b4c2'}}}}
+      });
+    }
+    if (!barChart){
+      barChart = new Chart($("bars").getContext("2d"),{
+        type:'bar',
+        data:{labels:['Off PPA','Def PPA (A)','Off Success','Def Success (A)','Off YPP','Def YPP (A)'],datasets:[{data:[0,0,0,0,0,0],label:'Team',backgroundColor:'rgba(74,169,255,.75)'}]},
+        options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#223045'},ticks:{color:'#a9b4c2'}},y:{beginAtZero:true,grid:{color:'#223045'},ticks:{color:'#a9b4c2'}}}}
+      });
+    }
+  }
+
+  function update(teamName){
+    const t = TEAMS.find(x => x.team === teamName) || TEAMS[0];
+    if (!t) return;
+
+    const off = t?.advanced?.offense || {};
+    const def = t?.advanced?.defense || {};
+
+    const offPlays = getPlaysOff(t) ?? 0;
+    const defPlays = getPlaysDef(t) ?? 0;
+
+    const offTY = getTotalYardsSimple(t.simple);
+    const defTY = getTotalYardsOpp(t.simple);
+
+    const offYPP = offTY != null && offPlays > 0 ? offTY/offPlays : null;
+    const defYPP = defTY != null && defPlays > 0 ? defTY/defPlays : null;
+
+    // Header
+    $("teamPill").textContent = t.team ?? "—";
+    $("rankPill").textContent = "#—"; // fill if you add rank later
+
+    // Snapshot
+    $("offPPA").textContent = fmt(off.ppa);
+    $("offSR").textContent  = pct(off.successRate);
+    $("offExp").textContent = fmt(off.explosiveness,2);
+    $("offYPP").textContent = fmt(offYPP,2);
+
+    $("defPPA").textContent = fmt(def.ppa);
+    $("defSR").textContent  = pct(def.successRate);
+    $("defExp").textContent = fmt(def.explosiveness,2);
+    $("defYPP").textContent = fmt(defYPP,2);
+
+    $("fpiVal").textContent = fmt(t?.fpi?.fpi,3);
+    $("playsOff").textContent = offPlays || "—";
+    $("playsDef").textContent = defPlays || "—";
+    $("games").textContent = t?.simple?.overall__games ?? "—";
 
     // Charts
-    const radarCtx = document.getElementById('radar').getContext('2d');
-    const barsCtx  = document.getElementById('bars').getContext('2d');
-
-    let radarChart = new Chart(radarCtx, {
-      type:'radar',
-      data:{
-        labels:['PPA','Success','Explosive','Yds/Play'],
-        datasets:[{ label:'Offense (normalized)', data:[0,0,0,0],
-          borderWidth:2, pointRadius:3, fill:true,
-          backgroundColor:'rgba(74,169,255,0.15)', borderColor:'rgba(74,169,255,.9)'}]
-      },
-      options:{
-        responsive:true, plugins:{ legend:{ display:false } },
-        scales:{
-          r:{ beginAtZero:true, max:1, angleLines:{ color:'#223045' }, grid:{ color:'#223045' }, pointLabels:{ color:'#a9b4c2' } }
-        }
-      }
-    });
-
-    let barChart = new Chart(barsCtx, {
-      type:'bar',
-      data:{
-        labels:['Off PPA','Def PPA (A)','Off Success','Def Success (A)','Off YPP','Def YPP (A)'],
-        datasets:[{ label:'Team', data:[0,0,0,0,0,0],
-          backgroundColor:'rgba(74,169,255,.75)'}]
-      },
-      options:{
-        responsive:true,
-        plugins:{ legend:{ display:false } },
-        scales:{
-          x:{ grid:{ color:'#223045' }, ticks:{ color:'#a9b4c2' } },
-          y:{ grid:{ color:'#223045' }, ticks:{ color:'#a9b4c2' }, beginAtZero:true }
-        }
-      }
-    });
-
-    function updateUI(teamName){
-      const t = byTeam.get(teamName);
-      if(!t) return;
-
-      // Elements
-      const text = id => document.getElementById(id).textContent = id;
-      const set = (id, val) => document.getElementById(id).textContent = val;
-
-      const off = t.advanced.offense;
-      const def = t.advanced.defense;
-
-      const offYPP = (t.simple.overall__totalyards || 0) / (off.plays || 1);
-      const defYPP = (t.simple.overall__totalyardsopponent || 0) / (def.plays || 1);
-
-      // Header pills
-      document.getElementById('teamNamePill').textContent = t.team;
-      // If you have ranks, put them here. Without a rank in JSON, show em dash.
-      document.getElementById('teamRankBadge').textContent = '# —';
-
-      // Snapshot
-      set('offPPA', fmt(off.ppa));
-      set('offSR', pct(off.successRate));
-      set('offExp', fmt(off.explosiveness, 2));
-      set('offYPP', fmt(offYPP, 2));
-
-      set('defPPA', fmt(def.ppa));
-      set('defSR', pct(def.successRate));
-      set('defExp', fmt(def.explosiveness, 2));
-      set('defYPP', fmt(defYPP, 2));
-
-      set('fpiVal', t.fpi?.fpi != null ? fmt(t.fpi.fpi, 3) : '—');
-      set('playsOff', off.plays ?? '—');
-      set('playsDef', def.plays ?? '—');
-      set('games', t.simple?.overall__games ?? '—');
-
-      // Radar (normalized 0..1)
+    ensureCharts();
+    if (radarChart){
       const norm = [
-        Math.min(1, (off.ppa || 0) / (MAXES.ppa || 1)),
-        Math.min(1, (off.successRate || 0) / (MAXES.sr || 1)),
-        Math.min(1, (off.explosiveness || 0) / (MAXES.exp || 1)),
-        Math.min(1, (offYPP || 0) / (MAXES.ypp || 1)),
+        Math.min(1,(off.ppa ?? 0)/(MAX.ppa||1)),
+        Math.min(1,(off.successRate ?? 0)/(MAX.sr||1)),
+        Math.min(1,(off.explosiveness ?? 0)/(MAX.exp||1)),
+        Math.min(1,(offYPP ?? 0)/(MAX.ypp||1))
       ];
       radarChart.data.datasets[0].data = norm;
       radarChart.update();
-
-      // Bars
+    }
+    if (barChart){
       barChart.data.datasets[0].data = [
-        off.ppa || 0,
-        def.ppa || 0,
-        off.successRate || 0,
-        def.successRate || 0,
-        offYPP || 0,
-        defYPP || 0
+        off.ppa ?? 0, def.ppa ?? 0,
+        off.successRate ?? 0, def.successRate ?? 0,
+        offYPP ?? 0, defYPP ?? 0
       ];
       barChart.update();
-
-      // Legends
-      document.getElementById('legendTeam').textContent = t.team;
-      document.getElementById('legendTeam2').textContent = t.team;
     }
+  }
 
-    // Init
-    sel.value = TEAMS[0]?.team || '';
-    updateUI(sel.value);
-    sel.addEventListener('change', e => updateUI(e.target.value));
-  </script>
+  // Initialize
+  if (TEAMS.length){
+    update(select.value || TEAMS[0].team);
+    select.addEventListener("change", e => update(e.target.value));
+  }
+})();
+</script>
 </body>
 </html>
