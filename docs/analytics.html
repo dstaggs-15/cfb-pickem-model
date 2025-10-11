@@ -6,48 +6,79 @@
 <title>CFB Analytics Dashboard</title>
 <style>
   :root{
-    --bg:#0b111a;--panel:#0f1621;--muted:#95a3b8;--text:#e6edf3;
-    --border:#1e2633;--brand:#4aa9ff;--accent:#9b59ff;--good:#22c55e;--bad:#ef4444;
-    --radius:14px
+    --bg:#090f17;--panel:#0f1724;--muted:#9fb0c5;--text:#ebf1f7;
+    --border:#1d2837;--brand:#4aa9ff;--accent:#9b59ff;--good:#22c55e;--bad:#ef4444;
+    --radius:16px;--shadow:0 8px 30px rgba(0,0,0,.35)
   }
   *{box-sizing:border-box}
-  body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#0b1220,transparent),radial-gradient(900px 500px at 100% 0%,#071422,transparent),var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-  .wrap{max-width:1250px;margin:28px auto;padding:0 16px}
-  h1{font-size:26px;margin:0 0 8px}
-  .pill{background:#0b1420;border:1px solid var(--border);padding:4px 10px;border-radius:999px;color:#cbd5e1;font-size:12px}
-  .card{background:linear-gradient(180deg,rgba(255,255,255,.02),transparent),var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+  body{margin:0;background:
+    radial-gradient(1200px 600px at 20% -10%,#0c1630,transparent),
+    radial-gradient(900px 500px at 100% 0%,#081628,transparent),
+    var(--bg);
+    color:var(--text);font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  .wrap{max-width:1250px;margin:88px auto 28px;padding:0 16px}
+
+  /* Sticky top bar with team chips */
+  .mast{position:fixed;top:0;left:0;right:0;backdrop-filter:blur(10px);
+    background:linear-gradient(180deg,rgba(13,23,36,.85),rgba(13,23,36,.55));
+    border-bottom:1px solid var(--border);z-index:20}
+  .mast-inner{max-width:1250px;margin:0 auto;padding:12px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .brand{font-weight:700;letter-spacing:.2px}
+  .chip{display:flex;align-items:center;gap:8px;border:1px solid var(--border);padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.03)}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .dot.a{background:var(--brand)}.dot.b{background:var(--accent)}
+  .sep{opacity:.5}
+
+  .card{background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01)),var(--panel);
+    border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
   .toolbar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
   .toolbar > div{display:flex;flex-direction:column;gap:6px}
-  select,input,button{appearance:none;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 12px}
-  input[type="search"]{min-width:220px}
+  select,input,button{appearance:none;background:rgba(255,255,255,.035);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:10px 12px}
   button{cursor:pointer}
+
   .grid{display:grid;gap:16px}
   .grid-2{grid-template-columns:1fr 1fr}
   @media (max-width:1000px){.grid-2{grid-template-columns:1fr}}
-  .error{background:#2a1320;border:1px solid #5c1e34;color:#ffd1da;padding:10px 12px;border-radius:10px;margin-bottom:12px;white-space:pre-wrap;display:none}
-  .info{background:#112333;border:1px solid #214a5e;color:#c9f1ff;padding:10px 12px;border-radius:10px;margin-top:8px}
-  .svgbox{width:100%; height:360px; border:1px solid var(--border); border-radius:12px; background:rgba(255,255,255,.01); display:flex; align-items:center; justify-content:center}
-  .legend{display:flex;gap:12px;align-items:center;font-size:12px;color:#a9b4c2;margin-top:8px}
-  .dot{width:10px;height:10px;border-radius:50%}
-  .dot.a{background:var(--brand)}.dot.b{background:var(--accent)}
-  .statgrid{display:grid;gap:10px;grid-template-columns:repeat(4,minmax(180px,1fr))}
-  @media (max-width:1100px){.statgrid{grid-template-columns:repeat(2,minmax(180px,1fr))}}
-  .stat{border:1px solid var(--border);border-radius:12px;padding:10px;background:rgba(255,255,255,.02);min-height:74px}
-  .stat label{font-size:12px;color:var(--muted)}
-  .stat .v{font-weight:700;font-size:18px;margin-top:4px}
-  .fade{opacity:.6}
+
+  .error{background:#2a1320;border:1px solid #5c1e34;color:#ffd1da;padding:10px 12px;border-radius:10px;margin:10px 0;white-space:pre-wrap;display:none}
+  .info{background:#0f2233;border:1px solid #1d3e56;color:#c9f1ff;padding:10px 12px;border-radius:12px;margin-top:8px}
+
+  .svgbox{width:100%; height:360px; border:1px dashed var(--border); border-radius:14px;
+    background:rgba(255,255,255,.02); display:flex; align-items:center; justify-content:center}
+
+  /* Snapshot cards now show A and B values with labels */
+  .snapgrid{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(240px,1fr))}
+  @media (max-width:980px){.snapgrid{grid-template-columns:1fr}}
+  .stat{border:1px solid var(--border);border-radius:14px;padding:12px;background:rgba(255,255,255,.02);min-height:84px}
+  .stat>label{font-size:12px;color:var(--muted);display:block;margin-bottom:8px}
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .val{display:flex;flex-direction:column;gap:2px}
+  .who{display:flex;align-items:center;gap:8px;color:#a9b4c2;font-size:11px}
+  .v{font-weight:800;font-size:20px}
+  .fade{opacity:.55}
+
   table{width:100%;border-collapse:collapse}
-  th,td{border-bottom:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top}
-  th{color:#c8d2e0;font-weight:600}
-  .advA{color:var(--brand);font-weight:600}
-  .advB{color:var(--accent);font-weight:600}
+  th,td{border-bottom:1px solid var(--border);padding:10px;text-align:left;vertical-align:top}
+  th{color:#c8d2e0;font-weight:700}
+  .advA{color:var(--brand);font-weight:700}
+  .advB{color:var(--accent);font-weight:700}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Team Analytics <span class="pill">Local JSON only</span> <span class="pill">Compare & Explore</span></h1>
 
+<!-- Sticky header with explicit labels -->
+<div class="mast">
+  <div class="mast-inner">
+    <div class="brand">Team Analytics</div>
+    <span class="sep">•</span>
+    <div id="mastYear" class="chip">Season <strong style="margin-left:6px" id="mastYearTxt"></strong></div>
+    <div id="mastA" class="chip"><span class="dot a"></span><span id="mastATxt">Team A</span></div>
+    <div id="mastB" class="chip"><span class="dot b"></span><span id="mastBTxt">Team B</span></div>
+  </div>
+</div>
+
+<div class="wrap">
   <div id="errorBox" class="error"></div>
 
   <div class="card">
@@ -68,23 +99,21 @@
         <label>Quick search</label>
         <input id="searchTeams" type="search" placeholder="Type to filter teams…" />
       </div>
-      <div>
-        <button id="swap">Swap A ↔ B</button>
-      </div>
+      <div><button id="swap">Swap A ↔ B</button></div>
     </div>
-    <div class="info">Data source: <code>docs/data/team_stats.json</code> and <code>docs/data/cfbrank.json</code>. This page does not use any API key.</div>
+    <div class="info">Local JSON only: <code>docs/data/team_stats.json</code> and <code>docs/data/cfbrank.json</code>.</div>
   </div>
 
   <div class="grid grid-2" style="margin-top:16px">
     <div class="card">
       <h3>Offensive Profile (Spider)</h3>
       <div id="offRadar" class="svgbox"></div>
-      <div class="legend"><span class="dot a"></span>Team A &nbsp;&nbsp;<span class="dot b"></span>Team B</div>
+      <div class="who" style="margin-top:8px"><span class="dot a"></span><span id="legendA1">Team A</span>&nbsp;&nbsp;<span class="dot b"></span><span id="legendB1">Team B</span></div>
     </div>
     <div class="card">
       <h3>Defensive Profile (Spider)</h3>
       <div id="defRadar" class="svgbox"></div>
-      <div class="legend"><span class="dot a"></span>Team A &nbsp;&nbsp;<span class="dot b"></span>Team B</div>
+      <div class="who" style="margin-top:8px"><span class="dot a"></span><span id="legendA2">Team A</span>&nbsp;&nbsp;<span class="dot b"></span><span id="legendB2">Team B</span></div>
     </div>
   </div>
 
@@ -92,26 +121,26 @@
     <div class="card">
       <h3>Head-to-Head Efficiency (Bars)</h3>
       <div id="barsH2H" class="svgbox"></div>
-      <div class="legend"><span class="dot a"></span>Team A &nbsp;&nbsp;<span class="dot b"></span>Team B</div>
+      <div class="who" style="margin-top:8px"><span class="dot a"></span><span id="legendA3">Team A</span>&nbsp;&nbsp;<span class="dot b"></span><span id="legendB3">Team B</span></div>
     </div>
     <div class="card">
       <h3>Pace & Play Mix (Bars)</h3>
       <div id="barsPace" class="svgbox"></div>
-      <div class="legend"><span class="dot a"></span>Team A &nbsp;&nbsp;<span class="dot b"></span>Team B</div>
+      <div class="who" style="margin-top:8px"><span class="dot a"></span><span id="legendA4">Team A</span>&nbsp;&nbsp;<span class="dot b"></span><span id="legendB4">Team B</span></div>
     </div>
   </div>
 
   <div class="card" style="margin-top:16px">
-    <h3>Snapshot – Easy-to-read Key Stats</h3>
-    <div id="snap" class="statgrid"></div>
-    <div class="info">Gray entries mean a value couldn’t be computed from the JSON for that team/year.</div>
+    <h3>Snapshot — Easy-to-read Key Stats</h3>
+    <!-- NEW: clearly labeled A/B values per stat -->
+    <div id="snap" class="snapgrid"></div>
   </div>
 
   <div class="card" style="margin-top:16px">
     <h3>Full Comparison Table</h3>
     <table id="statTable">
       <thead>
-        <tr><th>Stat</th><th>Team A</th><th>Team B</th><th>How it’s calculated</th></tr>
+        <tr><th>Stat</th><th id="thA">Team A</th><th id="thB">Team B</th><th>How it’s calculated</th></tr>
       </thead>
       <tbody></tbody>
     </table>
@@ -119,19 +148,19 @@
 </div>
 
 <script>
-// ====================== LOCAL JSON ONLY ======================
+/* ---------- Local JSON only ---------- */
 (function(){
-  const PATH_STATS = "data/team_stats.json";  // relative to docs/
-  const PATH_RANKS = "data/cfbrank.json";     // relative to docs/
+  const PATH_STATS = "data/team_stats.json";
+  const PATH_RANKS = "data/cfbrank.json";
 
   const $ = id => document.getElementById(id);
   const errBox = $("errorBox");
-  const showErr = (m)=>{errBox.style.display="block";errBox.textContent=m;};
-  const clearErr= ()=>{errBox.style.display="none";errBox.textContent="";};
+  const showErr = m => { errBox.style.display="block"; errBox.textContent=m; };
+  const clearErr = () => { errBox.style.display="none"; errBox.textContent=""; };
 
   let RAW=[], RANKS={}, YEARS=[], TEAMS_BY_YEAR={}, SELECTED_YEAR=null;
 
-  const unique = (a)=>Array.from(new Set(a));
+  const unique = a => Array.from(new Set(a));
   const num = v => (typeof v === "number" && isFinite(v)) ? v : null;
   const fmt = (v,d=3) => (v==null||isNaN(v)) ? "—" : Number(v).toFixed(d);
   const pct = v => (v==null||isNaN(v)) ? "—" : (v*100).toFixed(1)+"%";
@@ -142,7 +171,6 @@
   function totalYds(s){ return get(s,"overall__totalyards") ?? ((get(s,"overall__netpassingyards")||0)+(get(s,"overall__rushingyards")||0)); }
   function oppTotalYds(s){ return get(s,"overall__totalyardsopponent") ?? ((get(s,"overall__netpassingyardsopponent")||0)+(get(s,"overall__rushingyardsopponent")||0)); }
   function perGame(v,s){ const g=games(s); return (v!=null && g>0) ? v/g : null; }
-
   function playsOff(s){ return num(s?.advanced?.offense?.plays) ?? ((get(s,"overall__passattempts")||0)+(get(s,"overall__rushingattempts")||0)); }
   function playsDef(s){ return num(s?.advanced?.defense?.plays) ?? ((get(s,"overall__passattemptsopponent")||0)+(get(s,"overall__rushingattemptsopponent")||0)); }
 
@@ -164,10 +192,10 @@
   const defSackRate  = s => { const att=oppPassAtt(s); return (att && sacksDef(s)!=null) ? sacksDef(s)/att : null; };
   const thirdConv    = s => get(s,"overall__thirddownconversions");
   const thirdDowns   = s => get(s,"overall__thirddowns");
-  const thirdRate    = s => (thirdConv(s)!=null && thirdDowns(s)>0) ? thirdConv(s)/thirdDowns(s) : null;
+  const thirdRate    = s => (thirdConv(s)!=null && thirdDowns(s)>0) ? thirdConv/thirdDowns : null;
   const oppThirdConv = s => get(s,"overall__thirddownconversionsopponent");
   const oppThirdDowns= s => get(s,"overall__thirddownsopponent");
-  const oppThirdRate = s => (oppThirdConv(s)!=null && oppThirdDowns(s)>0) ? oppThirdConv(s)/oppThirdDowns(s) : null;
+  const oppThirdRate = s => (oppThirdConv(s)!=null && oppThirdDowns(s)>0) ? oppThirdConv/oppThirdDowns : null;
 
   function prefixedName(team){
     const rk = (RANKS?.teams||{})[team];
@@ -175,7 +203,6 @@
   }
 
   async function loadAll(){
-    clearErr();
     const [statsRes, ranksRes] = await Promise.all([
       fetch(PATH_STATS, {cache:"no-store"}),
       fetch(PATH_RANKS, {cache:"no-store"})
@@ -186,44 +213,36 @@
     RANKS = await ranksRes.json();
     YEARS = unique(RAW.map(r=>r.year)).sort((a,b)=>b-a);
     TEAMS_BY_YEAR = {};
-    for(const r of RAW){
-      (TEAMS_BY_YEAR[r.year] ||= []).push(r.team);
-    }
-    for(const y of Object.keys(TEAMS_BY_YEAR)){
-      TEAMS_BY_YEAR[y] = unique(TEAMS_BY_YEAR[y]).sort((a,b)=>a.localeCompare(b));
-    }
+    for(const r of RAW){ (TEAMS_BY_YEAR[r.year] ||= []).push(r.team); }
+    for(const y of Object.keys(TEAMS_BY_YEAR)){ TEAMS_BY_YEAR[y] = unique(TEAMS_BY_YEAR[y]).sort((a,b)=>a.localeCompare(b)); }
   }
 
   function populateYearSelect(){
     $("year").innerHTML = YEARS.map(y=>`<option value="${y}">${y}</option>`).join("");
     const prefer = RANKS?.season && YEARS.includes(RANKS.season) ? RANKS.season : YEARS[0];
     $("year").value = prefer;
-    SELECTED_YEAR = prefer;
   }
   function populateTeamSelects(){
-    const teams = TEAMS_BY_YEAR[SELECTED_YEAR] || [];
+    const yr = Number($("year").value);
+    const teams = TEAMS_BY_YEAR[yr] || [];
     const opts = teams.map(t=>`<option value="${t}">${prefixedName(t)}</option>`).join("");
     $("teamA").innerHTML = opts;
     $("teamB").innerHTML = opts;
-    if(teams.length){
-      $("teamA").value = teams[0];
-      $("teamB").value = teams[Math.min(1, teams.length-1)];
-    }
+    if(teams.length){ $("teamA").value = teams[0]; $("teamB").value = teams[Math.min(1, teams.length-1)]; }
   }
+
   function filterTeams(q){
-    const teams = (TEAMS_BY_YEAR[SELECTED_YEAR] || []);
+    const yr = Number($("year").value);
+    const teams = (TEAMS_BY_YEAR[yr] || []);
     const f = q.trim().toLowerCase();
     const list = f ? teams.filter(t=>t.toLowerCase().includes(f)) : teams.slice();
     const opts = list.map(t=>`<option value="${t}">${prefixedName(t)}</option>`).join("");
-    $("teamA").innerHTML = opts;
-    $("teamB").innerHTML = opts;
+    $("teamA").innerHTML = opts; $("teamB").innerHTML = opts;
   }
 
-  function findTeam(year, name){
-    return RAW.find(r => r.year === Number(year) && r.team === name) || null;
-  }
+  const findTeam = (year,name)=> RAW.find(r=>r.year===Number(year)&&r.team===name) || null;
 
-  // -------- SVG helpers --------
+  /* ---------- SVG helpers ---------- */
   function el(name, attrs={}, children=[]){
     const n=document.createElementNS("http://www.w3.org/2000/svg",name);
     Object.entries(attrs).forEach(([k,v])=> n.setAttribute(k,v));
@@ -233,21 +252,20 @@
   function clear(node){ while(node.firstChild) node.removeChild(node.firstChild); }
   function barChartDual(node, labels, A, B){
     clear(node);
-    const w=node.clientWidth||640, h=node.clientHeight||360, pad={l:90,r:24,t:24,b:44};
+    const w=node.clientWidth||640, h=node.clientHeight||360, pad={l:96,r:24,t:24,b:48};
     const svg=el("svg",{width:w,height:h,viewBox:`0 0 ${w} ${h}`});
     const gw=w-pad.l-pad.r, gh=h-pad.t-pad.b;
     const max=Math.max(0.001, ...A.map(v=>Math.abs(v||0)), ...B.map(v=>Math.abs(v||0)));
     svg.appendChild(el("rect",{x:pad.l,y:pad.t,width:gw,height:gh,fill:"none",stroke:"#223045"}));
-    const band=gw/labels.length;
-    const bw=band*0.36;
+    const band=gw/labels.length, bw=band*0.36;
     labels.forEach((lab,i)=>{
       const x=pad.l+band*i;
       const vA=A[i]??0, vB=B[i]??0;
       const hA=(Math.abs(vA)/max)*(gh*0.9), hB=(Math.abs(vB)/max)*(gh*0.9);
       const yA=pad.t+gh-hA, yB=pad.t+gh-hB;
-      svg.appendChild(el("rect",{x:x+band*0.5-bw-3,y:yA,width:bw,height:hA,fill:"var(--brand)"}));
-      svg.appendChild(el("rect",{x:x+band*0.5+3,y:yB,width:bw,height:hB,fill:"var(--accent)"}));
-      svg.appendChild(el("text",{x:x+band*0.5,y:pad.t+gh+16,fill:"#a9b4c2","text-anchor":"middle","font-size":"11"},[document.createTextNode(lab)]));
+      svg.appendChild(el("rect",{x:x+band*0.5-bw-3,y:yA,width:bw,height:hA,fill:"var(--brand)",rx:"4"}));
+      svg.appendChild(el("rect",{x:x+band*0.5+3,y:yB,width:bw,height:hB,fill:"var(--accent)",rx:"4"}));
+      svg.appendChild(el("text",{x:x+band*0.5,y:pad.t+gh+18,fill:"#a9b4c2","text-anchor":"middle","font-size":"11"},[document.createTextNode(lab)]));
     });
     node.appendChild(svg);
   }
@@ -277,45 +295,33 @@
     node.appendChild(svg);
   }
 
+  /* ---------- Metrics ---------- */
   const METRICS = [
     ["Points per Play (Offense)",     s => offPPA(s),                     "From advanced metrics (PPA). Higher is better."],
+    ["Yards per Play (Offense)",      s => offYPP(s),                     "Total yards divided by offensive plays. Higher is better."],
     ["Success Rate (Offense)",        s => offSR(s),                      "Share of plays that keep the drive on schedule. Higher is better."],
     ["Explosiveness (Offense)",       s => offEX(s),                      "How big the gains are when a play hits. Higher is better."],
-    ["Yards per Play (Offense)",      s => offYPP(s),                     "Total yards divided by offensive plays. Higher is better."],
-
     ["Points per Play Allowed",       s => defPPA(s),                     "Points allowed per play. Lower is better."],
+    ["Yards per Play Allowed",        s => defYPP(s),                     "Opponents’ yards per defensive play. Lower is better."],
     ["Success Rate Allowed",          s => defSR(s),                      "Opponents’ on-schedule rate. Lower is better."],
     ["Explosiveness Allowed",         s => defEX(s),                      "Opponents’ gain size on hits. Lower is better."],
-    ["Yards per Play Allowed",        s => defYPP(s),                     "Opponents’ total yards divided by defensive plays. Lower is better."],
-
-    ["Total Yards per Game",          s => perGame(totalYds(s), s),       "Team total yards / games. Higher is better."],
-    ["Opponent Yards per Game",       s => perGame(oppTotalYds(s), s),    "Opponents’ total yards / games. Lower is better."],
-    ["Plays per Game (Offense)",      s => perGame(playsOff(s), s),       "Offensive plays / games. Pace indicator."],
-    ["Time of Possession per Game",   s => perGame(get(s,"overall__possessiontime"), s), "Seconds with the ball per game."],
-    ["First Downs per Game",          s => perGame(get(s,"overall__firstdowns"), s),     "First downs / games. Higher is better."],
-    ["First Downs Allowed per Game",  s => perGame(get(s,"overall__firstdownsopponent"), s), "Opponents’ first downs / games. Lower is better."],
+    ["Plays per Game (Offense)",      s => perGame(playsOff(s), s),       "Offensive plays / game (pace)."],
+    ["Pass Rate (share of plays)",    s => { const pa=passAtt(s), ra=rushAtt(s); return (pa!=null&&ra!=null&&pa+ra>0)? pa/(pa+ra): null; }, "Pass attempts as share of plays."],
+    ["Rush Rate (share of plays)",    s => { const pa=passAtt(s), ra=rushAtt(s); return (pa!=null&&ra!=null&&pa+ra>0)? ra/(pa+ra): null; }, "Rush attempts as share of plays."],
+    ["Total Yards per Game",          s => perGame(totalYds(s), s),       "Team total yards / game."],
+    ["Opponent Yards per Game",       s => perGame(oppTotalYds(s), s),    "Opponents’ total yards / game."],
+    ["First Downs per Game",          s => perGame(get(s,"overall__firstdowns"), s), "First downs / game."],
     ["Turnover Margin per Game",      s => { const to=get(s,"overall__turnovers"); const ta=get(s,"overall__turnoversopponent"); const g=games(s); return (to!=null&&ta!=null&&g>0)? (ta-to)/g : null; }, "(Takeaways − giveaways) / game. Higher is better."],
-    ["Third-Down Conversion Rate",    s => thirdRate(s),                  "Conversions / attempts on 3rd down. Higher is better."],
-    ["Third-Down Allowed Rate",       s => oppThirdRate(s),               "Opponents’ 3rd-down conversions / attempts. Lower is better."],
-    ["Offensive Sack Rate",           s => offSackRate(s),                "Sacks allowed / pass attempts. Lower is better."],
-    ["Defensive Sack Rate",           s => defSackRate(s),                "Sacks made / opponent pass attempts. Higher is better."],
-    ["Pass Rate (share of plays)",    s => { const pa=passAtt(s), ra=rushAtt(s); return (pa!=null&&ra!=null&&pa+ra>0)? pa/(pa+ra): null; }, "Pass attempts share of total plays."],
-    ["Rush Rate (share of plays)",    s => { const pa=passAtt(s), ra=rushAtt(s); return (pa!=null&&ra!=null&&pa+ra>0)? ra/(pa+ra): null; }, "Rush attempts share of total plays."],
-    ["Penalties per Game",            s => perGame(get(s,"overall__penalties"), s),      "Flags against the team per game. Lower is better."],
-    ["Penalty Yards per Game",        s => perGame(get(s,"overall__penaltyyards"), s),   "Penalty yards per game. Lower is better."],
-    ["FPI (if present)",              s => num(s?.fpi?.fpi),              "From your JSON’s fpi field."]
+    ["Time of Possession per Game",   s => perGame(get(s,"overall__possessiontime"), s), "Seconds with the ball / game."]
   ];
 
-  function preferHigh(name){
-    const lowIsBetter = ["Allowed","Sack Rate","Penalties","Penalty Yards"];
-    return !lowIsBetter.some(k=>name.includes(k));
-  }
-  function advantageClass(name, a, b){
+  const preferHigh = name => !["Allowed","Sack Rate","Penalties","Penalty Yards","Opponent"].some(k=>name.includes(k));
+  const advantageClass = (name, a, b)=>{
     if(a==null || b==null) return "";
     const highWins = preferHigh(name);
     if(highWins){ return a>b ? "advA" : (b>a ? "advB" : ""); }
     else{        return a<b ? "advA" : (b<a ? "advB" : ""); }
-  }
+  };
 
   function computeMaxima(dataset){
     return dataset.reduce((m,s)=>{
@@ -333,6 +339,17 @@
   }
   const norm = (v,max) => Math.min(1,(v||0)/(max||1));
 
+  function updateMast(year, Aname, Bname){
+    $("mastYearTxt").textContent = String(year);
+    $("mastATxt").textContent = Aname;
+    $("mastBTxt").textContent = Bname;
+    // chart legends & table headers
+    ["legendA1","legendA2","legendA3","legendA4"].forEach(id=>$(id).textContent=Aname);
+    ["legendB1","legendB2","legendB3","legendB4"].forEach(id=>$(id).textContent=Bname);
+    $("thA").textContent = Aname;
+    $("thB").textContent = Bname;
+  }
+
   function renderAll(){
     clearErr();
     const year = Number($("year").value);
@@ -341,6 +358,8 @@
     const A = findTeam(year, Aname);
     const B = findTeam(year, Bname);
     if(!A || !B){ showErr("Selected teams not found in JSON for that season."); return; }
+
+    updateMast(year, prefixedName(Aname), prefixedName(Bname));
 
     const pool = RAW.filter(r=>r.year===year);
     const MAX = computeMaxima(pool);
@@ -368,6 +387,7 @@
     const BpassShare = (()=>{const pa=passAtt(B), ra=rushAtt(B); return (pa!=null&&ra!=null&&(pa+ra)>0)? pa/(pa+ra):0;})();
     barChartDual($("barsPace"), ["Plays/Game","Pass Rate"], [Apg,ApassShare], [Bpg,BpassShare]);
 
+    // ----- Snapshot with clear labels for A & B -----
     const snapNames = [
       "Points per Play (Offense)","Yards per Play (Offense)","Success Rate (Offense)","Explosiveness (Offense)",
       "Points per Play Allowed","Yards per Play Allowed","Success Rate Allowed","Explosiveness Allowed",
@@ -375,25 +395,39 @@
       "Total Yards per Game","Opponent Yards per Game","First Downs per Game","Turnover Margin per Game","Time of Possession per Game"
     ];
     const snap = $("snap"); snap.innerHTML="";
-    snapNames.forEach(name=>{
-      const m = METRICS.find(x=>x[0]===name);
-      const va = m? m[1](A) : null;
-      const isPct = /Rate|share/i.test(name);
-      const isClock = /Time of Possession/i.test(name);
-      const vtxt = isPct ? pct(va) : (isClock ? secToClock(va) : fmt(va, name.includes("Yards")?2:3));
-      const div=document.createElement("div"); div.className="stat"+(va==null?" fade":"");
-      div.innerHTML=`<label>${name}</label><div class="v">${vtxt}</div>`;
-      snap.appendChild(div);
-    });
+    const isPctName = n => /Rate|share/i.test(n);
+    const isClock = n => /Time of Possession/i.test(n);
 
+    for(const name of snapNames){
+      const getter = METRICS.find(m=>m[0]===name)?.[1];
+      const Av = getter? getter(A) : null;
+      const Bv = getter? getter(B) : null;
+      const Atext = isPctName(name) ? pct(Av) : (isClock(name) ? secToClock(Av) : fmt(Av, name.includes("Yards")?2:3));
+      const Btext = isPctName(name) ? pct(Bv) : (isClock(name) ? secToClock(Bv) : fmt(Bv, name.includes("Yards")?2:3));
+      const adv = advantageClass(name, Av, Bv);
+      const div=document.createElement("div"); div.className="stat";
+      div.innerHTML = `
+        <label>${name}</label>
+        <div class="pair">
+          <div class="val ${Av==null?'fade':''}">
+            <div class="who"><span class="dot a"></span><span>${prefixedName(Aname)}</span></div>
+            <div class="v ${adv==='advA'?'advA':''}">${Atext}</div>
+          </div>
+          <div class="val ${Bv==null?'fade':''}">
+            <div class="who"><span class="dot b"></span><span>${prefixedName(Bname)}</span></div>
+            <div class="v ${adv==='advB'?'advB':''}">${Btext}</div>
+          </div>
+        </div>`;
+      snap.appendChild(div);
+    }
+
+    // ----- Full table remains, but headers are named -----
     const tbody = $("statTable").querySelector("tbody");
     tbody.innerHTML="";
     for(const [name,getter,desc] of METRICS){
       const Av = getter(A), Bv = getter(B);
-      const isPct = /Rate|share/i.test(name);
-      const isClock = /Time of Possession/i.test(name);
-      const Avs = isPct ? pct(Av) : (isClock ? secToClock(Av) : fmt(Av, name.includes("Yards")?2:3));
-      const Bvs = isPct ? pct(Bv) : (isClock ? secToClock(Bv) : fmt(Bv, name.includes("Yards")?2:3));
+      const Avs = (/Rate|share/i.test(name)) ? pct(Av) : (/Time of Possession/i.test(name) ? secToClock(Av) : fmt(Av, name.includes("Yards")?2:3));
+      const Bvs = (/Rate|share/i.test(name)) ? pct(Bv) : (/Time of Possession/i.test(name) ? secToClock(Bv) : fmt(Bv, name.includes("Yards")?2:3));
       const advClsA = advantageClass(name, Av, Bv)==="advA" ? "advA" : "";
       const advClsB = advantageClass(name, Av, Bv)==="advB" ? "advB" : "";
       const tr=document.createElement("tr");
@@ -405,17 +439,13 @@
     }
   }
 
-  $("year").addEventListener("change", ()=>{
-    SELECTED_YEAR = Number($("year").value);
-    populateTeamSelects();
-    renderAll();
-  });
+  // events
+  $("year").addEventListener("change", ()=>{ populateTeamSelects(); renderAll(); });
   $("teamA").addEventListener("change", renderAll);
   $("teamB").addEventListener("change", renderAll);
   $("swap").addEventListener("click", ()=>{
     const a=$("teamA").value, b=$("teamB").value;
-    $("teamA").value=b; $("teamB").value=a;
-    renderAll();
+    $("teamA").value=b; $("teamB").value=a; renderAll();
   });
   $("searchTeams").addEventListener("input", e=> filterTeams(e.target.value));
 
@@ -426,7 +456,7 @@
       populateTeamSelects();
       renderAll();
     }catch(e){
-      showErr(e.message+"\n\nMake sure this file lives at docs/analytics.html and the JSON files are at:\n- docs/data/team_stats.json\n- docs/data/cfbrank.json");
+      showErr(e.message+"\n\nEnsure files exist:\n- docs/data/team_stats.json\n- docs/data/cfbrank.json");
     }
   })();
 })();
