@@ -3,103 +3,151 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Team Analytics – No-CDN Build</title>
+<title>College Team Analytics – Compare & Explore</title>
 <style>
-  :root{--bg:#0c1117;--panel:#0f1621;--muted:#9aa4b2;--text:#e6edf3;--brand:#4aa9ff;--border:#1e2633;--good:#2dd4bf;--bad:#f43f5e;--radius:14px}
-  *{box-sizing:border-box} body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#0b1220,transparent),radial-gradient(900px 500px at 100% 0%,#071422,transparent),var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-  .wrap{max-width:1200px;margin:28px auto;padding:0 16px}
-  .header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
-  .title{font-size:28px;font-weight:700;letter-spacing:.2px;display:flex;gap:10px;align-items:center}
+  :root{
+    --bg:#0b111a;--panel:#0f1621;--muted:#95a3b8;--text:#e6edf3;
+    --border:#1e2633;--brand:#4aa9ff;--good:#2dd4bf;--bad:#f43f5e;
+    --warn:#f59e0b;--radius:14px
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#0b1220,transparent),radial-gradient(900px 500px at 100% 0%,#071422,transparent),var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  .wrap{max-width:1250px;margin:28px auto;padding:0 16px}
+  .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  h1{font-size:26px;margin:0 0 10px}
   .pill{background:#0b1420;border:1px solid var(--border);padding:4px 10px;border-radius:999px;color:#cbd5e1;font-size:12px}
-  select{appearance:none;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 14px;min-width:220px}
+  select{appearance:none;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 12px;min-width:220px}
   .card{background:linear-gradient(180deg,rgba(255,255,255,.02),transparent),var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
-  .card h3{margin:0 0 12px;font-size:16px}
-  .snapshot{display:grid;gap:12px;grid-template-columns:repeat(6,minmax(160px,1fr))}
-  @media (max-width:1100px){.snapshot{grid-template-columns:repeat(3,minmax(160px,1fr))}}
-  @media (max-width:640px){.snapshot{grid-template-columns:repeat(2,minmax(140px,1fr))}}
-  .stat{border:1px solid var(--border);border-radius:12px;padding:12px;min-height:84px;display:flex;flex-direction:column;gap:6px;background:rgba(255,255,255,.01)}
-  .stat label{color:var(--muted);font-size:12px;display:flex;align-items:center;gap:6px}
-  .stat .value{font-size:18px;font-weight:700}
-  .info{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid #2a3750;color:#9fb3c8;font-size:11px;cursor:default}
-  .note{color:#95a3b8;font-size:12px;margin-top:10px}
   .grid{display:grid;gap:16px}
-  @media (min-width:880px){.grid-2{grid-template-columns:1fr 1fr}}
+  .grid-2{grid-template-columns:1fr 1fr}
+  .grid-3{grid-template-columns:1fr 1fr 1fr}
+  @media (max-width:1000px){.grid-2,.grid-3{grid-template-columns:1fr}}
   .error{background:#2a1320;border:1px solid #5c1e34;color:#ffd1da;padding:10px 12px;border-radius:10px;margin-bottom:12px;display:none;white-space:pre-wrap}
-  /* SVG containers */
-  .svgbox{width:100%; height:380px; border:1px solid var(--border); border-radius:12px; background:rgba(255,255,255,.01); display:flex; align-items:center; justify-content:center}
-  .legend{display:flex;gap:10px;align-items:center;font-size:12px;color:#a9b4c2;margin-top:8px}
-  .legend .dot{width:10px;height:10px;border-radius:50%;background:#4aa9ff}
+  .svgbox{width:100%; height:360px; border:1px solid var(--border); border-radius:12px; background:rgba(255,255,255,.01); display:flex; align-items:center; justify-content:center}
+  .legend{display:flex;gap:12px;align-items:center;font-size:12px;color:#a9b4c2;margin-top:8px}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .dot.a{background:#4aa9ff}.dot.b{background:#9b59ff}
+  .statgrid{display:grid;gap:10px;grid-template-columns:repeat(4,minmax(180px,1fr))}
+  @media (max-width:1100px){.statgrid{grid-template-columns:repeat(2,minmax(180px,1fr))}}
+  .stat{border:1px solid var(--border);border-radius:12px;padding:10px;background:rgba(255,255,255,.02);min-height:74px}
+  .stat label{font-size:12px;color:var(--muted)}
+  .stat .v{font-weight:700;font-size:18px;margin-top:4px}
+  .fade{opacity:.6}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid var(--border);padding:8px 10px;text-align:left}
+  th{color:#c8d2e0;font-weight:600}
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .search{flex:1;min-width:200px}
+  input[type="search"]{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#0e1520;color:var(--text)}
+  .note{color:#95a3b8;font-size:12px;margin-top:10px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="header">
-    <div class="title">
-      <span>Team Analytics</span>
-      <span class="pill" id="rankPill">#—</span>
-      <span class="pill" id="teamPill">—</span>
-    </div>
-    <select id="teamSelect" aria-label="Select team"></select>
-  </div>
+  <h1>Team Analytics <span class="pill">No-CDN</span> <span class="pill">Comprehensive</span></h1>
 
   <div id="errorBox" class="error"></div>
 
   <div class="card">
-    <h3>Snapshot</h3>
-    <div class="snapshot">
-      <div class="stat"><label>Points per Play (Offense) <span class="info" title="Average points added by the offense on each play.">i</span></label><div class="value" id="offPPA">—</div></div>
-      <div class="stat"><label>Success Rate (Offense) <span class="info" title="Share of plays that keep the drive on schedule (down & distance).">i</span></label><div class="value" id="offSR">—</div></div>
-      <div class="stat"><label>Explosiveness (Offense) <span class="info" title="How big the gains are when a play hits.">i</span></label><div class="value" id="offExp">—</div></div>
-      <div class="stat"><label>Yards per Play (Offense)</label><div class="value" id="offYPP">—</div></div>
-
-      <div class="stat"><label>Points per Play Allowed (Defense)</label><div class="value" id="defPPA">—</div></div>
-      <div class="stat"><label>Success Rate Allowed (Defense)</label><div class="value" id="defSR">—</div></div>
-      <div class="stat"><label>Explosiveness Allowed (Defense)</label><div class="value" id="defExp">—</div></div>
-      <div class="stat"><label>Yards per Play Allowed (Defense)</label><div class="value" id="defYPP">—</div></div>
-
-      <div class="stat"><label>Power Index</label><div class="value" id="fpiVal">—</div></div>
-      <div class="stat"><label>Offensive Plays</label><div class="value" id="playsOff">—</div></div>
-      <div class="stat"><label>Defensive Plays Faced</label><div class="value" id="playsDef">—</div></div>
-      <div class="stat"><label>Games Played</label><div class="value" id="games">—</div></div>
+    <div class="toolbar">
+      <div>
+        <label>Team A</label><br/>
+        <select id="teamA"></select>
+      </div>
+      <div>
+        <label>Team B (compare)</label><br/>
+        <select id="teamB"></select>
+      </div>
+      <div class="search">
+        <label>Filter teams</label>
+        <input id="filterBox" type="search" placeholder="Type to filter by school name…"/>
+      </div>
+      <span class="note">Paste your raw JSON in the block at the bottom. The picks update instantly.</span>
     </div>
-    <div class="note">All values are per play unless noted. “Allowed” = what your defense gave up to opponents.</div>
   </div>
 
   <div class="grid grid-2" style="margin-top:16px">
     <div class="card">
       <h3>Offensive Profile (Spider)</h3>
-      <div id="radarBox" class="svgbox"></div>
-      <div class="legend"><span class="dot"></span>Offense (normalized within the selected dataset)</div>
+      <div id="offRadar" class="svgbox"></div>
+      <div class="legend"><span class="dot a"></span>Team A &nbsp;&nbsp;<span class="dot b"></span>Team B</div>
     </div>
     <div class="card">
-      <h3>Efficiency Comparison (Bars)</h3>
-      <div id="barsBox" class="svgbox"></div>
-      <div class="legend"><span class="dot"></span>Selected team</div>
+      <h3>Defensive Profile (Spider)</h3>
+      <div id="defRadar" class="svgbox"></div>
+      <div class="legend"><span class="dot a"></span>Team A &nbsp;&nbsp;<span class="dot b"></span>Team B</div>
     </div>
+  </div>
+
+  <div class="grid grid-2" style="margin-top:16px">
+    <div class="card">
+      <h3>Head-to-Head Efficiency (Bars)</h3>
+      <div id="barsH2H" class="svgbox"></div>
+      <div class="legend"><span class="dot a"></span>Team A &nbsp;&nbsp;<span class="dot b"></span>Team B</div>
+    </div>
+    <div class="card">
+      <h3>Pace & Play Mix (Bars)</h3>
+      <div id="barsPace" class="svgbox"></div>
+      <div class="legend"><span class="dot a"></span>Team A &nbsp;&nbsp;<span class="dot b"></span>Team B</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Snapshot – Key Stats</h3>
+    <div id="snap" class="statgrid"></div>
+    <div class="note">Gray entries mean a value couldn’t be computed from your JSON fields.</div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Full Stat Table</h3>
+    <table id="statTable">
+      <thead>
+        <tr><th>Stat</th><th>Team A</th><th>Team B</th><th>How it’s calculated</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </div>
 </div>
 
-<!-- PASTE YOUR RAW JSON ARRAY BETWEEN THESE TAGS (comments/trailing commas are OK) -->
+<!-- ==== PASTE YOUR RAW JSON ARRAY BELOW (comments ok, trailing commas ok) ==== -->
 <script id="teams-json" type="text/plain">
 [
   {
     "team":"Alabama","year":2025,
     "simple":{
       "overall__games":5,
-      "overall__netpassingyards":1627,
-      "overall__rushingyards":634,
-      "overall__passattempts":176,
-      "overall__rushattempts":163,
-      "overall__netpassingyardsopponent":652,
-      "overall__rushingyardsopponent":778
+      "overall__netpassingyards":1627,"overall__rushingyards":634,
+      "overall__passattempts":176,"overall__rushattempts":163,
+      "overall__netpassingyardsopponent":652,"overall__rushingyardsopponent":778,
+      "overall__firstdowns":119,"overall__firstdownsopponent":77,
+      "overall__turnovers":1,"overall__turnoversopponent":9,
+      "overall__penalties":27,"overall__penaltyyards":228,
+      "overall__possessiontime":9947
     },
     "advanced":{
       "offense":{"plays":339,"ppa":0.37535891410422856,"successRate":0.471976401179941,"explosiveness":1.398429456846684},
       "defense":{"plays":272,"ppa":0.12060085388961003,"successRate":0.39705882352941174,"explosiveness":1.2869135990231348}
     },
     "fpi":{"fpi":23.452}
+  },
+  {
+    "team":"Georgia","year":2025,
+    "simple":{
+      "overall__games":5,
+      "overall__netpassingyards":1480,"overall__rushingyards":790,
+      "overall__passattempts":170,"overall__rushattempts":188,
+      "overall__netpassingyardsopponent":720,"overall__rushingyardsopponent":650,
+      "overall__firstdowns":113,"overall__firstdownsopponent":81,
+      "overall__turnovers":3,"overall__turnoversopponent":7,
+      "overall__penalties":22,"overall__penaltyyards":205,
+      "overall__possessiontime":10120
+    },
+    "advanced":{
+      "offense":{"plays":358,"ppa":0.345,"successRate":0.462,"explosiveness":1.33},
+      "defense":{"plays":300,"ppa":0.145,"successRate":0.402,"explosiveness":1.25}
+    },
+    "fpi":{"fpi":22.1}
   }
-  // … add more teams here …
 ]
 </script>
 
@@ -109,84 +157,75 @@
   const err = $("errorBox");
   const RAW = $("teams-json").textContent;
 
-  // ---------- Utils ----------
-  const fmt = (n, d=3) => (n == null || isNaN(n)) ? "—" : Number(n).toFixed(d);
-  const pct = n => (n == null || isNaN(n)) ? "—" : (n*100).toFixed(1) + "%";
+  // ---------- Utilities ----------
+  const fmt = (n,d=3) => (n==null||isNaN(n)) ? "—" : Number(n).toFixed(d);
+  const pct = n => (n==null||isNaN(n)) ? "—" : (n*100).toFixed(1)+"%";
+  const secToClock = s => isFinite(s)? new Date(s*1000).toISOString().substr(11,8) : "—";
   function sanitizeJSON(text){
-    return text
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/.*$/gm, "$1")
-      .replace(/,\s*([}\]])/g, "$1")
-      .trim();
+    return text.replace(/\/\*[\s\S]*?\*\//g,"").replace(/(^|[^:])\/\/.*$/gm,"$1").replace(/,\s*([}\]])/g,"$1").trim();
   }
   function safeParse(text){
     const clean = sanitizeJSON(text);
-    try { return JSON.parse(clean); }
-    catch(e){
-      err.style.display="block";
-      err.textContent = "JSON parse error: " + e.message + "\n\nFirst 300 chars of cleaned payload:\n" + clean.slice(0,300);
-      return [];
-    }
-  }
-  function getTotalYards(simple){
-    const ty = simple?.overall__totalyards;
-    const pass = simple?.overall__netpassingyards;
-    const rush = simple?.overall__rushingyards ?? simple?.overall__netrushingyards;
-    if (typeof ty === "number") return ty;
-    if (typeof pass === "number" && typeof rush === "number") return pass + rush;
-    return null;
-  }
-  function getTotalYardsOpp(simple){
-    const ty = simple?.overall__totalyardsopponent;
-    const pass = simple?.overall__netpassingyardsopponent;
-    const rush = simple?.overall__rushingyardsopponent ?? simple?.overall__netrushingyardsopponent;
-    if (typeof ty === "number") return ty;
-    if (typeof pass === "number" && typeof rush === "number") return pass + rush;
-    return null;
-  }
-  function getPlaysOff(t){
-    const p = t?.advanced?.offense?.plays;
-    if (typeof p === "number" && p>0) return p;
-    const pa = t?.simple?.overall__passattempts;
-    const ra = t?.simple?.overall__rushattempts;
-    if (typeof pa === "number" && typeof ra === "number") return pa + ra;
-    return null;
-  }
-  function getPlaysDef(t){
-    const p = t?.advanced?.defense?.plays;
-    if (typeof p === "number" && p>0) return p;
-    const pa = t?.simple?.overall__passattemptsopponent;
-    const ra = t?.simple?.overall__rushattemptsopponent;
-    if (typeof pa === "number" && typeof ra === "number") return pa + ra;
-    return null;
+    try{ return JSON.parse(clean); }
+    catch(e){ err.style.display="block"; err.textContent="JSON parse error: "+e.message; return []; }
   }
 
-  // ---------- Data ----------
-  const TEAMS = safeParse(RAW);
-  if (!TEAMS.length){
-    err.style.display="block";
-    err.textContent = (err.textContent ? err.textContent + "\n\n" : "") + "No teams found. Paste a JSON array in the <script id=\"teams-json\"> block.";
+  // ---------- Data helpers ----------
+  function get(simple, key){ const v = simple?.[key]; return typeof v==="number" ? v : null; }
+  function totalYards(simple){ return get(simple,"overall__totalyards") ?? (get(simple,"overall__netpassingyards")??0)+(get(simple,"overall__rushingyards")??0); }
+  function totalYardsOpp(simple){ return get(simple,"overall__totalyardsopponent") ?? (get(simple,"overall__netpassingyardsopponent")??0)+(get(simple,"overall__rushingyardsopponent")??0); }
+  function playsOff(t){ return t?.advanced?.offense?.plays ?? ((get(t.simple,"overall__passattempts")??0)+(get(t.simple,"overall__rushattempts")??0) || null); }
+  function playsDef(t){ return t?.advanced?.defense?.plays ?? ((get(t.simple,"overall__passattemptsopponent")??0)+(get(t.simple,"overall__rushattemptsopponent")??0) || null); }
+  function perGame(v,g){ return (v!=null && g>0) ? v/g : null; }
+
+  // Build metric list (name, getter, description)
+  const METRICS = [
+    ["Points per Play (Offense)", t => t?.advanced?.offense?.ppa ?? null, "From advanced offense: points added per play."],
+    ["Success Rate (Offense)", t => t?.advanced?.offense?.successRate ?? null, "Share of plays that keep the drive on schedule."],
+    ["Explosiveness (Offense)", t => t?.advanced?.offense?.explosiveness ?? null, "How big the gains are when a play hits."],
+    ["Yards per Play (Offense)", t => { const ty=totalYards(t.simple), p=playsOff(t); return (ty!=null&&p)? ty/p : null }, "Total yards divided by offensive plays."],
+
+    ["Points per Play Allowed (Defense)", t => t?.advanced?.defense?.ppa ?? null, "Points allowed per play."],
+    ["Success Rate Allowed (Defense)", t => t?.advanced?.defense?.successRate ?? null, "Opponents’ on-schedule rate."],
+    ["Explosiveness Allowed (Defense)", t => t?.advanced?.defense?.explosiveness ?? null, "Opponents’ gain size on hits."],
+    ["Yards per Play Allowed (Defense)", t => { const ty=totalYardsOpp(t.simple), p=playsDef(t); return (ty!=null&&p)? ty/p : null }, "Opponents’ total yards divided by defensive plays."],
+
+    ["Total Yards per Game", t => perGame(totalYards(t.simple), t?.simple?.overall__games ?? 0), "Team total yards divided by games."],
+    ["Opponent Yards per Game", t => perGame(totalYardsOpp(t.simple), t?.simple?.overall__games ?? 0), "Opponents’ total yards divided by games."],
+    ["Pass Rate (share of plays)", t => { const pa=get(t.simple,"overall__passattempts"), ra=get(t.simple,"overall__rushattempts"); return (pa!=null&&ra!=null&&pa+ra>0) ? pa/(pa+ra) : null; }, "Pass attempts / (pass + rush attempts)."],
+    ["Rush Rate (share of plays)", t => { const pa=get(t.simple,"overall__passattempts"), ra=get(t.simple,"overall__rushattempts"); return (pa!=null&&ra!=null&&pa+ra>0) ? ra/(pa+ra) : null; }, "Rush attempts / (pass + rush attempts)."],
+    ["Plays per Game (Offense)", t => perGame(playsOff(t), t?.simple?.overall__games ?? 0), "Offensive plays divided by games."],
+    ["Time of Possession per Game", t => perGame(get(t.simple,"overall__possessiontime"), t?.simple?.overall__games ?? 0), "Seconds with the ball per game (clock)."],
+    ["First Downs per Game", t => perGame(get(t.simple,"overall__firstdowns"), t?.simple?.overall__games ?? 0), "First downs divided by games."],
+    ["First Downs Allowed per Game", t => perGame(get(t.simple,"overall__firstdownsopponent"), t?.simple?.overall__games ?? 0), "Opponents’ first downs per game."],
+    ["Turnover Margin per Game", t => { const to=get(t.simple,"overall__turnovers"); const ta=get(t.simple,"overall__turnoversopponent"); const g=t?.simple?.overall__games ?? 0; return (to!=null&&ta!=null&&g>0)? (ta-to)/g : null; }, "(Takeaways − giveaways) per game."],
+    ["Penalties per Game", t => perGame(get(t.simple,"overall__penalties"), t?.simple?.overall__games ?? 0), "Flags against the team per game."],
+    ["Penalty Yards per Game", t => perGame(get(t.simple,"overall__penaltyyards"), t?.simple?.overall__games ?? 0), "Penalty yards per game."]
+  ];
+
+  // ---------- Parse & state ----------
+  let TEAMS = safeParse(RAW);
+  if (!Array.isArray(TEAMS) || !TEAMS.length){
+    err.style.display="block"; err.textContent="No teams found. Paste a JSON array (each item must have at least { team, simple or advanced }).";
+    TEAMS = [];
   }
 
-  // Build select
-  const select = $("teamSelect");
-  TEAMS.forEach(t => {
-    const opt=document.createElement("option");
-    opt.value=t.team; opt.textContent=t.team;
-    select.appendChild(opt);
+  // Build selects
+  const sA = $("teamA"), sB = $("teamB");
+  function populateSelects(list){
+    [sA,sB].forEach(s=>{ s.innerHTML=""; list.forEach(t=>{ const o=document.createElement("option"); o.value=t.team; o.textContent=t.team; s.appendChild(o); }); });
+    if (list[0]) sA.value = list[0].team;
+    if (list[1]) sB.value = list[1].team; else sB.value = list[0]?.team || "";
+  }
+  populateSelects(TEAMS);
+
+  // Filter
+  $("filterBox").addEventListener("input", e=>{
+    const q = e.target.value.toLowerCase();
+    const filtered = TEAMS.filter(t=> t.team.toLowerCase().includes(q));
+    populateSelects(filtered.length? filtered : TEAMS);
+    render();
   });
-  if (TEAMS[0]) select.value = TEAMS[0].team;
-
-  // Precompute maxima for normalization
-  const MAX = TEAMS.reduce((m,t)=>{
-    const off=t?.advanced?.offense||{};
-    const ypp=(getTotalYards(t.simple)??0)/((getPlaysOff(t)??1));
-    m.ppa=Math.max(m.ppa, off.ppa??0);
-    m.sr=Math.max(m.sr, off.successRate??0);
-    m.exp=Math.max(m.exp, off.explosiveness??0);
-    m.ypp=Math.max(m.ypp, ypp);
-    return m;
-  },{ppa:0,sr:0,exp:0,ypp:0});
 
   // ---------- SVG helpers ----------
   function el(name, attrs={}, children=[]){
@@ -197,124 +236,155 @@
   }
   function clear(node){ while(node.firstChild) node.removeChild(node.firstChild); }
 
-  // Simple bar chart
-  function renderBars(node, labels, values){
+  function barChartDual(node, labels, A, B){
     clear(node);
-    const w = node.clientWidth, h = node.clientHeight;
-    const pad = {l:60, r:16, t:20, b:30};
-    const svg = el("svg",{width:w, height:h, viewBox:`0 0 ${w} ${h}`});
-    const gw = w - pad.l - pad.r; const gh = h - pad.t - pad.b;
-    const max = Math.max(0.001, ...values.map(v=>Math.abs(v||0)));
-
-    // axes
+    const w=node.clientWidth, h=node.clientHeight, pad={l:70,r:20,t:24,b:40};
+    const svg=el("svg",{width:w,height:h,viewBox:`0 0 ${w} ${h}`});
+    const gw=w-pad.l-pad.r, gh=h-pad.t-pad.b;
+    const max=Math.max(0.001, ...A.map((v,i)=>Math.abs(v||0)), ...B.map((v,i)=>Math.abs(v||0)));
     svg.appendChild(el("rect",{x:pad.l,y:pad.t,width:gw,height:gh,fill:"none",stroke:"#223045"}));
-
-    const barW = gw / labels.length * 0.6;
+    const band=gw/labels.length;
+    const bw=band*0.36;
     labels.forEach((lab,i)=>{
-      const x = pad.l + (gw/labels.length)*i + (gw/labels.length - barW)/2;
-      const v = values[i] ?? 0;
-      const vh = (v/max) * (gh*0.9);
-      const y = pad.t + gh - vh;
-      svg.appendChild(el("rect",{x:x,y:y,width:barW,height:vh,fill:"#4aa9ff"}));
-      // value
-      svg.appendChild(el("text",{x:x+barW/2,y:y-6,fill:"#cfe3ff","text-anchor":"middle","font-size":"11"},[document.createTextNode(v.toFixed(3))]));
-      // label
-      const tl = el("text",{x:x+barW/2,y:pad.t+gh+14,fill:"#a9b4c2","text-anchor":"middle","font-size":"11"},[document.createTextNode(lab)]);
-      svg.appendChild(tl);
+      const x=pad.l+band*i;
+      const vA=A[i]??0, vB=B[i]??0;
+      const hA=(Math.abs(vA)/max)*(gh*0.9), hB=(Math.abs(vB)/max)*(gh*0.9);
+      const yA=pad.t+gh-hA, yB=pad.t+gh-hB;
+      svg.appendChild(el("rect",{x:x+band*0.5-bw-3,y:yA,width:bw,height:hA,fill:"#4aa9ff"}));
+      svg.appendChild(el("rect",{x:x+band*0.5+3,y:yB,width:bw,height:hB,fill:"#9b59ff"}));
+      svg.appendChild(el("text",{x:x+band*0.5,y:pad.t+gh+14,fill:"#a9b4c2","text-anchor":"middle","font-size":"11"},[document.createTextNode(lab)]));
     });
     node.appendChild(svg);
   }
 
-  // Simple spider/radar
-  function renderSpider(node, labels, values){ // values are 0..1
+  function radarDual(node, labels, valsA, valsB, colorA="#4aa9ff", colorB="#9b59ff"){
     clear(node);
-    const w = node.clientWidth, h=node.clientHeight;
-    const cx=w/2, cy=h/2, r=Math.min(w,h)/2 - 28, rings=4;
-    const svg = el("svg",{width:w,height:h,viewBox:`0 0 ${w} ${h}`});
-
-    // grid rings + spokes
+    const w=node.clientWidth,h=node.clientHeight,cx=w/2,cy=h/2,r=Math.min(w,h)/2-28,rings=4;
+    const svg=el("svg",{width:w,height:h,viewBox:`0 0 ${w} ${h}`});
+    // grid
     for(let k=1;k<=rings;k++){
-      const rr = (r/rings)*k;
-      const poly = [];
+      const rr=(r/rings)*k, poly=[];
       for(let i=0;i<labels.length;i++){
-        const a = (Math.PI*2/labels.length)*i - Math.PI/2;
-        poly.push(`${cx + rr*Math.cos(a)},${cy + rr*Math.sin(a)}`);
+        const a=(Math.PI*2/labels.length)*i - Math.PI/2;
+        poly.push(`${cx+rr*Math.cos(a)},${cy+rr*Math.sin(a)}`);
       }
       svg.appendChild(el("polygon",{points:poly.join(" "),fill:"none",stroke:"#223045"}));
     }
     for(let i=0;i<labels.length;i++){
-      const a = (Math.PI*2/labels.length)*i - Math.PI/2;
+      const a=(Math.PI*2/labels.length)*i - Math.PI/2;
       svg.appendChild(el("line",{x1:cx,y1:cy,x2:cx+r*Math.cos(a),y2:cy+r*Math.sin(a),stroke:"#223045"}));
-      // labels
-      const lx = cx + (r+14)*Math.cos(a), ly = cy + (r+14)*Math.sin(a);
+      const lx=cx+(r+14)*Math.cos(a), ly=cy+(r+14)*Math.sin(a);
       svg.appendChild(el("text",{x:lx,y:ly,fill:"#a9b4c2","font-size":"11","text-anchor": Math.cos(a)>0.1?"start":(Math.cos(a)<-0.1?"end":"middle"),"dominant-baseline":"middle"},[document.createTextNode(labels[i])]));
     }
-
-    // data polygon
-    const pts = values.map((v,i)=>{
-      const a=(Math.PI*2/values.length)*i - Math.PI/2;
-      const rr = r * Math.max(0, Math.min(1, v));
-      return `${cx + rr*Math.cos(a)},${cy + rr*Math.sin(a)}`;
-    }).join(" ");
-    svg.appendChild(el("polygon",{points:pts,fill:"rgba(74,169,255,0.18)",stroke:"rgba(74,169,255,0.95)","stroke-width":"2"}));
+    function poly(vals,color){
+      const pts=vals.map((v,i)=>{ const a=(Math.PI*2/vals.length)*i - Math.PI/2; const rr=r*Math.max(0,Math.min(1,v)); return `${cx+rr*Math.cos(a)},${cy+rr*Math.sin(a)}`; }).join(" ");
+      svg.appendChild(el("polygon",{points:pts,fill:color+"30",stroke:color,"stroke-width":"2"}));
+    }
+    poly(valsA,colorA); poly(valsB,colorB);
     node.appendChild(svg);
   }
 
-  // ---------- UI update ----------
-  function update(teamName){
-    const t = TEAMS.find(x=>x.team===teamName) || TEAMS[0];
-    if(!t) return;
+  // Precompute max for normalization
+  const MAX = TEAMS.reduce((m,t)=>{
+    const off=t?.advanced?.offense||{}, def=t?.advanced?.defense||{};
+    const ypp = (()=>{ const ty=totalYards(t.simple), p=playsOff(t); return (ty!=null&&p)? ty/p : 0; })();
+    const yppa=(()=>{ const ty=totalYardsOpp(t.simple), p=playsDef(t); return (ty!=null&&p)? ty/p : 0; })();
+    m.opp = Math.max(m.opp, off.ppa??0);
+    m.osr = Math.max(m.osr, off.successRate??0);
+    m.oex = Math.max(m.oex, off.explosiveness??0);
+    m.oyp = Math.max(m.oyp, ypp);
+    m.dpp = Math.max(m.dpp, def.ppa??0);
+    m.dsr = Math.max(m.dsr, def.successRate??0);
+    m.dex = Math.max(m.dex, def.explosiveness??0);
+    m.dyp = Math.max(m.dyp, yppa);
+    return m;
+  },{opp:0,osr:0,oex:0,oyp:0,dpp:0,dsr:0,dex:0,dyp:0});
 
-    const off=t?.advanced?.offense||{};
-    const def=t?.advanced?.defense||{};
-    const offPlays=getPlaysOff(t)??0;
-    const defPlays=getPlaysDef(t)??0;
-    const offTY=getTotalYards(t.simple);
-    const defTY=getTotalYardsOpp(t.simple);
-    const offYPP = offTY!=null && offPlays>0 ? offTY/offPlays : null;
-    const defYPP = defTY!=null && defPlays>0 ? defTY/defPlays : null;
+  function norm(v,max){ return Math.min(1,(v||0)/(max||1)); }
 
-    $("teamPill").textContent = t.team ?? "—";
-    $("rankPill").textContent = "#—";
+  // ---------- Rendering ----------
+  function teamByName(name){ return TEAMS.find(t=>t.team===name) || TEAMS[0]; }
 
-    $("offPPA").textContent = fmt(off.ppa);
-    $("offSR").textContent  = pct(off.successRate);
-    $("offExp").textContent = fmt(off.explosiveness,2);
-    $("offYPP").textContent = fmt(offYPP,2);
+  function render(){
+    const A=teamByName(sA.value), B=teamByName(sB.value)||A;
+    // Spiders
+    const Aoff = [
+      A?.advanced?.offense?.ppa ?? 0,
+      A?.advanced?.offense?.successRate ?? 0,
+      A?.advanced?.offense?.explosiveness ?? 0,
+      (()=>{ const ty=totalYards(A.simple), p=playsOff(A); return (ty!=null&&p)? ty/p : 0; })()
+    ].map((v,i)=>[MAX.opp,MAX.osr,MAX.oex,MAX.oyp][i]).map((mx,idx)=> norm([A?.advanced?.offense?.ppa, A?.advanced?.offense?.successRate, A?.advanced?.offense?.explosiveness, (()=>{ const ty=totalYards(A.simple), p=playsOff(A); return (ty!=null&&p)? ty/p : 0; })()][idx], [MAX.opp,MAX.osr,MAX.oex,MAX.oyp][idx]));
+    const Boff = [
+      B?.advanced?.offense?.ppa ?? 0,
+      B?.advanced?.offense?.successRate ?? 0,
+      B?.advanced?.offense?.explosiveness ?? 0,
+      (()=>{ const ty=totalYards(B.simple), p=playsOff(B); return (ty!=null&&p)? ty/p : 0; })()
+    ].map((v,i)=>[MAX.opp,MAX.osr,MAX.oex,MAX.oyp][i]).map((mx,idx)=> norm([B?.advanced?.offense?.ppa, B?.advanced?.offense?.successRate, B?.advanced?.offense?.explosiveness, (()=>{ const ty=totalYards(B.simple), p=playsOff(B); return (ty!=null&&p)? ty/p : 0; })()][idx], [MAX.opp,MAX.osr,MAX.oex,MAX.oyp][idx]));
+    radarDual($("offRadar"), ["Points/Play","Success","Explosiveness","Yards/Play"], Aoff, Boff);
 
-    $("defPPA").textContent = fmt(def.ppa);
-    $("defSR").textContent  = pct(def.successRate);
-    $("defExp").textContent = fmt(def.explosiveness,2);
-    $("defYPP").textContent = fmt(defYPP,2);
+    const Adef = [
+      A?.advanced?.defense?.ppa ?? 0,
+      A?.advanced?.defense?.successRate ?? 0,
+      A?.advanced?.defense?.explosiveness ?? 0,
+      (()=>{ const ty=totalYardsOpp(A.simple), p=playsDef(A); return (ty!=null&&p)? ty/p : 0; })()
+    ].map((v,i)=>[MAX.dpp,MAX.dsr,MAX.dex,MAX.dyp][i]).map((mx,idx)=> norm([A?.advanced?.defense?.ppa, A?.advanced?.defense?.successRate, A?.advanced?.defense?.explosiveness, (()=>{ const ty=totalYardsOpp(A.simple), p=playsDef(A); return (ty!=null&&p)? ty/p : 0; })()][idx], [MAX.dpp,MAX.dsr,MAX.dex,MAX.dyp][idx]));
+    const Bdef = [
+      B?.advanced?.defense?.ppa ?? 0,
+      B?.advanced?.defense?.successRate ?? 0,
+      B?.advanced?.defense?.explosiveness ?? 0,
+      (()=>{ const ty=totalYardsOpp(B.simple), p=playsDef(B); return (ty!=null&&p)? ty/p : 0; })()
+    ].map((v,i)=>[MAX.dpp,MAX.dsr,MAX.dex,MAX.dyp][i]).map((mx,idx)=> norm([B?.advanced?.defense?.ppa, B?.advanced?.defense?.successRate, B?.advanced?.defense?.explosiveness, (()=>{ const ty=totalYardsOpp(B.simple), p=playsDef(B); return (ty!=null&&p)? ty/p : 0; })()][idx], [MAX.dpp,MAX.dsr,MAX.dex,MAX.dyp][idx]));
+    radarDual($("defRadar"), ["Pts/Play Allowed","Success Allowed","Explosive Allowed","Yds/Play Allowed"], Adef, Bdef);
 
-    $("fpiVal").textContent = fmt(t?.fpi?.fpi,3);
-    $("playsOff").textContent = offPlays || "—";
-    $("playsDef").textContent = defPlays || "—";
-    $("games").textContent = t?.simple?.overall__games ?? "—";
+    // H2H bars (raw values)
+    const labels1 = ["Pts/Play (Off)","Pts/Play Allowed","Success (Off)","Success Allowed","Yds/Play (Off)","Yds/Play Allowed"];
+    const calcYPP = t => { const ty=totalYards(t.simple), p=playsOff(t); return (ty!=null&&p)? ty/p : 0; };
+    const calcYPPD = t => { const ty=totalYardsOpp(t.simple), p=playsDef(t); return (ty!=null&&p)? ty/p : 0; };
+    const Avals1 = [A?.advanced?.offense?.ppa, A?.advanced?.defense?.ppa, A?.advanced?.offense?.successRate, A?.advanced?.defense?.successRate, calcYPP(A), calcYPPD(A)].map(v=>v??0);
+    const Bvals1 = [B?.advanced?.offense?.ppa, B?.advanced?.defense?.ppa, B?.advanced?.offense?.successRate, B?.advanced?.defense?.successRate, calcYPP(B), calcYPPD(B)].map(v=>v??0);
+    barChartDual($("barsH2H"), labels1, Avals1, Bvals1);
 
-    // Spider (normalized)
-    const yppNorm = Math.min(1,(offYPP ?? 0)/(MAX.ypp||1));
-    renderSpider($("radarBox"),
-      ["Points/Play","Success Rate","Explosiveness","Yards/Play"],
-      [
-        Math.min(1,(off.ppa ?? 0)/(MAX.ppa||1)),
-        Math.min(1,(off.successRate ?? 0)/(MAX.sr||1)),
-        Math.min(1,(off.explosiveness ?? 0)/(MAX.exp||1)),
-        yppNorm
-      ]
-    );
+    // Pace & Mix bars
+    const Aplays = playsOff(A)||0, Bplays=playsOff(B)||0;
+    const Apass=get(A.simple,"overall__passattempts"), Arush=get(A.simple,"overall__rushattempts");
+    const Bpass=get(B.simple,"overall__passattempts"), Brush=get(B.simple,"overall__rushattempts");
+    const Ag=get(A.simple,"overall__games")||0, Bg=get(B.simple,"overall__games")||0;
+    const Atempo=Ag?Aplays/Ag:0, Btempo=Bg?Bplays/Bg:0;
+    const ApassShare = (Apass!=null&&Arush!=null&&(Apass+Arush)>0)? Apass/(Apass+Arush):0;
+    const BpassShare = (Bpass!=null&&Brush!=null&&(Bpass+Brush)>0)? Bpass/(Bpass+Brush):0;
+    barChartDual($("barsPace"), ["Plays/Game","Pass Rate"], [Atempo, ApassShare], [Btempo, BpassShare]);
 
-    // Bars (raw values)
-    renderBars($("barsBox"),
-      ["Pts/Play (Off)","Pts/Play Allowed","Success (Off)","Success Allowed","Yds/Play (Off)","Yds/Play Allowed"],
-      [off.ppa ?? 0, def.ppa ?? 0, off.successRate ?? 0, def.successRate ?? 0, offYPP ?? 0, defYPP ?? 0]
-    );
+    // Snapshot tiles (top 16)
+    const snap = $("snap"); snap.innerHTML="";
+    const topSnap = ["Points per Play (Offense)","Yards per Play (Offense)","Success Rate (Offense)","Explosiveness (Offense)","Points per Play Allowed (Defense)","Yards per Play Allowed (Defense)","Success Rate Allowed (Defense)","Explosiveness Allowed (Defense)","Plays per Game (Offense)","Pass Rate (share of plays)","Rush Rate (share of plays)","Total Yards per Game","Opponent Yards per Game","First Downs per Game","Turnover Margin per Game","Time of Possession per Game"];
+    topSnap.forEach(name=>{
+      const m = METRICS.find(x=>x[0]===name);
+      const va = m? m[1](A) : null;
+      const vtxt = name.includes("Rate") || name.includes("Share") ? pct(va) : (name.includes("Time of Possession") ? secToClock(va) : fmt(va, name.includes("Yards")?2:3));
+      const div=document.createElement("div"); div.className="stat"+(va==null?" fade":"");
+      div.innerHTML=`<label>${name}</label><div class="v">${vtxt}</div>`;
+      snap.appendChild(div);
+    });
+
+    // Big table
+    const tbody = $("statTable").querySelector("tbody");
+    tbody.innerHTML="";
+    METRICS.forEach(([name,getter,desc])=>{
+      const Av = getter(A), Bv=getter(B);
+      const isPct = name.toLowerCase().includes("rate") || name.toLowerCase().includes("share");
+      const isClock = name.includes("Time of Possession");
+      const Avs = isPct ? pct(Av) : (isClock ? secToClock(Av) : fmt(Av, name.includes("Yards")?2:3));
+      const Bvs = isPct ? pct(Bv) : (isClock ? secToClock(Bv) : fmt(Bv, name.includes("Yards")?2:3));
+      const tr=document.createElement("tr");
+      tr.innerHTML=`<td>${name}</td><td class="${Av==null?'fade':''}">${Avs}</td><td class="${Bv==null?'fade':''}">${Bvs}</td><td class="fade">${desc}</td>`;
+      tbody.appendChild(tr);
+    });
   }
 
-  if (TEAMS.length){
-    update(select.value || TEAMS[0].team);
-    select.addEventListener("change", e=> update(e.target.value));
-  }
+  sA.addEventListener("change", render);
+  sB.addEventListener("change", render);
+
+  if (TEAMS.length){ render(); }
 })();
 </script>
 </body>
