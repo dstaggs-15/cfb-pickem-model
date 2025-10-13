@@ -4,12 +4,12 @@
   "resolved": [
     {
       "input": {
-        "away": "Alabama",
-        "home": "Missouri"
+        "away": "LSU",
+        "home": "Vanderbilt"
       },
       "resolved": {
-        "away": "Alabama",
-        "home": "Missouri"
+        "away": "LSU",
+        "home": "Vanderbilt"
       },
       "scores": {
         "away": 1.0,
@@ -18,12 +18,40 @@
     },
     {
       "input": {
-        "away": "Indiana",
-        "home": "Oregon"
+        "away": "Georgia Tech",
+        "home": "Duke"
       },
       "resolved": {
-        "away": "Indiana",
-        "home": "Oregon"
+        "away": "Georgia Tech",
+        "home": "Duke"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    },
+    {
+      "input": {
+        "away": "Arizona",
+        "home": "Houston"
+      },
+      "resolved": {
+        "away": "Arizona",
+        "home": "Houston"
+      },
+      "scores": {
+        "away": 1.0,
+        "home": 1.0
+      }
+    },
+    {
+      "input": {
+        "away": "Baylor",
+        "home": "TCU"
+      },
+      "resolved": {
+        "away": "Baylor",
+        "home": "TCU"
       },
       "scores": {
         "away": 1.0,
@@ -33,11 +61,11 @@
     {
       "input": {
         "away": "Oklahoma",
-        "home": "Texas"
+        "home": "South Carolina"
       },
       "resolved": {
         "away": "Oklahoma",
-        "home": "Texas"
+        "home": "South Carolina"
       },
       "scores": {
         "away": 1.0,
@@ -46,12 +74,12 @@
     },
     {
       "input": {
-        "away": "TCU",
-        "home": "Kansas State"
+        "away": "Ole Miss",
+        "home": "Georgia"
       },
       "resolved": {
-        "away": "TCU",
-        "home": "Kansas State"
+        "away": "Ole Miss",
+        "home": "Georgia"
       },
       "scores": {
         "away": 1.0,
@@ -60,26 +88,26 @@
     },
     {
       "input": {
-        "away": "Iowa State",
-        "home": "Colorado"
+        "away": "Old Dominon",
+        "home": "James Madison"
       },
       "resolved": {
-        "away": "Iowa State",
-        "home": "Colorado"
+        "away": "Old Dominion",
+        "home": "James Madison"
       },
       "scores": {
-        "away": 1.0,
+        "away": 0.333,
         "home": 1.0
       }
     },
     {
       "input": {
-        "away": "Nebraska",
-        "home": "Maryland"
+        "away": "Penn State",
+        "home": "Iowa"
       },
       "resolved": {
-        "away": "Nebraska",
-        "home": "Maryland"
+        "away": "Penn State",
+        "home": "Iowa"
       },
       "scores": {
         "away": 1.0,
@@ -88,11 +116,11 @@
     },
     {
       "input": {
-        "away": "Georgia",
+        "away": "Missouri",
         "home": "Auburn"
       },
       "resolved": {
-        "away": "Georgia",
+        "away": "Missouri",
         "home": "Auburn"
       },
       "scores": {
@@ -102,40 +130,12 @@
     },
     {
       "input": {
-        "away": "Michigan",
-        "home": "USC"
+        "away": "Utah",
+        "home": "BYU"
       },
       "resolved": {
-        "away": "Michigan",
-        "home": "USC"
-      },
-      "scores": {
-        "away": 1.0,
-        "home": 1.0
-      }
-    },
-    {
-      "input": {
-        "away": "BYU",
-        "home": "Arizona"
-      },
-      "resolved": {
-        "away": "BYU",
-        "home": "Arizona"
-      },
-      "scores": {
-        "away": 1.0,
-        "home": 1.0
-      }
-    },
-    {
-      "input": {
-        "away": "Arizona State",
-        "home": "Utah"
-      },
-      "resolved": {
-        "away": "Arizona State",
-        "home": "Utah"
+        "away": "Utah",
+        "home": "BYU"
       },
       "scores": {
         "away": 1.0,
