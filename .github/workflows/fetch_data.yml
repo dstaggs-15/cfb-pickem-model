@@ -1,10 +1,10 @@
-name: Fetch CFBD Data (Commit to Repo)
+name: Fetch CFBD Data main (Commit to Repo)
 
 on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch or ref to commit to (default: current)"
+        description: "Branch or ref to commit to (default: current ref)"
         required: false
         default: ""
 
@@ -14,9 +14,11 @@ permissions:
 jobs:
   fetch:
     runs-on: ubuntu-latest
+
+    # Prevent overlapping runs on the same branch from fighting to push
     concurrency:
       group: fetch-cfbd-${{ github.ref }}
-      cancel-in-progress: false
+      cancel-in-progress: true
 
     env:
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
@@ -26,8 +28,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          # full history so rebase/merge works
           fetch-depth: 0
-          ref: ${{ github.event.inputs.ref || github.ref }}
+          # honor manual input ref, else current ref/branch
+          ref: ${{ github.event.inputs.ref || github.ref_name }}
+          persist-credentials: true
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -37,7 +42,9 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
 
       - name: Ensure raw data dir
         run: mkdir -p data/raw/cfbd
@@ -52,15 +59,17 @@ jobs:
           echo "Listing data/raw/cfbd:"
           ls -l data/raw/cfbd || true
 
-      - name: Commit & push raw data
+      - name: Commit & push raw data (with pull --rebase + retry)
         if: always()
         run: |
           set -euo pipefail
 
-          git config user.name "github-actions[bot]"
+          git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Only try to add if there are files to add
+          TARGET_REF="${{ github.event.inputs.ref || github.ref_name }}"
+
+          # Stage only if CSVs exist
           if [ -d data/raw/cfbd ] && [ -n "$(find data/raw/cfbd -type f -name '*.csv' -print -quit)" ]; then
             git add -A data/raw/cfbd
           else
@@ -68,11 +77,32 @@ jobs:
             exit 0
           fi
 
-          if ! git diff --cached --quiet; then
-            MSG="chore(data): CFBD refresh $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-            git commit -m "$MSG"
-            TARGET_REF="${{ github.event.inputs.ref || github.ref_name }}"
-            git push origin "HEAD:${TARGET_REF}"
-          else
+          # If nothing staged, bail out cleanly
+          if git diff --cached --quiet; then
             echo "No staged changes; nothing to commit."
+            exit 0
+          fi
+
+          MSG="chore(data): CFBD refresh $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          git commit -m "$MSG"
+
+          # Make sure we have the latest before pushing (fixes non-fast-forward)
+          # Try up to 3 times in case another run sneaks in a push.
+          n=0
+          until [ $n -ge 3 ]
+          do
+            # Re-sync with remote without creating merge commits
+            git pull --rebase origin "$TARGET_REF" || true
+            if git push origin "HEAD:${TARGET_REF}"; then
+              echo "Push succeeded."
+              break
+            fi
+            n=$((n+1))
+            echo "Push failed (attempt $n). Retrying in 3s..."
+            sleep 3
+          done
+
+          if [ $n -ge 3 ]; then
+            echo "ERROR: Failed to push after 3 attempts."
+            exit 1
           fi
