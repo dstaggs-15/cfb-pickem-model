@@ -14,29 +14,51 @@
 
   // === This week’s 10 (Away, Home) — EXACT ORDER YOU ASKED ===
   const DESIRED_ORDER = [
-    ["Alabama", "Missouri"],
-    ["Indiana", "Oregon"],
-    ["Oklahoma", "Texas"],
-    ["TCU", "Kansas State"],
-    ["Iowa State", "Colorado"],
-    ["Nebraska", "Maryland"],
-    ["Georgia", "Auburn"],
-    ["Michigan", "USC"],
-    ["BYU", "Arizona"],
-    ["Arizona State", "Utah"]
+    ["LSU", "Vanderbilt"],
+    ["Georgia Tech", "Duke"],
+    ["Arizona", "Houston"],
+    ["Baylor", "TCU"],
+    ["Oklahoma", "South Carolina"],
+    ["Ole Miss", "Georgia"],
+    ["Old Dominion", "James Madison"],
+    ["Penn State", "Iowa"],
+    ["Missouri", "Auburn"],
+    ["Utah", "BYU"]
   ];
   const ONLY_USE_DESIRED = true;
 
   // Team colors (fallback → hashed color).
   const TEAM_COLORS = {
-    "Alabama":"#9E1B32","Auburn":"#0C2340","Arizona":"#AB0520","Arizona State":"#8C1D40",
-    "Baylor":"#004834","BYU":"#0D254C","California":"#003262","Colorado":"#CFB87C",
-    "Cincinnati":"#E00122","Duke":"#003087","Florida":"#0021A5","Florida State":"#782F40",
-    "Georgia":"#BA0C2F","Indiana":"#990000","Iowa State":"#A71930","Kansas":"#0051BA",
-    "Kansas State":"#512888","Louisville":"#AD0000","Maryland":"#E03A3E","Michigan":"#00274C",
-    "Missouri":"#F1B82D","Nebraska":"#E41C38","Oklahoma":"#841617","Oregon":"#004F27",
-    "TCU":"#4D1979","Texas":"#BF5700","UCF":"#BA9B37","UNLV":"#CC0000","USC":"#990000",
-    "Utah":"#CC0000","Vanderbilt":"#866D4B","Washington":"#4B2E83","Wyoming":"#492F24"
+    // New/this week
+    "LSU": "#461D7C",
+    "Vanderbilt": "#866D4B",
+    "Georgia Tech": "#B3A369",
+    "Duke": "#003087",
+    "Arizona": "#AB0520",
+    "Houston": "#C8102E",
+    "Baylor": "#004834",
+    "TCU": "#4D1979",
+    "Oklahoma": "#841617",
+    "South Carolina": "#73000A",
+    // Canonical for Ole Miss (aliases map "Ole Miss" -> "Mississippi")
+    "Mississippi": "#082C5C",
+    "Georgia": "#BA0C2F",
+    "Old Dominion": "#003A70",
+    "James Madison": "#450084",
+    "Penn State": "#1E407C",
+    "Iowa": "#FFCD00",
+    "Missouri": "#F1B82D",
+    "Auburn": "#0C2340",
+    "Utah": "#CC0000",
+    "BYU": "#0D254C",
+
+    // Existing palette retained
+    "Alabama":"#9E1B32","Arizona State":"#8C1D40","California":"#003262","Colorado":"#CFB87C",
+    "Cincinnati":"#E00122","Florida":"#0021A5","Florida State":"#782F40","Indiana":"#990000",
+    "Iowa State":"#A71930","Kansas":"#0051BA","Kansas State":"#512888","Louisville":"#AD0000",
+    "Maryland":"#E03A3E","Michigan":"#00274C","Nebraska":"#E41C38","Oregon":"#004F27",
+    "Texas":"#BF5700","UCF":"#BA9B37","UNLV":"#CC0000","USC":"#990000",
+    "Washington":"#4B2E83","Wyoming":"#492F24"
   };
 
   // ---------- helpers ----------
@@ -56,7 +78,7 @@
   // Expanded aliases for robustness
   const ALIASES = new Map([
     ["usc","southern california"],
-    ["ole miss","mississippi"],
+    ["ole miss","mississippi"],          // Ole Miss canonicalized to "Mississippi"
     ["ucf","central florida"],
     ["byu","brigham young"],
     ["lsu","louisiana state"],
@@ -71,7 +93,16 @@
     ["uga","georgia"],
     ["bama","alabama"],
     ["mizzou","missouri"],
-    ["kansas st.","kansas state"]
+    ["kansas st.","kansas state"],
+
+    // New helpful ones this week:
+    ["psu","penn state"],
+    ["penn st","penn state"],
+    ["jmu","james madison"],
+    ["old dominon","old dominion"],      // (typo safety)
+    ["gt","georgia tech"],
+    ["hou","houston"],
+    ["sc","south carolina"]
   ]);
 
   const normAlias = (s) => {
