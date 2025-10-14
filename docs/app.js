@@ -199,4 +199,157 @@
   let fpiMap=new Map();
   try{
     const r=await fetch(FPI_URL+cacheBust(),{cache:'no-store'});
-    const j=await r.json()
+    const j=await r.json();
+    const put=(name,obj)=>{
+      fpiMap.set(normAlias(name),{
+        name,
+        rank:(obj && Number.isFinite(Number(obj.rank))) ? Number(obj.rank) : null,
+        fpi: (obj && Number.isFinite(Number(obj.fpi)))  ? Number(obj.fpi)  : null
+      });
+    };
+    if (Array.isArray(j.data)) j.data.forEach(it=>put(it.name,it));
+    else if (j.teams && typeof j.teams==='object') Object.entries(j.teams).forEach(([n,o])=>put(n,o));
+  }catch(e){
+    console.warn('fpi.json load failed',e);
+    fpiMap=new Map();
+  }
+
+  // ---------- load CFB Ranking (Top-25) ----------
+  let rankMap = new Map();
+  try{
+    const r=await fetch(RANKS_URL+cacheBust(),{cache:'no-store'});
+    if (r.ok) {
+      const j=await r.json();
+      if (Array.isArray(j?.ranks)) {
+        j.ranks.forEach(({team,rank})=>{
+          if (team && Number.isFinite(Number(rank))) rankMap.set(normAlias(team), Number(rank));
+        });
+      } else if (j?.teams && typeof j.teams === 'object') {
+        Object.entries(j.teams).forEach(([team,rank])=>{
+          if (team && Number.isFinite(Number(rank))) rankMap.set(normAlias(team), Number(rank));
+        });
+      }
+    }
+  }catch(e){
+    console.warn('cfbrank.json load failed', e);
+    rankMap = new Map();
+  }
+
+  // ---------- build UI ----------
+  const container = document.getElementById('predictions-container') || document.body;
+  container.innerHTML = '';
+
+  // Orientation fix applied here
+  const base = dedupe(preds.map(orientToDesired));
+  const games = orderGames(base);
+
+  if (!games.length){
+    container.innerHTML = `<div class="status-message">No predictions found.</div>`;
+    return;
+  }
+
+  const pct = (x) => (Number(x)*100).toFixed(1) + '%';
+  const showName = (team) => {
+    const r = rankMap.get(normAlias(team));
+    return (Number.isFinite(r) ? `#${r} ` : '') + team;
+  };
+
+  games.forEach(g=>{
+    const away = g.away_team;         // <-- AWAY first
+    const home = g.home_team;
+
+    const awayColor = teamColor(away);
+    const homeColor = teamColor(home);
+    const awayText  = pickTextColor(awayColor);
+    const homeText  = pickTextColor(homeColor);
+
+    const pHome = Number(g.model_prob_home ?? g.prob_home ?? 0.5);
+    const pAway = 1 - pHome;
+    const pick  = g.pick || (pHome >= 0.5 ? home : away);
+
+    // ---- CARD ----
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    // Header chips and "@"
+    // *** FIXED: render AWAY @ HOME (was HOME @ AWAY) ***
+    const hdr = document.createElement('div');
+    hdr.className = 'row hdr';
+    hdr.innerHTML = `
+      <div class="team" style="background:${awayColor};color:${awayText};">${showName(away)}</div>
+      <div class="vs">@</div>
+      <div class="team" style="background:${homeColor};color:${homeText};">${showName(home)}</div>
+    `;
+    card.appendChild(hdr);
+
+    // Bars (pill) with % inside + PICK line
+    const body = document.createElement('div');
+    body.className = 'row body';
+    body.innerHTML = `
+      <div class="bar-wrap">
+        <div class="bar left"  style="width:${(pAway*100).toFixed(1)}%; background:${awayColor};">
+          <span class="pct">${pct(pAway)}</span>
+        </div>
+        <div class="bar right" style="width:${(pHome*100).toFixed(1)}%; background:${homeColor};">
+          <span class="pct">${pct(pHome)}</span>
+        </div>
+      </div>
+      <div class="meta-line"><span class="label">PICK:</span> <strong>${showName(pick)}</strong></div>
+    `;
+    card.appendChild(body);
+
+    // ----- FPI (underneath) -----
+    const fAway = fpiMap.get(normAlias(away));
+    const fHome = fpiMap.get(normAlias(home));
+
+    let fpiFav = null;
+    if (fHome && fAway) {
+      if (Number.isFinite(fHome.fpi) && Number.isFinite(fAway.fpi)) {
+        fpiFav = fHome.fpi > fAway.fpi ? home : (fAway.fpi > fHome.fpi ? away : null);
+      }
+      if (!fpiFav && Number.isFinite(fHome.rank) && Number.isFinite(fAway.rank)) {
+        fpiFav = fHome.rank < fAway.rank ? home : (fAway.rank < fHome.rank ? away : null);
+      }
+    } else if (fHome && !fAway) fpiFav = home;
+    else if (!fHome && fAway)   fpiFav = away;
+
+    const agree = fpiFav && pick ? (normalize(fpiFav) === normalize(pick)) : null;
+
+    const fpiWrap = document.createElement('div');
+    fpiWrap.className = 'fpi-wrap';
+    fpiWrap.innerHTML = `
+      <div class="fpi-row">
+        <div class="fpi-side">
+          <span class="fpi-team">${showName(away)}</span>
+          <span class="fpi-meta">${fAway ? `FPI ${fAway.fpi ?? '—'}  ·  #${fAway.rank ?? '—'}` : 'FPI —'}</span>
+        </div>
+        <div class="fpi-vs">FPI</div>
+        <div class="fpi-side right">
+          <span class="fpi-team">${showName(home)}</span>
+          <span class="fpi-meta">${fHome ? `FPI ${fHome.fpi ?? '—'}  ·  #${fHome.rank ?? '—'}` : 'FPI —'}</span>
+        </div>
+      </div>
+      <div class="fpi-fav">
+        ${fpiFav ? `FPI favors: <strong>${showName(fpiFav)}</strong>` : 'FPI favors: <strong>—</strong>'}
+        ${agree === true  ? `<span class="fpi-badge agree">AGREE</span>` : ''}
+        ${agree === false ? `<span class="fpi-badge disagree">DISAGREE</span>` : ''}
+      </div>
+    `;
+    card.appendChild(fpiWrap);
+
+    container.appendChild(card);
+  });
+
+  // Filter box support (optional element with id="filterInput")
+  const filterInput = document.getElementById('filterInput');
+  if (filterInput) {
+    const normalizeAll = (s)=>normalize(String(s||''));
+    filterInput.addEventListener('input', () => {
+      const q = normalizeAll(filterInput.value || '');
+      $$('.card').forEach(card => {
+        const txt = normalizeAll(card.textContent || '');
+        card.style.display = q && !txt.includes(q) ? 'none' : '';
+      });
+    });
+  }
+})();
