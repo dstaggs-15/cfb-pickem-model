@@ -1,6 +1,6 @@
 {
   "season": 2025,
-  "last_build_utc": "2025-10-06T20:57:17.584580",
+  "last_build_utc": "2025-10-13T04:35:40.754625",
   "ranks": [
     {
       "team": "Indiana",
@@ -15,7 +15,7 @@
       "rank": 3
     },
     {
-      "team": "Oklahoma",
+      "team": "Texas Tech",
       "rank": 4
     },
     {
@@ -23,19 +23,19 @@
       "rank": 5
     },
     {
-      "team": "Texas A&M",
+      "team": "Alabama",
       "rank": 6
     },
     {
-      "team": "Alabama",
+      "team": "Texas A&M",
       "rank": 7
     },
     {
-      "team": "Texas Tech",
+      "team": "Georgia",
       "rank": 8
     },
     {
-      "team": "Illinois",
+      "team": "BYU",
       "rank": 9
     },
     {
@@ -43,11 +43,11 @@
       "rank": 10
     },
     {
-      "team": "LSU",
+      "team": "Illinois",
       "rank": 11
     },
     {
-      "team": "Michigan",
+      "team": "Utah",
       "rank": 12
     },
     {
@@ -55,51 +55,51 @@
       "rank": 13
     },
     {
-      "team": "Virginia",
+      "team": "Washington",
       "rank": 14
     },
     {
-      "team": "Georgia",
+      "team": "South Florida",
       "rank": 15
     },
     {
-      "team": "Tennessee",
+      "team": "LSU",
       "rank": 16
     },
     {
-      "team": "Nebraska",
+      "team": "Oklahoma",
       "rank": 17
     },
     {
-      "team": "Washington",
+      "team": "Nebraska",
       "rank": 18
     },
     {
-      "team": "Missouri",
+      "team": "Tennessee",
       "rank": 19
     },
     {
-      "team": "BYU",
+      "team": "Oregon",
       "rank": 20
     },
     {
-      "team": "Oregon",
+      "team": "Virginia",
       "rank": 21
     },
     {
-      "team": "Arizona State",
+      "team": "Louisville",
       "rank": 22
     },
     {
-      "team": "North Texas",
+      "team": "USC",
       "rank": 23
     },
     {
-      "team": "Florida State",
+      "team": "Tulane",
       "rank": 24
     },
     {
-      "team": "Vanderbilt",
+      "team": "North Texas",
       "rank": 25
     }
   ],
@@ -107,27 +107,27 @@
     "Indiana": 1,
     "Ohio State": 2,
     "Miami": 3,
-    "Oklahoma": 4,
+    "Texas Tech": 4,
     "Ole Miss": 5,
-    "Texas A&M": 6,
-    "Alabama": 7,
-    "Texas Tech": 8,
-    "Illinois": 9,
+    "Alabama": 6,
+    "Texas A&M": 7,
+    "Georgia": 8,
+    "BYU": 9,
     "Cincinnati": 10,
-    "LSU": 11,
-    "Michigan": 12,
+    "Illinois": 11,
+    "Utah": 12,
     "Georgia Tech": 13,
-    "Virginia": 14,
-    "Georgia": 15,
-    "Tennessee": 16,
-    "Nebraska": 17,
-    "Washington": 18,
-    "Missouri": 19,
-    "BYU": 20,
-    "Oregon": 21,
-    "Arizona State": 22,
-    "North Texas": 23,
-    "Florida State": 24,
-    "Vanderbilt": 25
+    "Washington": 14,
+    "South Florida": 15,
+    "LSU": 16,
+    "Oklahoma": 17,
+    "Nebraska": 18,
+    "Tennessee": 19,
+    "Oregon": 20,
+    "Virginia": 21,
+    "Louisville": 22,
+    "USC": 23,
+    "Tulane": 24,
+    "North Texas": 25
   }
 }
