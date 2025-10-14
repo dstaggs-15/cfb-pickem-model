@@ -1,4 +1,5 @@
 # scripts/predict.py
+
 from __future__ import annotations
 import argparse, json, re, sys
 from pathlib import Path
@@ -10,8 +11,9 @@ from joblib import load as joblib_load
 
 from .lib.features import create_feature_set
 from .lib.parsing import ensure_schedule_columns
-from .lib import hypo  # <-- NEW
+from .lib import hypo  # used for fallback "hypothetical" mode
 
+# --- Paths ---
 DERIVED_DIR = Path("data/derived")
 RAW_DIR     = Path("data/raw/cfbd")
 DOCS_DATA   = Path("docs/data")
@@ -33,8 +35,15 @@ MANUAL_LINES= INPUT_DIR / "manual_lines.csv"
 MODEL_FILE  = DERIVED_DIR / "model.joblib"
 
 CHUNKSIZE   = 200_000
-DESIRED_SCHED_COLS = ["game_id","season","week","date","home_team","away_team","neutral_site","home_points","away_points","venue_id","venue"]
+DESIRED_SCHED_COLS = [
+    "game_id","season","week","date","home_team","away_team","neutral_site",
+    "home_points","away_points","venue_id","venue"
+]
+
 STOP = {"THE","OF","UNIVERSITY","UNIV","U","STATE","ST","&","AND","AT"}
+
+
+# -------------------- Helpers --------------------
 
 def _canon(s: str) -> str:
     if not isinstance(s, str): return ""
@@ -53,11 +62,13 @@ def _canon(s: str) -> str:
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
+
 def _tokens(s: str) -> List[str]:
     if not isinstance(s, str): return []
     s = _canon(s)
     toks = re.split(r"[^A-Z0-9]+", s)
     return [t for t in toks if t and t not in STOP]
+
 
 def _read_csv(path: Path, usecols: Iterable[str] | None = None) -> pd.DataFrame:
     if not path.exists():
@@ -67,6 +78,7 @@ def _read_csv(path: Path, usecols: Iterable[str] | None = None) -> pd.DataFrame:
     cols = pd.read_csv(path, nrows=0).columns
     keep = [c for c in cols if c in set(usecols)]
     return pd.read_csv(path, usecols=keep, low_memory=False)
+
 
 def _prep_schedule(df: pd.DataFrame) -> pd.DataFrame:
     df = ensure_schedule_columns(df.copy())
@@ -85,14 +97,19 @@ def _prep_schedule(df: pd.DataFrame) -> pd.DataFrame:
     df["away_toks"] = df["away_team"].map(_tokens)
     return df
 
+
 def _extract_pairs_from_text(txt: str) -> List[Tuple[str,str]]:
     pairs: List[Tuple[str,str]] = []
+    # "Away @ Home"
     for m in re.finditer(r"([A-Za-z0-9&.\' \-]+?)\s*@\s*([A-Za-z0-9&.\' \-]+)", txt):
-        pairs.append((m.group(1).strip(), m.group(2).strip()))           # (away, home)
+        pairs.append((m.group(1).strip(), m.group(2).strip()))  # (away, home)
+    # "TeamA vs TeamB" -> treat as (away, home) = (TeamB, TeamA)
     for m in re.finditer(r"([A-Za-z0-9&.\' \-]+?)\s*vs\s*([A-Za-z0-9&.\' \-]+)", txt, flags=re.IGNORECASE):
-        pairs.append((m.group(2).strip(), m.group(1).strip()))           # vs → (away, home)
+        pairs.append((m.group(2).strip(), m.group(1).strip()))
+    # "TeamA, TeamB" -> (away, home) = (TeamB, TeamA)
     for m in re.finditer(r"([A-Za-z0-9&.\' \-]+?)\s*,\s*([A-Za-z0-9&.\' \-]+)", txt):
-        pairs.append((m.group(2).strip(), m.group(1).strip()))           # csv → (away, home)
+        pairs.append((m.group(2).strip(), m.group(1).strip()))
+    # dedupe (case-insensitive)
     seen=set(); out=[]
     for a,h in pairs:
         key=(a.lower(),h.lower())
@@ -100,30 +117,74 @@ def _extract_pairs_from_text(txt: str) -> List[Tuple[str,str]]:
             seen.add(key); out.append((a,h))
     return out
 
+
 def _load_games_list(path: Path) -> List[Tuple[str, str]]:
     if not path.exists(): return []
     return _extract_pairs_from_text(path.read_text())
 
-def _score_match(away_req: List[str], home_req: List[str], away_row: List[str], home_row: List[str]) -> float:
+
+def _score_match(away_req: List[str], home_req: List[str],
+                 away_row: List[str], home_row: List[str]) -> float:
     def jacc(a,b):
-        A,B=set(a),set(b);  return 0.0 if not A or not B else len(A&B)/len(A|B)
+        A,B=set(a),set(b)
+        return 0.0 if not A or not B else len(A&B)/len(A|B)
     return 0.5*(jacc(away_req,away_row)+jacc(home_req,home_row))
 
+
+# >>>>>>>>>>>>>>>>>> FIX APPLIED HERE <<<<<<<<<<<<<<<<<<
 def _best_row_for_pair(pool: pd.DataFrame, away: str, home: str) -> Optional[pd.Series]:
-    away_req=_tokens(away); home_req=_tokens(home)
-    if pool.empty or not away_req or not home_req: return None
+    """
+    Find the best schedule row for (away, home). If the best score hits only when
+    the row is interpreted with swapped teams, return a copy of the row with
+    home/away (and their tokens/points) flipped so downstream logic is correct.
+    """
+    away_req = _tokens(away)
+    home_req = _tokens(home)
+    if pool.empty or not away_req or not home_req:
+        return None
+
     cand = pool[
         pool["home_toks"].apply(lambda t: bool(set(t)&set(home_req)) or bool(set(t)&set(away_req))) &
         pool["away_toks"].apply(lambda t: bool(set(t)&set(home_req)) or bool(set(t)&set(away_req)))
     ]
-    if cand.empty: return None
-    best=None; best_score=-1.0
-    for _,row in cand.iterrows():
-        sc1=_score_match(away_req,home_req,row["away_toks"],row["home_toks"])
-        sc2=_score_match(away_req,home_req,row["home_toks"],row["away_toks"])
-        sc=max(sc1,sc2)
-        if sc>best_score: best_score=sc; best=row
-    return best if best_score>=0.40 else None
+    if cand.empty:
+        return None
+
+    best = None
+    best_score = -1.0
+    best_flip = False
+
+    for _, row in cand.iterrows():
+        sc1 = _score_match(away_req, home_req, row["away_toks"], row["home_toks"])  # (away->away, home->home)
+        sc2 = _score_match(away_req, home_req, row["home_toks"], row["away_toks"])  # swapped
+        if sc1 >= sc2:
+            sc = sc1
+            flip = False
+        else:
+            sc = sc2
+            flip = True
+        if sc > best_score:
+            best_score = sc
+            best = row
+            best_flip = flip
+
+    if best is None or best_score < 0.40:
+        return None
+
+    if best_flip:
+        # Return a flipped copy so "away @ home" matches input orientation
+        r = best.copy()
+        if "home_team" in r and "away_team" in r:
+            r["home_team"], r["away_team"] = r["away_team"], r["home_team"]
+        if "home_points" in r and "away_points" in r:
+            r["home_points"], r["away_points"] = r["away_points"], r["home_points"]
+        if "home_toks" in r and "away_toks" in r:
+            r["home_toks"], r["away_toks"] = r["away_toks"], r["home_toks"]
+        return r
+
+    return best
+# >>>>>>>>>>>>>>>>> END FIX <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
 
 def _stream_filter_by_gids(csv_path: Path, gids: set[str]) -> pd.DataFrame:
     if not csv_path.exists() or not gids:
@@ -136,14 +197,18 @@ def _stream_filter_by_gids(csv_path: Path, gids: set[str]) -> pd.DataFrame:
             gid_col = c; break
     if gid_col is None:
         return pd.DataFrame()
+
     keep=[]
     for chunk in pd.read_csv(csv_path, chunksize=CHUNKSIZE, low_memory=False):
         chunk[gid_col]=chunk[gid_col].astype(str)
         piece = chunk[chunk[gid_col].isin(gids)]
-        if not piece.empty: keep.append(piece)
+        if not piece.empty:
+            keep.append(piece)
     return pd.concat(keep, ignore_index=True) if keep else pd.DataFrame()
 
-# ---------- PREDICT ----------
+
+# -------------------- PREDICT --------------------
+
 def _normal_mode_predict(pairs: List[tuple[str,str]], season: int, week: int) -> tuple[list, dict]:
     """Use the trained model with full features IF schedule rows can be matched."""
     if not MODEL_FILE.exists() or not META_JSON.exists():
@@ -152,7 +217,7 @@ def _normal_mode_predict(pairs: List[tuple[str,str]], season: int, week: int) ->
         return [], {"mode":"NORMAL","error":"missing_schedule_csv"}
 
     model = joblib_load(MODEL_FILE)
-    meta  = json.loads(META_JSON.read_text())
+    meta = json.loads(META_JSON.read_text())
     features: list[str] = meta.get("features", [])
 
     sched_all = _read_csv(SCHED_CSV)
@@ -167,21 +232,24 @@ def _normal_mode_predict(pairs: List[tuple[str,str]], season: int, week: int) ->
         picked=[]
         for away,home in pairs:
             r=_best_row_for_pair(cand,away,home)
-            if r is not None: picked.append(r)
+            if r is not None:
+                picked.append(r)
         return pd.concat(picked,axis=1).T if picked else cand.iloc[0:0].copy()
 
     tried=[]
-    pred_rows = try_week(week);            tried.append({"week":week,"matched":int(len(pred_rows))})
+    pred_rows = try_week(week); tried.append({"week":week,"matched":int(len(pred_rows))})
     if pred_rows.empty:
         for wk in (week-1, week+1):
             if wk>=0:
                 r=try_week(wk); tried.append({"week":wk,"matched":int(len(r))})
-                if not r.empty: pred_rows=r; week=wk; break
+                if not r.empty:
+                    pred_rows=r; week=wk; break
     if pred_rows.empty:
         picked=[]
         for away,home in pairs:
             r=_best_row_for_pair(pool,away,home)
-            if r is not None: picked.append(r)
+            if r is not None:
+                picked.append(r)
         pred_rows = pd.concat(picked,axis=1).T if picked else pool.iloc[0:0].copy()
         tried.append({"week":"ANY","matched":int(len(pred_rows))})
 
@@ -189,11 +257,12 @@ def _normal_mode_predict(pairs: List[tuple[str,str]], season: int, week: int) ->
         return [], {"mode":"NORMAL","tried":tried,"matched":0}
 
     gids=set(pred_rows["game_id"].astype(str).unique())
+
     teams_df  = _read_csv(TEAMS_CSV)
     venues_df = _read_csv(VENUES_CSV)
     talent_df = _read_csv(TALENT_CSV)
     stats_chunk = _stream_filter_by_gids(STATS_CSV, gids)
-    lines_chunk = _stream_filter_by_gids(LINES_CSV,  gids)
+    lines_chunk = _stream_filter_by_gids(LINES_CSV, gids)
 
     X_all, feat_list = create_feature_set(
         schedule=sched_all[sched_all["game_id"].isin(gids)].copy(),
@@ -208,37 +277,49 @@ def _normal_mode_predict(pairs: List[tuple[str,str]], season: int, week: int) ->
 
     Xp = X_all[X_all["game_id"].isin(gids)].copy()
     for c in features:
-        if c not in Xp.columns: Xp[c]=0.0
-    if "neutral_site" not in Xp.columns: Xp["neutral_site"]=False
+        if c not in Xp.columns:
+            Xp[c]=0.0
+    if "neutral_site" not in Xp.columns:
+        Xp["neutral_site"]=False
+
     base=["game_id","home_team","away_team","neutral_site"]
     Xp = Xp[[c for c in base+features if c in Xp.columns]].copy()
 
     probs = model.predict_proba(Xp[features])[:,1]
+
     out=[]
-    for (gid,home,away,ns,p_home) in zip(Xp["game_id"],Xp["home_team"],Xp["away_team"],Xp["neutral_site"],probs):
+    for (gid,home,away,ns,p_home) in zip(
+        Xp["game_id"],Xp["home_team"],Xp["away_team"],Xp["neutral_site"],probs
+    ):
         out.append({
-            "id": str(gid),                          # compat for UI
+            "id": str(gid),               # compat for UI
             "season": int(season),
             "week": int(week),
             "home_team": str(home),
             "away_team": str(away),
             "neutral_site": bool(ns),
             "model_prob_home": float(round(p_home,4)),
-            "prob_home": float(round(p_home,4)),     # compat alias
-            "prob_away": float(round(1.0-p_home,4)), # compat alias
+            "prob_home": float(round(p_home,4)),    # compat alias
+            "prob_away": float(round(1.0-p_home,4)),# compat alias
             "pick": str(home if p_home>=0.5 else away),
             "explanation": []
         })
 
-    dbg={"mode":"NORMAL","season":season,"matched_week":week,"tried":tried,
-         "matched_preview": pred_rows[["home_team","away_team","season","week"]].to_dict(orient="records")}
+    dbg={
+        "mode":"NORMAL",
+        "season":season,
+        "matched_week":week,
+        "tried":tried,
+        "matched_preview": pred_rows[["home_team","away_team","season","week"]].to_dict(orient="records")
+    }
     return out, dbg
+
 
 def _hypothetical_stats_mode(pairs: List[tuple[str,str]], season: int) -> tuple[list, dict]:
     """
     Stats-first hypothetical predictions:
-      - Build team strength from current season blended with last ~20 seasons
-      - Logistic on rating diff + small home edge -> P(home)
+    - Build team strength from current season blended with last ~20 seasons
+    - Logistic on rating diff + small home edge -> P(home)
     """
     strength = hypo.team_strength_table(STATS_CSV, season=season, years_back=20)
     if strength.empty:
@@ -257,77 +338,4 @@ def _hypothetical_stats_mode(pairs: List[tuple[str,str]], season: int) -> tuple[
         ra = float(rating_map.get(away, 0.0))
         home_edge = 0.15
         diff = (rh - ra) + home_edge
-        p_home = 1.0/(1.0+np.exp(-1.5*diff))
-        gid = f"{season}-{home.replace(' ','_')}-vs-{away.replace(' ','_')}-HYP"
-        out.append({
-            "id": gid,                        # synth id so frontend can key on it
-            "season": int(season),            # so UI filters don’t drop it
-            "week": int(0),                   # unknown week; set 0 so UI renders
-            "home_team": home,
-            "away_team": away,
-            "neutral_site": False,
-            "model_prob_home": float(round(p_home,4)),
-            "prob_home": float(round(p_home,4)),     # compat alias
-            "prob_away": float(round(1.0-p_home,4)),
-            "pick": home if p_home>=0.5 else away,
-            "explanation": [
-                "hypothetical_stats_mode",
-                f"rating_home={round(rh,3)}",
-                f"rating_away={round(ra,3)}",
-                f"home_edge={home_edge}"
-            ]
-        })
-
-    dbg={"mode":"HYPOTHETICAL",
-         "season":season,
-         "resolved":resolved[:10]}  # trim to keep debug readable
-    return out, dbg
-
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--week", type=int, required=True)
-    ap.add_argument("--season", type=int, default=None)
-    args = ap.parse_args()
-
-    # Load input pairs
-    pairs = _load_games_list(GAMES_TXT)
-    if not pairs:
-        print(f"{GAMES_TXT} is empty/unparsable. Nothing to do.")
-        DOCS_DATA.mkdir(parents=True, exist_ok=True)
-        with open(PRED_JSON,"w") as f: json.dump({"games":[]}, f, indent=2)
-        with open(DEBUG_JSON,"w") as f: json.dump({"mode":"NONE","error":"no_pairs"}, f, indent=2)
-        return
-
-    # Choose season: if we have schedule, use its max season; else guess 2025
-    season_guess = 2025
-    if SCHED_CSV.exists():
-        try:
-            sched = _read_csv(SCHED_CSV)
-            if not sched.empty and "season" in sched.columns:
-                season_guess = int(pd.to_numeric(sched["season"], errors="coerce").max())
-        except Exception:
-            pass
-
-    season = int(args.season or season_guess)
-    week   = int(args.week)
-    print(f"Predicting season={season}, week={week}")
-
-    # 1) Try normal mode
-    normal_out, normal_dbg = _normal_mode_predict(pairs, season=season, week=week)
-    if normal_out:
-        DOCS_DATA.mkdir(parents=True, exist_ok=True)
-        with open(PRED_JSON,"w") as f: json.dump({"games": normal_out}, f, indent=2)
-        with open(DEBUG_JSON,"w") as f: json.dump(normal_dbg, f, indent=2)
-        print(f"Wrote {len(normal_out)} predictions (normal mode).")
-        return
-
-    print("Normal mode produced 0 games or failed; falling back to stats-based hypothetical mode.")
-    # 2) Hypothetical stats mode (20y + current)
-    hypo_out, hypo_dbg = _hypothetical_stats_mode(pairs, season=season)
-    DOCS_DATA.mkdir(parents=True, exist_ok=True)
-    with open(PRED_JSON,"w") as f: json.dump({"games": hypo_out}, f, indent=2)
-    with open(DEBUG_JSON,"w") as f: json.dump(hypo_dbg, f, indent=2)
-    print(f"Wrote {len(hypo_out)} predictions (hypothetical stats mode).")
-
-if __name__ == "__main__":
-    main()
+       
