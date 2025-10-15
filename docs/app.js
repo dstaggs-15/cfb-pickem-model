@@ -23,7 +23,7 @@
     ["Old Dominion", "James Madison"],
     ["Penn State", "Iowa"],
     ["Missouri", "Auburn"],
-    ["Utah", "BYU"]
+    ["Utah", "BYU"],
     ["Alabama", "Tennessee"]
   ];
   const ONLY_USE_DESIRED = true;
