@@ -9,7 +9,7 @@ on:
         default: "0"
 
 permissions:
-  contents: write   # allow committing back to the repo
+  contents: write
 
 concurrency:
   group: predict
@@ -19,25 +19,25 @@ jobs:
   build-and-predict:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
     steps:
-      - name: Checkout MAIN (not the UI ref)
+      - name: Checkout MAIN branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: main   # <-- force main so we never read a stale branch
+          ref: main
 
-      - name: Git identity
+      - name: Set up Git identity
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Show input slate (prove what we’re reading)
+      - name: Show input slate for debugging
         run: |
           echo "=== docs/input/games.txt ==="
-          sed -n '1,200p' docs/input/games.txt || true
-          echo "=== line count ==="
-          wc -l docs/input/games.txt || true
-          echo "=== current HEAD ==="
+          cat docs/input/games.txt || true
+          echo "============================="
+          echo "Current HEAD:"
           git rev-parse --short HEAD
 
       - name: Set up Python
@@ -45,46 +45,48 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install deps
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Build model & predict
+      # --- FIX: ensure __init__.py exists so imports work ---
+      - name: Ensure Python package init files exist
+        run: |
+          mkdir -p scripts/lib
+          touch scripts/__init__.py
+          touch scripts/lib/__init__.py
+          echo "Package inits created"
+
+      - name: Build model & predict (fixed import)
         env:
           WEEK: ${{ inputs.week }}
         run: |
           set -euo pipefail
-          # Run your pipeline; adjust if your script/flags differ
-          python scripts/predict.py \
+          python -m scripts.predict \
             --input-file docs/input/games.txt \
             --week "${WEEK}" \
             --out-dir docs/data
 
-          # Sanity checks: fail loud if nothing got produced
-          test -s docs/data/predictions.json || (echo "predictions.json missing/empty" && exit 1)
+          # Sanity check
+          test -s docs/data/predictions.json || (echo "ERROR: predictions.json not created" && exit 1)
 
           echo "=== first 40 lines of predictions.json ==="
           head -n 40 docs/data/predictions.json || true
 
-      - name: Commit outputs (with rebase to avoid push rejects)
+      - name: Commit outputs (safe push)
         run: |
           set -euo pipefail
-          git add docs/data/*.json
-          # Also update a build stamp so there is always a diff (helps bust caches)
+          git add docs/data/*.json || true
           date -u +"%Y-%m-%dT%H:%M:%SZ" > docs/data/build-stamp.txt
           git add docs/data/build-stamp.txt
-
-          # If nothing changed, still make an empty commit so deployment moves forward
-          git commit -m "chore(pred): week=${{ inputs.week }} $(date -u +'%Y-%m-%dT%H:%M:%SZ')" || git commit --allow-empty -m "chore(pred): no file diffs; touch build-stamp"
-
-          # Rebase against latest main to prevent non-fast-forward errors
+          git commit -m "chore(pred): week=${{ inputs.week }} $(date -u +'%Y-%m-%dT%H:%M:%SZ')" || git commit --allow-empty -m "chore(pred): rebuild timestamp only"
           git pull --rebase origin main || true
           git push origin HEAD:main
 
-      - name: Final verify
+      - name: Verify output
         run: |
           echo "=== recently committed files ==="
           git show --name-only --oneline -1
-          echo "=== ensure predictions.json references this week's teams ==="
+          echo "=== teams found in predictions.json ==="
           grep -E "Oklahoma|Memphis|Vanderbilt|Iowa State|Washington|Iowa|Fresno State|Cincinnati|LSU|South Dakota State" -n docs/data/predictions.json || true
