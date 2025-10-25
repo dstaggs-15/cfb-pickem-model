@@ -12,54 +12,54 @@
   const RANKS_URL  = 'data/cfbrank.json';
   const cacheBust  = () => `?v=${Date.now()}`;
 
-  // === This week’s 10 (Away, Home) — EXACT ORDER YOU ASKED ===
+  // === This week’s 10 (Away, Home) — EXACT ORDER YOU GAVE ===
   const DESIRED_ORDER = [
-    ["LSU", "Vanderbilt"],
-    ["Georgia Tech", "Duke"],
-    ["Arizona", "Houston"],
-    ["Baylor", "TCU"],
-    ["Oklahoma", "South Carolina"],
-    ["Ole Miss", "Georgia"],
-    ["Old Dominion", "James Madison"],
-    ["Penn State", "Iowa"],
-    ["Missouri", "Auburn"],
-    ["Utah", "BYU"],
-    ["Alabama", "Tennessee"]
+    ["Ole Miss", "Oklahoma"],
+    ["South Florida", "Memphis"],
+    ["Missouri", "Vanderbilt"],
+    ["BYU", "Iowa State"],
+    ["Illinois", "Washington"],
+    ["Minnesota", "Iowa"],
+    ["San Diego", "Fresno State"],       // note: alias maps "San Diego" -> "San Diego State" for robustness
+    ["Baylor", "Cincinnati"],
+    ["Texas A&M", "LSU"],
+    ["North Dakota State", "South Dakota State"]
   ];
   const ONLY_USE_DESIRED = true;
 
-  // Team colors (fallback → hashed color).
+  // Team colors (fallback → hashed color if unknown).
   const TEAM_COLORS = {
-    // New/this week
-    "LSU": "#461D7C",
-    "Vanderbilt": "#866D4B",
-    "Georgia Tech": "#B3A369",
-    "Duke": "#003087",
-    "Arizona": "#AB0520",
-    "Houston": "#C8102E",
-    "Baylor": "#004834",
-    "TCU": "#4D1979",
+    // This week's set (added where missing)
+    "Ole Miss": "#082C5C",               // using Mississippi canonical color; alias maps "Ole Miss" -> "Mississippi" in some data
     "Oklahoma": "#841617",
-    "South Carolina": "#73000A",
-    // Canonical for Ole Miss (aliases map "Ole Miss" -> "Mississippi")
-    "Mississippi": "#082C5C",
-    "Georgia": "#BA0C2F",
-    "Old Dominion": "#003A70",
-    "James Madison": "#450084",
-    "Penn State": "#1E407C",
-    "Iowa": "#FFCD00",
+    "South Florida": "#006747",
+    "Memphis": "#0C1C8C",
     "Missouri": "#F1B82D",
-    "Auburn": "#0C2340",
-    "Utah": "#CC0000",
+    "Vanderbilt": "#866D4B",
     "BYU": "#0D254C",
+    "Iowa State": "#A71930",
+    "Illinois": "#E84A27",
+    "Washington": "#4B2E83",
+    "Minnesota": "#7A0019",
+    "Iowa": "#FFCD00",
+    "San Diego State": "#A6192E",
+    "Fresno State": "#C41230",
+    "Baylor": "#004834",
+    "Cincinnati": "#E00122",
+    "Texas A&M": "#500000",
+    "LSU": "#461D7C",
+    "North Dakota State": "#115740",
+    "South Dakota State": "#005596",
 
     // Existing palette retained
-    "Alabama":"#9E1B32","Arizona State":"#8C1D40","California":"#003262","Colorado":"#CFB87C",
-    "Cincinnati":"#E00122","Florida":"#0021A5","Florida State":"#782F40","Indiana":"#990000",
-    "Iowa State":"#A71930","Kansas":"#0051BA","Kansas State":"#512888","Louisville":"#AD0000",
-    "Maryland":"#E03A3E","Michigan":"#00274C","Nebraska":"#E41C38","Oregon":"#004F27",
-    "Texas":"#BF5700","UCF":"#BA9B37","UNLV":"#CC0000","USC":"#990000",
-    "Washington":"#4B2E83","Wyoming":"#492F24"
+    "Arizona State":"#8C1D40","California":"#003262","Colorado":"#CFB87C",
+    "Florida":"#0021A5","Florida State":"#782F40","Indiana":"#990000",
+    "Kansas":"#0051BA","Kansas State":"#512888","Louisville":"#AD0000",
+    "Maryland":"#E03A3E","Michigan":"#00274C","Nebraska":"#E41C38",
+    "Oregon":"#004F27","Texas":"#BF5700","UCF":"#BA9B37","UNLV":"#CC0000",
+    "USC":"#990000","Washington State":"#981E32","Wyoming":"#492F24",
+    // Keep Mississippi canonical key for aliasing
+    "Mississippi":"#082C5C"
   };
 
   // ---------- helpers ----------
@@ -79,7 +79,8 @@
   // Expanded aliases for robustness
   const ALIASES = new Map([
     ["usc","southern california"],
-    ["ole miss","mississippi"],
+    ["ole miss","mississippi"],          // keep canonical mapping
+    ["usf","south florida"],
     ["ucf","central florida"],
     ["byu","brigham young"],
     ["lsu","louisiana state"],
@@ -95,14 +96,15 @@
     ["bama","alabama"],
     ["mizzou","missouri"],
     ["kansas st.","kansas state"],
-    // New helpful ones this week:
-    ["psu","penn state"],
-    ["penn st","penn state"],
-    ["jmu","james madison"],
-    ["old dominon","old dominion"],      // (typo safety)
-    ["gt","georgia tech"],
-    ["hou","houston"],
-    ["sc","south carolina"]
+
+    // New helpful ones for this slate:
+    ["ill","illinois"],
+    ["wash","washington"],
+    ["minn","minnesota"],
+    ["fresno st","fresno state"],
+    ["san diego","san diego state"],     // treat plain "San Diego" as SDSU for CFB
+    ["ndsu","north dakota state"],
+    ["sdsu","south dakota state"],       // note: ambiguous acronym; using South Dakota State here because it appears this week
   ]);
 
   const normAlias = (s) => {
@@ -256,7 +258,7 @@
   };
 
   games.forEach(g=>{
-    const away = g.away_team;         // <-- AWAY first
+    const away = g.away_team;         // AWAY first
     const home = g.home_team;
 
     const awayColor = teamColor(away);
@@ -272,8 +274,7 @@
     const card = document.createElement('div');
     card.className = 'card';
 
-    // Header chips and "@"
-    // *** FIXED: render AWAY @ HOME (was HOME @ AWAY) ***
+    // Header chips and "@": AWAY @ HOME
     const hdr = document.createElement('div');
     hdr.className = 'row hdr';
     hdr.innerHTML = `
