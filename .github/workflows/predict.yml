@@ -34,11 +34,8 @@ jobs:
 
       - name: Show input slate for debugging
         run: |
-          echo "=== docs/input/games.txt ==="
-          cat docs/input/games.txt || true
-          echo "============================="
-          echo "Current HEAD:"
-          git rev-parse --short HEAD
+          echo "=== docs/input/games.txt ==="; nl -ba docs/input/games.txt || true
+          echo "HEAD: $(git rev-parse --short HEAD)"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -50,15 +47,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # --- FIX: ensure __init__.py exists so imports work ---
+      # Ensure package layout for relative imports
       - name: Ensure Python package init files exist
         run: |
           mkdir -p scripts/lib
           touch scripts/__init__.py
           touch scripts/lib/__init__.py
-          echo "Package inits created"
 
-      - name: Build model & predict (fixed import)
+      # >>> IMPORTANT: blow away stale outputs so the script MUST rewrite them
+      - name: Pre-clean previous outputs
+        run: |
+          rm -f docs/data/predictions.json docs/data/debug_predict.json || true
+
+      - name: Build model & predict
         env:
           WEEK: ${{ inputs.week }}
         run: |
@@ -68,11 +69,24 @@ jobs:
             --week "${WEEK}" \
             --out-dir docs/data
 
-          # Sanity check
           test -s docs/data/predictions.json || (echo "ERROR: predictions.json not created" && exit 1)
 
-          echo "=== first 40 lines of predictions.json ==="
-          head -n 40 docs/data/predictions.json || true
+          echo "=== first 60 lines of predictions.json ==="
+          head -n 60 docs/data/predictions.json || true
+
+      # Hard guardrails: must include NEW teams and must NOT include OLD teams
+      - name: Verify new slate present / old slate absent
+        run: |
+          set -euo pipefail
+          echo "Checking for this week's teams..."
+          grep -qE "Oklahoma|Memphis|Vanderbilt|Iowa State|Washington|Iowa|Fresno State|Cincinnati|LSU|South Dakota State" docs/data/predictions.json \
+            || (echo "New slate not found in predictions.json" && exit 1)
+          echo "Ensuring last week's telltales are gone..."
+          if grep -qE "Duke|Georgia Tech|Vanderbilt\".*,\\s*\"away_team\": \"LSU" docs/data/predictions.json; then
+            echo "Old slate still present; failing."
+            exit 1
+          fi
+          echo "Verification OK."
 
       - name: Commit outputs (safe push)
         run: |
@@ -80,13 +94,10 @@ jobs:
           git add docs/data/*.json || true
           date -u +"%Y-%m-%dT%H:%M:%SZ" > docs/data/build-stamp.txt
           git add docs/data/build-stamp.txt
-          git commit -m "chore(pred): week=${{ inputs.week }} $(date -u +'%Y-%m-%dT%H:%M:%SZ')" || git commit --allow-empty -m "chore(pred): rebuild timestamp only"
+          git commit -m "chore(pred): week=${{ inputs.week }} $(date -u +'%Y-%m-%dT%H:%M:%SZ')" || git commit --allow-empty -m "chore(pred): timestamp only"
           git pull --rebase origin main || true
           git push origin HEAD:main
 
-      - name: Verify output
+      - name: Final verify
         run: |
-          echo "=== recently committed files ==="
           git show --name-only --oneline -1
-          echo "=== teams found in predictions.json ==="
-          grep -E "Oklahoma|Memphis|Vanderbilt|Iowa State|Washington|Iowa|Fresno State|Cincinnati|LSU|South Dakota State" -n docs/data/predictions.json || true
