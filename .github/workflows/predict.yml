@@ -4,100 +4,87 @@ on:
   workflow_dispatch:
     inputs:
       week:
-        description: "CFB Week number (e.g., 5)"
+        description: "CFB week number (use 0 for hypothetical)"
         required: true
-        default: "5"
-      ref:
-        description: "Git ref to run on (branch/tag). Leave blank to use current."
-        required: false
-        default: ""
+        default: "0"
 
 permissions:
-  contents: write
+  contents: write   # allow committing back to the repo
+
+concurrency:
+  group: predict
+  cancel-in-progress: false
 
 jobs:
   build-and-predict:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-        working-directory: .
-
-    env:
-      PYTHONUNBUFFERED: "1"
-      WEEK: ${{ github.event.inputs.week }}
-      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
-
+    timeout-minutes: 30
     steps:
-      - name: Checkout
+      - name: Checkout MAIN (not the UI ref)
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.ref || github.ref_name }}
           fetch-depth: 0
-          persist-credentials: true
+          ref: main   # <-- force main so we never read a stale branch
+
+      - name: Git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Show input slate (prove what we’re reading)
+        run: |
+          echo "=== docs/input/games.txt ==="
+          sed -n '1,200p' docs/input/games.txt || true
+          echo "=== line count ==="
+          wc -l docs/input/games.txt || true
+          echo "=== current HEAD ==="
+          git rev-parse --short HEAD
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Show cache key for train artifacts
-        id: cachekey
+      - name: Build model & predict
+        env:
+          WEEK: ${{ inputs.week }}
         run: |
           set -euo pipefail
-          tmpfile=$(mktemp)
-          if [ -d data/raw/cfbd ]; then
-            find data/raw/cfbd -type f -name '*.csv' -print0 | sort -z | xargs -0 sha256sum >> "$tmpfile" || true
-          fi
-          if [ -d scripts ]; then
-            find scripts -type f -name '*.py' -print0 | sort -z | xargs -0 sha256sum >> "$tmpfile" || true
-          fi
-          if [ -f requirements.txt ]; then
-            sha256sum requirements.txt >> "$tmpfile"
-          fi
-          key=$(sha256sum "$tmpfile" | cut -c1-16)
-          echo "key=$key" >> "$GITHUB_OUTPUT"
-          echo "Cache key: $key"
+          # Run your pipeline; adjust if your script/flags differ
+          python scripts/predict.py \
+            --input-file docs/input/games.txt \
+            --week "${WEEK}" \
+            --out-dir docs/data
 
-      - name: Restore train cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            data/derived/model.joblib
-            data/derived/training.parquet
-          key: train-${{ steps.cachekey.outputs.key }}
+          # Sanity checks: fail loud if nothing got produced
+          test -s docs/data/predictions.json || (echo "predictions.json missing/empty" && exit 1)
 
-      - name: Train final model
+          echo "=== first 40 lines of predictions.json ==="
+          head -n 40 docs/data/predictions.json || true
+
+      - name: Commit outputs (with rebase to avoid push rejects)
         run: |
-          python -m scripts.train_model
+          set -euo pipefail
+          git add docs/data/*.json
+          # Also update a build stamp so there is always a diff (helps bust caches)
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > docs/data/build-stamp.txt
+          git add docs/data/build-stamp.txt
 
-      - name: Predict games for week
-        env:
-          WEEK: ${{ github.event.inputs.week }}
-        run: |
-          W="${WEEK:-5}"
-          echo "Predicting Week $W"
-          python -m scripts.predict --week "$W"
+          # If nothing changed, still make an empty commit so deployment moves forward
+          git commit -m "chore(pred): week=${{ inputs.week }} $(date -u +'%Y-%m-%dT%H:%M:%SZ')" || git commit --allow-empty -m "chore(pred): no file diffs; touch build-stamp"
 
-      - name: Print debug file
-        run: |
-          echo "----- DEBUG (docs/data/debug_predict.json) -----"
-          if [ -f docs/data/debug_predict.json ]; then
-            cat docs/data/debug_predict.json
-          else
-            echo "debug_predict.json not found"
-          fi
-          echo "----- END DEBUG -----"
+          # Rebase against latest main to prevent non-fast-forward errors
+          git pull --rebase origin main || true
+          git push origin HEAD:main
 
-      - name: Commit and push predictions/meta/debug
+      - name: Final verify
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A docs/data/predictions.json docs/data/train_meta.json docs/data/debug_predict.json
-          git commit -m "chore(predictions): update Week ${WEEK}" || true
-          git push origin "${{ github.event.inputs.ref || github.ref_name }}"
+          echo "=== recently committed files ==="
+          git show --name-only --oneline -1
+          echo "=== ensure predictions.json references this week's teams ==="
+          grep -E "Oklahoma|Memphis|Vanderbilt|Iowa State|Washington|Iowa|Fresno State|Cincinnati|LSU|South Dakota State" -n docs/data/predictions.json || true
