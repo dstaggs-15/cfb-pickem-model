@@ -1,6 +1,6 @@
 {
   "season": 2025,
-  "last_build_utc": "2025-10-13T04:35:40.754625",
+  "last_build_utc": "2025-10-20T13:30:06.624219",
   "ranks": [
     {
       "team": "Indiana",
@@ -11,123 +11,123 @@
       "rank": 2
     },
     {
-      "team": "Miami",
+      "team": "Alabama",
       "rank": 3
     },
     {
-      "team": "Texas Tech",
+      "team": "Miami",
       "rank": 4
     },
     {
-      "team": "Ole Miss",
+      "team": "Georgia",
       "rank": 5
     },
     {
-      "team": "Alabama",
+      "team": "Louisville",
       "rank": 6
     },
     {
-      "team": "Texas A&M",
+      "team": "BYU",
       "rank": 7
     },
     {
-      "team": "Georgia",
+      "team": "Texas Tech",
       "rank": 8
     },
     {
-      "team": "BYU",
+      "team": "Georgia Tech",
       "rank": 9
     },
     {
-      "team": "Cincinnati",
+      "team": "Texas A&M",
       "rank": 10
     },
     {
-      "team": "Illinois",
+      "team": "South Florida",
       "rank": 11
     },
     {
-      "team": "Utah",
+      "team": "Ole Miss",
       "rank": 12
     },
     {
-      "team": "Georgia Tech",
+      "team": "Oklahoma",
       "rank": 13
     },
     {
-      "team": "Washington",
+      "team": "Oregon",
       "rank": 14
     },
     {
-      "team": "South Florida",
+      "team": "Cincinnati",
       "rank": 15
     },
     {
-      "team": "LSU",
+      "team": "Virginia",
       "rank": 16
     },
     {
-      "team": "Oklahoma",
+      "team": "Vanderbilt",
       "rank": 17
     },
     {
-      "team": "Nebraska",
+      "team": "Notre Dame",
       "rank": 18
     },
     {
-      "team": "Tennessee",
+      "team": "Illinois",
       "rank": 19
     },
     {
-      "team": "Oregon",
+      "team": "Utah",
       "rank": 20
     },
     {
-      "team": "Virginia",
+      "team": "Michigan",
       "rank": 21
     },
     {
-      "team": "Louisville",
+      "team": "Tulane",
       "rank": 22
     },
     {
-      "team": "USC",
+      "team": "Missouri",
       "rank": 23
     },
     {
-      "team": "Tulane",
+      "team": "Boise State",
       "rank": 24
     },
     {
-      "team": "North Texas",
+      "team": "USC",
       "rank": 25
     }
   ],
   "teams": {
     "Indiana": 1,
     "Ohio State": 2,
-    "Miami": 3,
-    "Texas Tech": 4,
-    "Ole Miss": 5,
-    "Alabama": 6,
-    "Texas A&M": 7,
-    "Georgia": 8,
-    "BYU": 9,
-    "Cincinnati": 10,
-    "Illinois": 11,
-    "Utah": 12,
-    "Georgia Tech": 13,
-    "Washington": 14,
-    "South Florida": 15,
-    "LSU": 16,
-    "Oklahoma": 17,
-    "Nebraska": 18,
-    "Tennessee": 19,
-    "Oregon": 20,
-    "Virginia": 21,
-    "Louisville": 22,
-    "USC": 23,
-    "Tulane": 24,
-    "North Texas": 25
+    "Alabama": 3,
+    "Miami": 4,
+    "Georgia": 5,
+    "Louisville": 6,
+    "BYU": 7,
+    "Texas Tech": 8,
+    "Georgia Tech": 9,
+    "Texas A&M": 10,
+    "South Florida": 11,
+    "Ole Miss": 12,
+    "Oklahoma": 13,
+    "Oregon": 14,
+    "Cincinnati": 15,
+    "Virginia": 16,
+    "Vanderbilt": 17,
+    "Notre Dame": 18,
+    "Illinois": 19,
+    "Utah": 20,
+    "Michigan": 21,
+    "Tulane": 22,
+    "Missouri": 23,
+    "Boise State": 24,
+    "USC": 25
   }
 }
