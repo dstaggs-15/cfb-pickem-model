@@ -12,7 +12,7 @@
   const RANKS_URL  = 'data/cfbrank.json';
   const cacheBust  = () => `?v=${Date.now()}`;
 
-  // === This week’s 10 (Away, Home) — EXACT ORDER YOU GAVE ===
+  // === This week’s (Away, Home) — EXACT ORDER YOU GAVE ===
   const DESIRED_ORDER = [
     ["Ole Miss", "Oklahoma"],
     ["South Florida", "Memphis"],
@@ -20,7 +20,7 @@
     ["BYU", "Iowa State"],
     ["Illinois", "Washington"],
     ["Minnesota", "Iowa"],
-    ["San Diego", "Fresno State"],       // note: alias maps "San Diego" -> "San Diego State" for robustness
+    ["San Diego", "Fresno State"],       // will alias to San Diego State
     ["Baylor", "Cincinnati"],
     ["Texas A&M", "LSU"],
     ["North Dakota State", "South Dakota State"]
@@ -30,7 +30,8 @@
   // Team colors (fallback → hashed color if unknown).
   const TEAM_COLORS = {
     // This week's set (added where missing)
-    "Ole Miss": "#082C5C",               // using Mississippi canonical color; alias maps "Ole Miss" -> "Mississippi" in some data
+    "Ole Miss": "#082C5C",               // canonical color; alias maps to Mississippi when needed
+    "Mississippi": "#082C5C",
     "Oklahoma": "#841617",
     "South Florida": "#006747",
     "Memphis": "#0C1C8C",
@@ -51,15 +52,13 @@
     "North Dakota State": "#115740",
     "South Dakota State": "#005596",
 
-    // Existing palette retained
+    // Common extras retained
     "Arizona State":"#8C1D40","California":"#003262","Colorado":"#CFB87C",
     "Florida":"#0021A5","Florida State":"#782F40","Indiana":"#990000",
     "Kansas":"#0051BA","Kansas State":"#512888","Louisville":"#AD0000",
     "Maryland":"#E03A3E","Michigan":"#00274C","Nebraska":"#E41C38",
     "Oregon":"#004F27","Texas":"#BF5700","UCF":"#BA9B37","UNLV":"#CC0000",
-    "USC":"#990000","Washington State":"#981E32","Wyoming":"#492F24",
-    // Keep Mississippi canonical key for aliasing
-    "Mississippi":"#082C5C"
+    "USC":"#990000","Washington State":"#981E32","Wyoming":"#492F24"
   };
 
   // ---------- helpers ----------
@@ -76,10 +75,10 @@
 
   const stripParens = (s) => String(s||'').replace(/\s*\(.*?\)\s*/g,' ').trim();
 
-  // Expanded aliases for robustness
+  // Aliases for robust matching (no hard-coding of weekly teams beyond generic forms)
   const ALIASES = new Map([
     ["usc","southern california"],
-    ["ole miss","mississippi"],          // keep canonical mapping
+    ["ole miss","mississippi"],
     ["usf","south florida"],
     ["ucf","central florida"],
     ["byu","brigham young"],
@@ -96,15 +95,14 @@
     ["bama","alabama"],
     ["mizzou","missouri"],
     ["kansas st.","kansas state"],
-
-    // New helpful ones for this slate:
+    // This slate:
     ["ill","illinois"],
     ["wash","washington"],
     ["minn","minnesota"],
     ["fresno st","fresno state"],
-    ["san diego","san diego state"],     // treat plain "San Diego" as SDSU for CFB
+    ["san diego","san diego state"],
     ["ndsu","north dakota state"],
-    ["sdsu","south dakota state"],       // note: ambiguous acronym; using South Dakota State here because it appears this week
+    ["sdsu","south dakota state"], // (note: ambiguous acronym; here it's Jackrabbits)
   ]);
 
   const normAlias = (s) => {
@@ -116,12 +114,12 @@
     return n;
   };
 
-  // For ordering by the list you provided (works either orientation)
+  // Build rank map using ALIAS-AWARE keys (fixes "no predictions" issue)
   const RANK = new Map();
-  DESIRED_ORDER.forEach((pair, i) => {
-    const [away, home] = pair;
-    RANK.set(`${normalize(home)}__${normalize(away)}`, i);
-    RANK.set(`${normalize(away)}__${normalize(home)}`, i);
+  DESIRED_ORDER.forEach(([away, home], i) => {
+    const a = normAlias(away), h = normAlias(home);
+    RANK.set(`${h}__${a}`, i);
+    RANK.set(`${a}__${h}`, i);
   });
 
   function pickTextColor(hex){
@@ -152,10 +150,19 @@
     games.forEach((g,i)=>{ seen[`${g.home_team}__${g.away_team}`]={...g,_order:i}; });
     return Object.values(seen).sort((a,b)=>a._order-b._order);
   }
+
   function orderGames(games){
-    const withRank=games.map(g=>({...g,_rank:RANK.get(`${normalize(g.home_team)}__${normalize(g.away_team)}`)??Infinity}));
-    let list=withRank;
-    if(ONLY_USE_DESIRED) list=withRank.filter(g=>g._rank!==Infinity);
+    const withRank = games.map(g => {
+      const key = `${normAlias(g.home_team)}__${normAlias(g.away_team)}`;
+      return { ...g, _rank: RANK.get(key) ?? Infinity };
+    });
+
+    let list = withRank;
+    if (ONLY_USE_DESIRED) {
+      list = withRank.filter(g => g._rank !== Infinity);
+      // Safety fallback so the page never goes blank if keys don't align
+      if (!list.length) list = withRank;
+    }
     return list.sort((a,b)=>(a._rank-b._rank)||(a._order-b._order));
   }
 
