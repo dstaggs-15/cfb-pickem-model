@@ -324,9 +324,26 @@ def _hypothetical_stats_mode(pairs: List[tuple[str,str]], season: int) -> tuple[
     strength = hypo.team_strength_table(STATS_CSV, season=season, years_back=20)
     if strength.empty:
         # No stats at all? hard fail with empty output
-        return [], {"mode":"HYPOTHETICAL","error":"no_stats_loaded"}
-
-    # Resolve names
+         # No stats available; produce fallback predictions using default home edge
+    out = []
+    for away, home in pairs:
+        diff = 0.15  # default home edge
+        p_home = float(1 / (1 + np.exp(-diff)))
+        out.append({
+            "id": f"NA_{home}_{away}",
+            "season": int(season),
+            "week": -1,
+            "home_team": str(home),
+            "away_team": str(away),
+            "neutral_site": False,
+            "model_prob_home": round(p_home, 4),
+            "prob_home": round(p_home, 4),
+            "prob_away": round(1.0 - p_home, 4),
+            "pick": str(home if p_home >= 0.5 else away),
+            "explanation": []
+        })
+       return out, {"mode": "HYPOTHETICAL", "error": "no_stats_loaded", "fallback": True}
+ # Resolve names
     resolved = hypo.resolve_pairs_against_strength(pairs, strength)
     rating_map = strength.set_index("team")["rating"].to_dict()
 
