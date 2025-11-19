@@ -1,184 +1,134 @@
 {
   "games": [
     {
-      "id": "2025-Vanderbilt-vs-LSU-HYP",
+      "id": "2025-Louisville-vs-SMU",
       "season": 2025,
-      "week": 0,
-      "home_team": "Vanderbilt",
-      "away_team": "LSU",
+      "week": 13,
+      "home_team": "Louisville",
+      "away_team": "SMU",
       "neutral_site": false,
-      "model_prob_home": 0.8395,
-      "prob_home": 0.8395,
-      "prob_away": 0.1605,
-      "pick": "Vanderbilt",
-      "explanation": [
-        "hypothetical_stats_mode",
-        "rating_home=1.479",
-        "rating_away=0.526",
-        "home_edge=0.15"
-      ]
+      "model_prob_home": 0.46,
+      "prob_home": 0.46,
+      "prob_away": 0.54,
+      "pick": "SMU",
+      "explanation": []
     },
     {
-      "id": "2025-Duke-vs-Georgia_Tech-HYP",
+      "id": "2025-Missouri-State-vs-Kennesaw-State",
       "season": 2025,
-      "week": 0,
-      "home_team": "Duke",
-      "away_team": "Georgia Tech",
+      "week": 13,
+      "home_team": "Missouri State",
+      "away_team": "Kennesaw State",
       "neutral_site": false,
-      "model_prob_home": 0.4624,
-      "prob_home": 0.4624,
-      "prob_away": 0.5376,
-      "pick": "Georgia Tech",
-      "explanation": [
-        "hypothetical_stats_mode",
-        "rating_home=0.826",
-        "rating_away=1.076",
-        "home_edge=0.15"
-      ]
+      "model_prob_home": 0.15,
+      "prob_home": 0.15,
+      "prob_away": 0.85,
+      "pick": "Kennesaw State",
+      "explanation": []
     },
     {
-      "id": "2025-Houston-vs-Arizona-HYP",
+      "id": "2025-USC-vs-Oregon",
       "season": 2025,
-      "week": 0,
+      "week": 13,
+      "home_team": "Oregon",
+      "away_team": "USC",
+      "neutral_site": false,
+      "model_prob_home": 0.9,
+      "prob_home": 0.9,
+      "prob_away": 0.1,
+      "pick": "Oregon",
+      "explanation": []
+    },
+    {
+      "id": "2025-Jacksonville-State-vs-Florida-International",
+      "season": 2025,
+      "week": 13,
+      "home_team": "Florida International",
+      "away_team": "Jacksonville State",
+      "neutral_site": false,
+      "model_prob_home": 0.09,
+      "prob_home": 0.09,
+      "prob_away": 0.91,
+      "pick": "Jacksonville State",
+      "explanation": []
+    },
+    {
+      "id": "2025-East-Carolina-vs-UTSA",
+      "season": 2025,
+      "week": 13,
+      "home_team": "UTSA",
+      "away_team": "East Carolina",
+      "neutral_site": false,
+      "model_prob_home": 0.09,
+      "prob_home": 0.09,
+      "prob_away": 0.91,
+      "pick": "East Carolina",
+      "explanation": []
+    },
+    {
+      "id": "2025-Southern-Miss-vs-South-Alabama",
+      "season": 2025,
+      "week": 13,
+      "home_team": "South Alabama",
+      "away_team": "Southern Miss",
+      "neutral_site": false,
+      "model_prob_home": 0.04,
+      "prob_home": 0.04,
+      "prob_away": 0.96,
+      "pick": "Southern Miss",
+      "explanation": []
+    },
+    {
+      "id": "2025-TCU-vs-Houston",
+      "season": 2025,
+      "week": 13,
       "home_team": "Houston",
-      "away_team": "Arizona",
+      "away_team": "TCU",
       "neutral_site": false,
-      "model_prob_home": 0.283,
-      "prob_home": 0.283,
-      "prob_away": 0.717,
-      "pick": "Arizona",
-      "explanation": [
-        "hypothetical_stats_mode",
-        "rating_home=-0.178",
-        "rating_away=0.592",
-        "home_edge=0.15"
-      ]
+      "model_prob_home": 0.87,
+      "prob_home": 0.87,
+      "prob_away": 0.13,
+      "pick": "Houston",
+      "explanation": []
     },
     {
-      "id": "2025-TCU-vs-Baylor-HYP",
+      "id": "2025-Pittsburgh-vs-Georgia-Tech",
       "season": 2025,
-      "week": 0,
-      "home_team": "TCU",
-      "away_team": "Baylor",
+      "week": 13,
+      "home_team": "Georgia Tech",
+      "away_team": "Pittsburgh",
       "neutral_site": false,
-      "model_prob_home": 0.518,
-      "prob_home": 0.518,
-      "prob_away": 0.482,
-      "pick": "TCU",
-      "explanation": [
-        "hypothetical_stats_mode",
-        "rating_home=0.816",
-        "rating_away=0.918",
-        "home_edge=0.15"
-      ]
+      "model_prob_home": 0.86,
+      "prob_home": 0.86,
+      "prob_away": 0.14,
+      "pick": "Georgia Tech",
+      "explanation": []
     },
     {
-      "id": "2025-South_Carolina-vs-Oklahoma-HYP",
+      "id": "2025-Tennessee-vs-Florida",
       "season": 2025,
-      "week": 0,
-      "home_team": "South Carolina",
-      "away_team": "Oklahoma",
+      "week": 13,
+      "home_team": "Florida",
+      "away_team": "Tennessee",
       "neutral_site": false,
-      "model_prob_home": 0.3201,
-      "prob_home": 0.3201,
-      "prob_away": 0.6799,
-      "pick": "Oklahoma",
-      "explanation": [
-        "hypothetical_stats_mode",
-        "rating_home=0.138",
-        "rating_away=0.791",
-        "home_edge=0.15"
-      ]
+      "model_prob_home": 0.13,
+      "prob_home": 0.13,
+      "prob_away": 0.87,
+      "pick": "Tennessee",
+      "explanation": []
     },
     {
-      "id": "2025-Georgia-vs-Ole_Miss-HYP",
+      "id": "2025-BYU-vs-Cincinnati",
       "season": 2025,
-      "week": 0,
-      "home_team": "Georgia",
-      "away_team": "Ole Miss",
+      "week": 13,
+      "home_team": "Cincinnati",
+      "away_team": "BYU",
       "neutral_site": false,
-      "model_prob_home": 0.4638,
-      "prob_home": 0.4638,
-      "prob_away": 0.5362,
-      "pick": "Ole Miss",
-      "explanation": [
-        "hypothetical_stats_mode",
-        "rating_home=0.887",
-        "rating_away=1.133",
-        "home_edge=0.15"
-      ]
-    },
-    {
-      "id": "2025-James_Madison-vs-Old_Dominion-HYP",
-      "season": 2025,
-      "week": 0,
-      "home_team": "James Madison",
-      "away_team": "Old Dominion",
-      "neutral_site": false,
-      "model_prob_home": 0.4436,
-      "prob_home": 0.4436,
-      "prob_away": 0.5564,
-      "pick": "Old Dominion",
-      "explanation": [
-        "hypothetical_stats_mode",
-        "rating_home=0.696",
-        "rating_away=0.997",
-        "home_edge=0.15"
-      ]
-    },
-    {
-      "id": "2025-Iowa-vs-Penn_State-HYP",
-      "season": 2025,
-      "week": 0,
-      "home_team": "Iowa",
-      "away_team": "Penn State",
-      "neutral_site": false,
-      "model_prob_home": 0.3818,
-      "prob_home": 0.3818,
-      "prob_away": 0.6182,
-      "pick": "Penn State",
-      "explanation": [
-        "hypothetical_stats_mode",
-        "rating_home=0.487",
-        "rating_away=0.958",
-        "home_edge=0.15"
-      ]
-    },
-    {
-      "id": "2025-Auburn-vs-Missouri-HYP",
-      "season": 2025,
-      "week": 0,
-      "home_team": "Auburn",
-      "away_team": "Missouri",
-      "neutral_site": false,
-      "model_prob_home": 0.337,
-      "prob_home": 0.337,
-      "prob_away": 0.663,
-      "pick": "Missouri",
-      "explanation": [
-        "hypothetical_stats_mode",
-        "rating_home=0.727",
-        "rating_away=1.329",
-        "home_edge=0.15"
-      ]
-    },
-    {
-      "id": "2025-BYU-vs-Utah-HYP",
-      "season": 2025,
-      "week": 0,
-      "home_team": "BYU",
-      "away_team": "Utah",
-      "neutral_site": false,
-      "model_prob_home": 0.5048,
-      "prob_home": 0.5048,
-      "prob_away": 0.4952,
+      "model_prob_home": 0.17,
+      "prob_home": 0.17,
+      "prob_away": 0.83,
       "pick": "BYU",
-      "explanation": [
-        "hypothetical_stats_mode",
-        "rating_home=1.251",
-        "rating_away=1.388",
-        "home_edge=0.15"
-      ]
+      "explanation": []
     }
   ]
 }
