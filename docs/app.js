@@ -14,16 +14,16 @@
 
   // === This week’s (Away, Home) — EXACT ORDER YOU GAVE ===
   const DESIRED_ORDER = [
-    ["Ole Miss", "Oklahoma"],
-    ["South Florida", "Memphis"],
-    ["Missouri", "Vanderbilt"],
-    ["BYU", "Iowa State"],
-    ["Illinois", "Washington"],
-    ["Minnesota", "Iowa"],
-    ["San Diego", "Fresno State"],       // will alias to San Diego State
-    ["Baylor", "Cincinnati"],
-    ["Texas A&M", "LSU"],
-    ["North Dakota State", "South Dakota State"]
+   ["Louisville", "SMU"],
+["Missouri State", "Kennesaw State"],
+["USC", "Oregon"],
+["Jacksonville State", "Florida International"],
+["East Carolina", "UTSA"],
+["Southern Miss", "South Alabama"],
+["TCU", "Houston"],
+["Pittsburgh", "Georgia Tech"],
+["Tennessee", "Florida"],
+["BYU", "Cincinnati"]
   ];
   const ONLY_USE_DESIRED = true;
 
@@ -41,19 +41,33 @@
     "Iowa State": "#A71930",
     "Illinois": "#E84A27",
     "Washington": "#4B2E83",
-    "Minnesota": "#7A0019",
+    "Minnesota": "#7A0019",;
     "Iowa": "#FFCD00",
     "San Diego State": "#A6192E",
     "Fresno State": "#C41230",
     "Baylor": "#004834",
     "Cincinnati": "#E00122",
     "Texas A&M": "#500000",
-    "LSU": "#461D7C",
+      "SMU": "#003D7D",
+    "Missouri State": "#4E0028",
+    "Kennesaw State": "#FFC61E",
+    "Jacksonville State": "#9D2235",
+    "Florida International": "#081E3F",
+    "East Carolina": "#592A8A",
+    "UTSA": "#F47321",
+    "Southern Miss": "#EFB21E",
+    "South Alabama": "#003E7E",
+    "TCU": "#4F2C76",
+    "Houston": "#C5001F",
+    "Pittsburgh": "#003263",
+    "Georgia Tech": "#003057",
+    "Tennessee": ,"#FF8200",
+
     "North Dakota State": "#115740",
     "South Dakota State": "#005596",
 
     // Common extras retained
-    "Arizona State":"#8C1D40","California":"#003262","Colorado":"#CFB87C",
+    "Arizona State":"#8C1D40""California":"#003262","Colorado":"#CFB87C",
     "Florida":"#0021A5","Florida State":"#782F40","Indiana":"#990000",
     "Kansas":"#0051BA","Kansas State":"#512888","Louisville":"#AD0000",
     "Maryland":"#E03A3E","Michigan":"#00274C","Nebraska":"#E41C38",
